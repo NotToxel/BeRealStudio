@@ -155,11 +155,17 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          bun run tauri build --verbose 2>&1 | tee tauri-build.log
+          bun run tauri build --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 1)
 
       - name: Build Tauri Desktop Application (Windows)
         if: runner.os == 'Windows'
-        run: bun run tauri build --verbose *>&1 | Tee-Object -FilePath tauri-build.log
+        run: |
+          bun run tauri build --verbose *>&1 | Tee-Object -FilePath tauri-build.log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "=== BUILD LOG TAIL ==="
+            Get-Content tauri-build.log -Tail 120
+            exit 1
+          }
 
       - name: Upload Build Log
         if: always()
