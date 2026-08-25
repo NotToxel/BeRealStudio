@@ -197,25 +197,38 @@ jobs:
               if (!fs.existsSync(dir)) return results;
               const list = fs.readdirSync(dir, { withFileTypes: true });
               for (const file of list) {
+                if (file.name === 'node_modules' || file.name === '.git' || file.name === '.svelte-kit' || file.name === 'deps' || file.name === 'incremental') continue;
                 const fullPath = path.join(dir, file.name);
                 if (file.isDirectory()) {
                   results = results.concat(findFiles(fullPath, exts));
-                } else if (exts.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()))) {
-                  results.push(fullPath);
+                } else {
+                  const lower = file.name.toLowerCase();
+                  if (exts.some(ext => lower.endsWith(ext))) {
+                    results.push(fullPath);
+                  }
                 }
               }
               return results;
             }
 
-            const bundleDir = path.join(process.env.GITHUB_WORKSPACE, 'src-tauri', 'target', 'release', 'bundle');
-            const exts = ['.dmg', '.deb', '.appimage', '.exe', '.msi', '.tar.gz', '.zip'];
-            const files = findFiles(bundleDir, exts);
+            const searchDirs = [
+              path.join(process.env.GITHUB_WORKSPACE, 'src-tauri', 'target'),
+              path.join(process.env.GITHUB_WORKSPACE, 'target')
+            ];
 
-            console.log(`Found ${files.length} bundle binaries in ${bundleDir}:`);
+            const exts = ['.dmg', '.deb', '.appimage', '.exe', '.msi', '.tar.gz', '.zip'];
+            let files = [];
+            for (const sDir of searchDirs) {
+              if (fs.existsSync(sDir)) {
+                files = files.concat(findFiles(sDir, exts));
+              }
+            }
+
+            console.log(`Found ${files.length} release files:`);
             files.forEach(f => console.log(' - ' + f));
 
             if (files.length === 0) {
-              console.log('No matching bundle files found to upload.');
+              console.log('No matching bundle files found in target directories.');
               return;
             }
 
@@ -225,8 +238,13 @@ jobs:
               tag: resolvedTag
             });
 
+            const uploadedNames = new Set();
+
             for (const filePath of files) {
               const fileName = path.basename(filePath);
+              if (uploadedNames.has(fileName)) continue;
+              uploadedNames.add(fileName);
+
               const fileData = fs.readFileSync(filePath);
 
               const existing = release.data.assets.find(a => a.name === fileName);
