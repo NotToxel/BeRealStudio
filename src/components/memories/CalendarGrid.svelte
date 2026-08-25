@@ -9,15 +9,24 @@
   import DualCameraFrame from './DualCameraFrame.svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import CalendarIcon from 'lucide-svelte/icons/calendar';
   import Grid from 'lucide-svelte/icons/layout-grid';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
 
   const weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  let isPickerOpen = false;
 
   // Parse active month key "YYYY-MM"
   $: yearMonth = $calendarCurrentMonth || ($explorerData?.uniqueMonths[0] ?? '2024-08');
   $: currentYear = parseInt(yearMonth.slice(0, 4), 10);
   $: currentMonthNum = parseInt(yearMonth.slice(5, 7), 10); // 1-12
+
+  // Selected year inside picker popover
+  let pickerYear = currentYear;
+  $: if (currentYear) pickerYear = currentYear;
 
   // Month Title e.g. "August 2024"
   $: monthTitle = (() => {
@@ -39,8 +48,9 @@
     return firstDay === 0 ? 6 : firstDay - 1;
   })();
 
-  // Available months for navigation
+  // Available months & years from dataset
   $: availableMonths = $explorerData?.uniqueMonths ?? [];
+  $: uniqueYears = $explorerData?.uniqueYears ?? [currentYear];
   $: currentMonthIdx = availableMonths.indexOf(yearMonth);
   $: hasPrevMonth = currentMonthIdx > 0;
   $: hasNextMonth = currentMonthIdx < availableMonths.length - 1;
@@ -57,6 +67,19 @@
     }
   }
 
+  function selectMonthFromPicker(mIdx: number) {
+    const targetMonthKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`;
+    calendarCurrentMonth.set(targetMonthKey);
+    isPickerOpen = false;
+  }
+
+  function jumpToLatestMonth() {
+    if (availableMonths.length > 0) {
+      calendarCurrentMonth.set(availableMonths[availableMonths.length - 1]);
+    }
+    isPickerOpen = false;
+  }
+
   function handleDayClick(dayNum: number) {
     const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const posts = $memoriesByDate.get(dateStr);
@@ -67,10 +90,78 @@
 </script>
 
 <div class="calendar-view-container">
-  <!-- Month Switcher Header -->
+  <!-- Month Switcher Header with Rich Picker -->
   <div class="calendar-header-bar">
     <div class="month-title-group">
-      <h2 class="month-title-text">{monthTitle}</h2>
+      <button
+        type="button"
+        class="month-picker-trigger-btn"
+        class:is-active={isPickerOpen}
+        on:click={() => (isPickerOpen = !isPickerOpen)}
+        title="Click to open Month & Year picker"
+        aria-expanded={isPickerOpen}
+      >
+        <CalendarIcon size={16} class="text-sky-400" />
+        <span class="month-title-text">{monthTitle}</span>
+        <ChevronDown size={14} class="picker-chevron {isPickerOpen ? 'rotate-180' : ''}" />
+      </button>
+
+      <!-- Rich Month / Year Popover -->
+      {#if isPickerOpen}
+        <div class="month-picker-popover">
+          <div class="picker-year-row">
+            <button
+              type="button"
+              class="picker-nav-btn"
+              on:click={() => pickerYear--}
+              title="Previous Year"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span class="picker-year-title">{pickerYear}</span>
+            <button
+              type="button"
+              class="picker-nav-btn"
+              on:click={() => pickerYear++}
+              title="Next Year"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          <div class="picker-months-grid">
+            {#each monthNames as mName, mIdx}
+              {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
+              {@const isCurrent = mKey === yearMonth}
+              {@const hasData = availableMonths.includes(mKey)}
+
+              <button
+                type="button"
+                class="picker-month-btn"
+                class:is-selected={isCurrent}
+                class:has-memories={hasData}
+                on:click={() => selectMonthFromPicker(mIdx)}
+              >
+                <span>{mName}</span>
+                {#if hasData}
+                  <span class="month-data-dot"></span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+
+          <div class="picker-footer-row">
+            <button
+              type="button"
+              class="picker-today-btn"
+              on:click={jumpToLatestMonth}
+            >
+              <Sparkles size={12} class="text-amber-400" />
+              <span>Latest Month</span>
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <div class="month-nav-actions">
@@ -84,17 +175,6 @@
       >
         <ChevronLeft size={16} />
       </button>
-
-      {#if availableMonths.length > 1}
-        <select
-          class="month-select-dropdown"
-          bind:value={$calendarCurrentMonth}
-        >
-          {#each availableMonths as mo}
-            <option value={mo}>{mo}</option>
-          {/each}
-        </select>
-      {/if}
 
       <button
         type="button"
@@ -204,19 +284,186 @@
     justify-content: space-between;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border-subtle);
+    position: relative;
+  }
+
+  .month-title-group {
+    position: relative;
+  }
+
+  .month-picker-trigger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: #14141d;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .month-picker-trigger-btn:hover,
+  .month-picker-trigger-btn.is-active {
+    background: #1a1a26;
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.15);
   }
 
   .month-title-text {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 800;
     color: #ffffff;
     letter-spacing: -0.01em;
   }
 
-  .month-nav-actions {
+  :global(.picker-chevron) {
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+  }
+
+  :global(.rotate-180) {
+    transform: rotate(180deg);
+  }
+
+  /* Popover Dialog Matrix */
+  .month-picker-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 260px;
+    background: #101017;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
+    padding: 14px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: popoverScaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes popoverScaleIn {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .picker-year-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .picker-year-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .picker-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    background: #181824;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .picker-nav-btn:hover {
+    background: #242436;
+    border-color: var(--border-medium);
+  }
+
+  .picker-months-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .picker-month-btn {
+    position: relative;
+    padding: 8px 4px;
+    border-radius: var(--radius-sm);
+    background: #151520;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .picker-month-btn:hover {
+    background: #1f1f2e;
+    color: #ffffff;
+  }
+
+  .picker-month-btn.has-memories {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .picker-month-btn.is-selected {
+    background: #38bdf8;
+    color: #09090b;
+    font-weight: 800;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.4);
+  }
+
+  .month-data-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #38bdf8;
+  }
+
+  .picker-month-btn.is-selected .month-data-dot {
+    background: #09090b;
+  }
+
+  .picker-footer-row {
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .picker-today-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: var(--radius-full);
+    transition: all 0.15s ease;
+  }
+
+  .picker-today-btn:hover {
+    color: #ffffff;
+    background: #181824;
   }
 
   .month-nav-btn {
@@ -241,19 +488,6 @@
   .month-nav-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-  }
-
-  .month-select-dropdown {
-    height: 32px;
-    padding: 0 10px;
-    background: #181824;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 600;
-    outline: none;
-    cursor: pointer;
   }
 
   .weekdays-grid {

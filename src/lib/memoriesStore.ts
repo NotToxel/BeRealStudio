@@ -32,18 +32,24 @@ export const calendarCurrentMonth = writable<string>('');
 
 // ─── Derived Filtered Memories Store ──────────────────────────────────────────
 
-export const filteredMemories = derived(
+export const filteredMemories = derived<[typeof explorerData, typeof explorerFilter], ExplorerMemory[]>(
   [explorerData, explorerFilter],
   ([$data, $filter]) => {
     if (!$data || !$data.memories) return [];
 
-    return $data.memories.filter((m) => {
-      // 1. Text search (caption, location, date)
+    return $data.memories.filter((m: ExplorerMemory) => {
+      // 1. Text search (caption, location, city, country, date)
       if ($filter.searchQuery.trim()) {
         const q = $filter.searchQuery.toLowerCase().trim();
-        const captionMatch = m.caption?.toLowerCase().includes(q) ?? false;
-        const locationMatch = m.locationName?.toLowerCase().includes(q) ?? false;
-        const dateMatch = m.dateFormatted.toLowerCase().includes(q);
+        const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
+        const locationMatch =
+          (m.locationName ? m.locationName.toLowerCase().includes(q) : false) ||
+          (m.city ? m.city.toLowerCase().includes(q) : false) ||
+          (m.country ? m.country.toLowerCase().includes(q) : false);
+        const dateMatch =
+          m.dateFormatted.toLowerCase().includes(q) ||
+          m.takenAt.toLowerCase().includes(q) ||
+          m.monthKey.includes(q);
         if (!captionMatch && !locationMatch && !dateMatch) return false;
       }
 
@@ -68,7 +74,7 @@ export const filteredMemories = derived(
       }
 
       // 6. Flags
-      if ($filter.hasLocationOnly && !m.location) return false;
+      if ($filter.hasLocationOnly && !m.location && !m.locationName) return false;
       if ($filter.hasBtsOnly && !m.btsPath) return false;
       if ($filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
       if ($filter.retakesOnly && m.retakeCounter === 0) return false;
@@ -77,6 +83,21 @@ export const filteredMemories = derived(
     });
   }
 );
+
+// Count of currently active filters for clear UI indication
+export const activeFilterCount = derived(explorerFilter, ($f) => {
+  let count = 0;
+  if ($f.searchQuery.trim()) count++;
+  if ($f.selectedYear !== 'all') count++;
+  if ($f.selectedMonth !== 'all') count++;
+  if ($f.selectedCity !== 'all') count++;
+  if ($f.selectedCountry !== 'all') count++;
+  if ($f.hasLocationOnly) count++;
+  if ($f.hasBtsOnly) count++;
+  if ($f.hasCaptionOnly) count++;
+  if ($f.retakesOnly) count++;
+  return count;
+});
 
 // Group filtered memories by month for fast month jumping
 export const memoriesByMonth = derived(filteredMemories, ($memories) => {
@@ -91,11 +112,9 @@ export const memoriesByMonth = derived(filteredMemories, ($memories) => {
 });
 
 // Group memories by date string ("YYYY-MM-DD") for the Calendar day cells
-export const memoriesByDate = derived(explorerData, ($data) => {
+export const memoriesByDate = derived(filteredMemories, ($memories) => {
   const map = new Map<string, ExplorerMemory[]>();
-  if (!$data) return map;
-
-  for (const m of $data.memories) {
+  for (const m of $memories) {
     const dateStr = `${m.year}-${String(m.month).padStart(2, '0')}-${String(m.day).padStart(2, '0')}`;
     if (!map.has(dateStr)) {
       map.set(dateStr, []);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { getSafeImageSrc, getMediaDataUrl } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';
@@ -46,17 +47,22 @@
     swapped = !swapped;
   }
 
-  function toggleBts(e: MouseEvent) {
+  async function toggleBts(e: MouseEvent) {
     if (!btsSrc) return;
     e.stopPropagation();
-    if (btsVideoEl) {
-      if (isPlayingBts) {
-        btsVideoEl.pause();
-        isPlayingBts = false;
-      } else {
-        btsVideoEl.play();
-        isPlayingBts = true;
+    isPlayingBts = !isPlayingBts;
+    if (isPlayingBts) {
+      await tick();
+      if (btsVideoEl) {
+        try {
+          btsVideoEl.currentTime = 0;
+          await btsVideoEl.play();
+        } catch (err) {
+          console.warn('BTS video playback error:', err);
+        }
       }
+    } else if (btsVideoEl) {
+      btsVideoEl.pause();
     }
   }
 
@@ -205,6 +211,7 @@
         class="media-layer base-video"
         autoplay
         loop
+        muted
         playsinline
         on:ended={handleVideoEnded}
       >

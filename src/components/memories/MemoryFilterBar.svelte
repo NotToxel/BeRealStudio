@@ -54,7 +54,7 @@
     <div class="quick-chips-row">
       <button
         type="button"
-        class="filter-chip"
+        class="filter-chip chip-location"
         class:active={$explorerFilter.hasLocationOnly}
         on:click={() => ($explorerFilter.hasLocationOnly = !$explorerFilter.hasLocationOnly)}
       >
@@ -64,7 +64,7 @@
 
       <button
         type="button"
-        class="filter-chip"
+        class="filter-chip chip-bts"
         class:active={$explorerFilter.hasBtsOnly}
         on:click={() => ($explorerFilter.hasBtsOnly = !$explorerFilter.hasBtsOnly)}
       >
@@ -74,7 +74,7 @@
 
       <button
         type="button"
-        class="filter-chip"
+        class="filter-chip chip-captions"
         class:active={$explorerFilter.hasCaptionOnly}
         on:click={() => ($explorerFilter.hasCaptionOnly = !$explorerFilter.hasCaptionOnly)}
       >
@@ -84,7 +84,7 @@
 
       <button
         type="button"
-        class="filter-chip"
+        class="filter-chip chip-retakes"
         class:active={$explorerFilter.retakesOnly}
         on:click={() => ($explorerFilter.retakesOnly = !$explorerFilter.retakesOnly)}
       >
@@ -117,7 +117,10 @@
     </div>
 
     <!-- Count Pill -->
-    <div class="count-pill">
+    <div class="count-pill" class:is-active-filter={isFiltered}>
+      {#if isFiltered}
+        <span class="count-badge-tag">Filtered</span>
+      {/if}
       <span class="count-bold">{countShown}</span>
       <span class="count-total">/ {totalMemories}</span>
     </div>
@@ -287,35 +290,76 @@
   }
 
   .filter-chip.active {
-    background: rgba(255, 230, 0, 0.14);
-    border-color: rgba(255, 230, 0, 0.6);
-    color: #ffe600;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .filter-chip.chip-location.active {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: #10b981;
+    color: #34d399;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.25);
+  }
+
+  .filter-chip.chip-bts.active {
+    background: rgba(245, 158, 11, 0.16);
+    border-color: #f59e0b;
+    color: #fbbf24;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.25);
+  }
+
+  .filter-chip.chip-captions.active {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25);
+  }
+
+  .filter-chip.chip-retakes.active {
+    background: rgba(168, 85, 247, 0.16);
+    border-color: #a855f7;
+    color: #c084fc;
+    box-shadow: 0 2px 10px rgba(168, 85, 247, 0.25);
   }
 
   .filter-chip.advanced-toggle.active {
-    background: rgba(168, 85, 247, 0.14);
-    border-color: rgba(168, 85, 247, 0.6);
-    color: #c084fc;
+    background: rgba(139, 92, 246, 0.18);
+    border-color: #8b5cf6;
+    color: #a78bfa;
+    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.25);
   }
 
-  .filter-chip.reset-chip {
+  .reset-chip {
     background: rgba(244, 63, 94, 0.12);
-    border-color: rgba(244, 63, 94, 0.35);
-    color: #fb7185;
+    border-color: rgba(244, 63, 94, 0.4);
+    color: #fda4af;
+  }
+
+  .reset-chip:hover {
+    background: #f43f5e;
+    color: #ffffff;
+    border-color: #f43f5e;
+    box-shadow: 0 2px 10px rgba(244, 63, 94, 0.4);
   }
 
   .count-pill {
-    display: inline-flex;
-    align-items: baseline;
+    display: flex;
+    align-items: center;
     gap: 4px;
-    padding: 4px 10px;
-    background: #09090d;
+    padding: 5px 12px;
+    background: #181824;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-full);
-    font-size: 11px;
-    color: var(--text-muted);
+    font-size: 11.5px;
     margin-left: auto;
+    transition: all 0.2s ease;
+  }
+
+  .count-pill.is-active-filter {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.2);
   }
 
   .count-bold {
