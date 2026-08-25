@@ -95,9 +95,7 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            name: 'macOS Apple Silicon'
-          - platform: 'macos-13'
-            name: 'macOS Intel'
+            name: 'macOS'
           - platform: 'ubuntu-22.04'
             name: 'Linux x86_64'
           - platform: 'windows-latest'
