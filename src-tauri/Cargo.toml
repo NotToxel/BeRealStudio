@@ -62,6 +62,5 @@ anyhow = "1"
 [profile.release]
 panic = "abort"
 codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true
+lto = "thin"
+opt-level = 3
