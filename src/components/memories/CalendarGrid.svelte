@@ -26,7 +26,7 @@
   $: currentMonthNum = parseInt(yearMonth.slice(5, 7), 10); // 1-12
 
   // Selected year inside picker popover
-  let pickerYear = currentYear;
+  let pickerYear = 2024;
   $: if (currentYear) pickerYear = currentYear;
 
   // Month Title e.g. "August 2024"

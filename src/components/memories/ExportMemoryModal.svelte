@@ -22,14 +22,23 @@
   let exportSuccess = false;
 
   $: state = $exportModalState;
-  $: memory = state.memory;
+  $: memory = state?.memory;
   $: prefs = $exportPreferences;
 
-  let selectedType: ExportPreferences['exportType'] = prefs.exportType || 'combined_pip';
-  let selectedFormat: ExportPreferences['format'] = prefs.format || 'Jpeg';
-  let embedExif = prefs.embedExif ?? true;
-  let embedGps = prefs.embedGps ?? true;
-  let makeDefault = prefs.isDefaultSet ?? false;
+  let selectedType: ExportPreferences['exportType'] = $exportPreferences?.exportType || 'combined_pip';
+  let selectedFormat: ExportPreferences['format'] = $exportPreferences?.format || 'Jpeg';
+  let embedExif = $exportPreferences?.embedExif ?? true;
+  let embedGps = $exportPreferences?.embedGps ?? true;
+  let makeDefault = $exportPreferences?.isDefaultSet ?? false;
+
+  // Sync state when modal is opened
+  $: if (state?.isOpen && $exportPreferences) {
+    selectedType = $exportPreferences.exportType || 'combined_pip';
+    selectedFormat = $exportPreferences.format || 'Jpeg';
+    embedExif = $exportPreferences.embedExif ?? true;
+    embedGps = $exportPreferences.embedGps ?? true;
+    makeDefault = $exportPreferences.isDefaultSet ?? false;
+  }
 
   $: if (memory && !memory.secondaryPath && (selectedType === 'combined_pip' || selectedType === 'combined_sidebyside' || selectedType === 'secondary_only')) {
     selectedType = 'primary_only';
