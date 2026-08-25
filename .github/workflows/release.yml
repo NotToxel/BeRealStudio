@@ -10,7 +10,69 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create-release.outputs.result }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Release Notes and Create GitHub Release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tagName = context.ref.replace('refs/tags/', '');
+            
+            let releaseBody = '';
+            const notesFile = path.join(process.env.GITHUB_WORKSPACE, `docs/RELEASE_NOTES_${tagName}.md`);
+            if (fs.existsSync(notesFile)) {
+              releaseBody = fs.readFileSync(notesFile, 'utf8');
+            } else {
+              releaseBody = `## 🚀 BeReal Studio ${tagName}\n\nOne-click desktop application to browse, composite, and recap BeReal GDPR archives.`;
+            }
+
+            // Check if release already exists
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tagName
+              });
+              if (existing.data) {
+                await github.rest.repos.updateRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: existing.data.id,
+                  name: `BeReal Studio ${tagName}`,
+                  body: releaseBody,
+                  draft: false,
+                  prerelease: false
+                });
+                return existing.data.id;
+              }
+            } catch (e) {
+              // Not found, proceed to create
+            }
+
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tagName,
+              name: `BeReal Studio ${tagName}`,
+              body: releaseBody,
+              draft: false,
+              prerelease: false
+            });
+            return data.id;
+
+  build-tauri:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -53,30 +115,10 @@ jobs:
       - name: Install Frontend Dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build and Upload Artifacts via Tauri Action
+      - name: Build Desktop Application & Upload Bundles
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'BeReal Studio ${{ github.ref_name }}'
-          releaseBody: |
-            ## 🚀 BeReal Studio ${{ github.ref_name }} — The Memories Explorer Release
-
-            BeReal Studio v2.0.0 introduces the **Native BeReal Memories & Calendar Explorer**, bringing the authentic mobile BeReal browsing and post exploration experience directly to your desktop.
-
-            ### 📦 One-Click Platform Installers
-            - 🍏 **macOS**: `BeReal Studio_${{ github.ref_name }}_universal.dmg` (Universal binary for M1/M2/M3/M4 & Intel)
-            - 🪟 **Windows**: `BeReal Studio_${{ github.ref_name }}_x64-setup.exe` (NSIS Installer) and `_en-US.msi`
-            - 🐧 **Linux**: `BeReal Studio_${{ github.ref_name }}_amd64.AppImage` (Universal) and `.deb`
-
-            ### 🌟 Key Highlights
-            - **Native Memories & Calendar Explorer**: Fluid mobile dark UI, segmented toggle `[ Memories | Calendar ]`, and monthly calendar matrix.
-            - **Continuous Vertical Infinite-Scroll Feed**: Seamless whole-archive scrolling with auto-scroll to tapped post and dynamic top date tracking.
-            - **Interactive Dual-Camera Frame & Movable PIP**: Click-to-swap camera perspectives and drag-and-drop selfie PIP to any corner.
-            - **Multi-Dimensional Filter Bar**: Live instant search and dropdown filters by Year, Month, City, and Country.
-            - **Contextual Export Menu**: 1-click PIP, Side-by-Side, single camera exports with full metadata.
-            - **Blazing Fast Engine**: Rayon multi-core processing parses and geocodes 1,000+ posts in under 10ms.
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
