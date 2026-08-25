@@ -882,8 +882,13 @@
         <div class="mockup-frame">
           <div class="mockup-screen">
             <div class="simulated-photo">
-              <!-- Primary Background Camera Badge -->
-              <div class="camera-badge badge-primary" title="Landscape & Environment (Main Camera)">
+              <!-- Primary Background Camera Badge (dynamically positioned to avoid text overlay clipping) -->
+              <div
+                class="camera-badge badge-primary"
+                class:badge-pos-top-right={$recapperConfig.datePosition !== 'TopRight'}
+                class:badge-pos-bottom-left={$recapperConfig.datePosition === 'TopRight'}
+                title="Landscape & Environment (Main Camera)"
+              >
                 <Mountain size={13} class="badge-icon text-sky-300" />
               </div>
 
@@ -895,24 +900,12 @@
                 </div>
               </div>
 
-              <!-- Overlaid Text Elements -->
+              <!-- Overlaid Text Elements with Smooth Layout & Reordering Transitions -->
               <div
                 class="overlay-container pos-{$recapperConfig.datePosition.toLowerCase()}"
-                class:pos-loc-above={$recapperConfig.locationPosition === 'AboveDate'}
-                class:pos-loc-below={$recapperConfig.locationPosition === 'BelowDate'}
+                class:loc-is-above={$recapperConfig.locationPosition === 'AboveDate'}
+                class:loc-is-below={$recapperConfig.locationPosition !== 'AboveDate'}
               >
-                {#if $recapperConfig.locationPosition === 'AboveDate' && $recapperConfig.locationEnabled}
-                  <div
-                    class="live-location-text {currentCssFont}"
-                    style="
-                      font-size: {Math.max(Math.round(previewFontSize * 0.82), 9)}px;
-                      text-shadow: {textShadowCss};
-                    "
-                  >
-                    {sampleLocation}
-                  </div>
-                {/if}
-
                 {#if $recapperConfig.dateEnabled && previewDateStr}
                   <div
                     class="live-date-text {currentCssFont}"
@@ -925,7 +918,7 @@
                   </div>
                 {/if}
 
-                {#if $recapperConfig.locationPosition !== 'AboveDate' && $recapperConfig.locationEnabled}
+                {#if $recapperConfig.locationEnabled}
                   <div
                     class="live-location-text {currentCssFont}"
                     style="
@@ -1448,11 +1441,10 @@
   .preview-sticky-card {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     background: #111116;
-    padding: 16px;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
   }
 
   .preview-action-footer {
@@ -1464,8 +1456,8 @@
   .preview-action-footer .w-full {
     width: 100%;
     justify-content: center;
-    padding: 12px 18px;
-    font-size: 13.5px;
+    padding: 10px 16px;
+    font-size: 13px;
     font-weight: 700;
   }
 
@@ -1491,7 +1483,7 @@
 
   .mockup-frame {
     width: 100%;
-    max-width: 270px;
+    max-width: min(220px, 30vh);
     margin: 0 auto;
     aspect-ratio: 3 / 4;
     background: #000000;
@@ -1545,12 +1537,25 @@
   }
 
   .badge-primary {
-    bottom: 12px;
-    left: 12px;
     padding: 3px 8px;
     font-size: 11px;
     font-weight: 500;
     z-index: 2;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .badge-primary.badge-pos-top-right {
+    top: 14px;
+    right: 14px;
+    bottom: auto;
+    left: auto;
+  }
+
+  .badge-primary.badge-pos-bottom-left {
+    bottom: 14px;
+    left: 14px;
+    top: auto;
+    right: auto;
   }
 
   .badge-secondary {
@@ -1574,59 +1579,92 @@
     border: 1.5px solid #475569;
   }
 
-  /* Overlay text positions */
+  /* Overlay text positions & smooth animated transitions */
   .overlay-container {
     position: absolute;
-    width: 100%;
-    padding: 16px;
+    inset: 0;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     pointer-events: none;
     gap: 4px;
+    z-index: 5;
+    transition: all 0.42s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .overlay-container.pos-bottomcenter {
-    bottom: 12px;
-    left: 0;
+    justify-content: flex-end;
     align-items: center;
     text-align: center;
+    padding-bottom: 14px;
   }
 
   .overlay-container.pos-bottomleft {
-    bottom: 12px;
-    left: 12px;
+    justify-content: flex-end;
     align-items: flex-start;
     text-align: left;
+    padding-bottom: 14px;
+    padding-left: 14px;
   }
 
   .overlay-container.pos-bottomright {
-    bottom: 12px;
-    right: 12px;
+    justify-content: flex-end;
     align-items: flex-end;
     text-align: right;
+    padding-bottom: 14px;
+    padding-right: 14px;
   }
 
   .overlay-container.pos-topright {
-    top: 14px;
-    right: 14px;
-    left: auto;
-    width: auto;
-    max-width: 65%;
+    justify-content: flex-start;
     align-items: flex-end;
     text-align: right;
+    padding-top: 14px;
+    padding-right: 14px;
+    max-width: 70%;
+    left: auto;
+    right: 0;
   }
 
-  .live-date-text, .live-location-text {
+  .live-date-text,
+  .live-location-text {
     color: #ffffff;
     font-weight: 700;
     line-height: 1.15;
     letter-spacing: -0.01em;
     user-select: none;
+    transition: font-size 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.25s ease,
+                text-shadow 0.25s ease;
+    will-change: font-size, transform;
+  }
+
+  .live-date-text {
+    order: 2;
   }
 
   .live-location-text {
+    order: 3;
     font-weight: 500;
     opacity: 0.95;
+  }
+
+  /* Animated stack order reordering */
+  .overlay-container.loc-is-above .live-date-text {
+    order: 2;
+  }
+
+  .overlay-container.loc-is-above .live-location-text {
+    order: 1;
+  }
+
+  .overlay-container.loc-is-below .live-date-text {
+    order: 1;
+  }
+
+  .overlay-container.loc-is-below .live-location-text {
+    order: 2;
   }
 
   /* Visual Screen Position Grid */

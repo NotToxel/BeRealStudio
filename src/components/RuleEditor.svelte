@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition';
   import type { LocationRule } from '$lib/types';
   import { openPath } from '$lib/tauri';
   import Plus from 'lucide-svelte/icons/plus';
@@ -216,7 +217,7 @@
   </button>
 
   {#if isExpanded}
-    <div class="accordion-body">
+    <div class="accordion-body" transition:slide={{ duration: 240 }}>
       <div class="header-actions">
         <span class="priority-note">
           Rules evaluate <strong>top-to-bottom</strong>. The first matching rule applies.

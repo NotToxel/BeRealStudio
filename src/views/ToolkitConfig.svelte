@@ -1259,29 +1259,29 @@
   .preview-action-footer {
     display: flex;
     width: 100%;
-    padding-top: 6px;
+    padding-top: 4px;
   }
 
   .preview-action-footer .w-full {
     width: 100%;
     justify-content: center;
-    padding: 12px 18px;
-    font-size: 13.5px;
+    padding: 10px 16px;
+    font-size: 13px;
     font-weight: 700;
   }
 
   /* ── Right Column / Live Mockup ── */
   .preview-column {
     position: sticky;
-    top: 20px;
+    top: 14px;
   }
 
   .preview-sticky-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
     background: #111115;
-    padding: 18px;
+    padding: 14px 16px;
     border-radius: var(--radius-lg);
     border: 1px solid rgba(255, 230, 0, 0.25);
     box-shadow: 0 8px 32px rgba(255, 230, 0, 0.08);
@@ -1480,7 +1480,7 @@
   /* ── Morphing Stage Canvas ── */
   .mockup-frame {
     width: 100%;
-    max-width: 270px;
+    max-width: min(220px, 28vh);
     margin: 0 auto;
     aspect-ratio: 3 / 4;
     background: #000000;
@@ -1494,7 +1494,7 @@
 
   .mockup-frame.is-sbs {
     aspect-ratio: 3 / 2;
-    max-width: 340px;
+    max-width: min(290px, 32vh);
   }
 
   .morph-stage {
@@ -1638,10 +1638,10 @@
   .preview-info-box {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
     background: #0d0d10;
     border: 1px solid var(--border-subtle);
-    padding: 12px;
+    padding: 8px 10px;
     border-radius: var(--radius-md);
   }
 
@@ -1649,7 +1649,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
   .info-label {
@@ -1659,10 +1659,10 @@
   .feature-tag {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
+    gap: 5px;
+    padding: 2px 6px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 500;
   }
 

@@ -120,7 +120,7 @@ impl Default for RecapperConfig {
             date_range_end: None,
             resolution: (1440, 1920),
             fps: 30,
-            start_padding: 2.0,
+            start_padding: 3.0,
             end_padding: 3.0,
             speed_mode: SpeedMode::Ramp,
             date_enabled: true,

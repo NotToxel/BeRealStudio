@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { APP_DISPLAY_VERSION } from '$lib/version';
   import { currentView, isProcessing, progressState, activeFeature, activityHistory, activeJobs } from '$lib/stores';
   import type { ViewMode } from '$lib/types';
   import Home from 'lucide-svelte/icons/house';
@@ -32,7 +33,7 @@
         </div>
         <div class="brand-text">
           <span class="brand-title">BeReal Studio</span>
-          <span class="brand-ver">v1.2.0</span>
+          <span class="brand-ver">{APP_DISPLAY_VERSION}</span>
         </div>
       </button>
     </div>

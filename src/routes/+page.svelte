@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { currentView, toolkitConfig, recapperConfig } from '$lib/stores';
   import { loadSettings, saveSettings, detectFfmpeg } from '$lib/tauri';
+  import { fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import Home from '../views/Home.svelte';
   import ToolkitConfig from '../views/ToolkitConfig.svelte';
   import RecapperConfig from '../views/RecapperConfig.svelte';
@@ -41,20 +43,31 @@
   }
 </script>
 
-{#if $currentView === 'home'}
-  <Home />
-{:else if $currentView === 'toolkit-config'}
-  <ToolkitConfig />
-{:else if $currentView === 'recapper-config'}
-  <RecapperConfig />
-{:else if $currentView === 'processing'}
-  <Processing />
-{:else if $currentView === 'complete'}
-  <Complete />
-{:else if $currentView === 'activity'}
-  <Activity />
-{:else if $currentView === 'settings'}
-  <Settings />
-{:else if $currentView === 'about'}
-  <About />
-{/if}
+{#key $currentView}
+  <div class="view-transition-stage" in:fly={{ y: 6, duration: 220, easing: cubicOut }}>
+    {#if $currentView === 'home'}
+      <Home />
+    {:else if $currentView === 'toolkit-config'}
+      <ToolkitConfig />
+    {:else if $currentView === 'recapper-config'}
+      <RecapperConfig />
+    {:else if $currentView === 'processing'}
+      <Processing />
+    {:else if $currentView === 'complete'}
+      <Complete />
+    {:else if $currentView === 'activity'}
+      <Activity />
+    {:else if $currentView === 'settings'}
+      <Settings />
+    {:else if $currentView === 'about'}
+      <About />
+    {/if}
+  </div>
+{/key}
+
+<style>
+  .view-transition-stage {
+    width: 100%;
+    height: 100%;
+  }
+</style>

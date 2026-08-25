@@ -155,7 +155,7 @@
     flex: 1;
     font-family: var(--font-mono);
     font-size: 12.5px;
-    transition: all var(--transition-fast);
+    transition: border-color var(--transition-normal), box-shadow var(--transition-normal), background var(--transition-normal);
   }
 
   @keyframes shake {

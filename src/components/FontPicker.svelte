@@ -338,7 +338,18 @@
     color: var(--status-error);
   }
 
-  /* Popover Menu */
+  /* Popover Menu with Smooth Spring Entrance */
+  @keyframes popoverDrop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
   .custom-font-menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -348,11 +359,13 @@
     background: #121218;
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-md);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
     display: flex;
     flex-direction: column;
     max-height: 260px;
     overflow: hidden;
+    animation: popoverDrop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transform-origin: top center;
   }
 
   .menu-search-box {

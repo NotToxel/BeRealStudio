@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { APP_VERSION } from '$lib/version';
   import ShieldCheck from 'lucide-svelte/icons/shield-check';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Layers from 'lucide-svelte/icons/layers';
@@ -15,7 +16,7 @@
       <span class="dot"></span>
     </div>
     <h1 class="title-lg font-bold">BeReal Studio</h1>
-    <span class="version-tag">Version 1.0.0 &bull; Open Source Desktop Suite</span>
+    <span class="version-tag">Version {APP_VERSION} &bull; Open Source Desktop Suite</span>
     <p class="subtitle text-secondary">
       The all-in-one, privacy-first desktop suite to restore, process, composite, and recap your personal BeReal GDPR archives.
     </p>

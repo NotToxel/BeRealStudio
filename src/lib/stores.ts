@@ -39,7 +39,7 @@ export const defaultRecapperConfig: RecapperConfig = {
   dateRangeEnd: undefined,
   resolution: [1440, 1920],
   fps: 30,
-  startPadding: 2.0,
+  startPadding: 3.0,
   endPadding: 3.0,
   speedMode: 'Ramp',
   dateEnabled: true,

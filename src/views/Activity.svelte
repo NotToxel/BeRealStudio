@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide, fade } from 'svelte/transition';
   import {
     currentView,
     activeJobs,
@@ -241,9 +242,9 @@
               </div>
             </div>
 
-            <!-- Expandable Live Terminal Console -->
+            <!-- Expandable Live Terminal Console with Smooth Accordion Transition -->
             {#if expandedLogs[job.id]}
-              <div class="job-logs-console">
+              <div class="job-logs-console" transition:slide={{ duration: 220 }}>
                 <div class="logs-console-head">
                   <span class="logs-console-title font-mono text-xs text-muted">Real-Time Event Stream</span>
                   <span class="badge badge-dark font-mono text-xs">{job.logs.length} events</span>

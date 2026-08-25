@@ -66,27 +66,7 @@
     font-weight: 600;
     padding: 2px 8px;
     border-radius: var(--radius-full);
-  }
-
-  .badge-yellow {
-    background: rgba(255, 230, 0, 0.15);
-    color: #ffe600;
-    border: 1px solid rgba(255, 230, 0, 0.3);
-  }
-  .badge-violet {
-    background: rgba(139, 92, 246, 0.15);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.3);
-  }
-  .badge-emerald {
-    background: rgba(52, 211, 153, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(52, 211, 153, 0.3);
-  }
-  .badge-cyan {
-    background: rgba(56, 189, 248, 0.15);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.3);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .slider-track-container {
@@ -96,6 +76,12 @@
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: border-color 0.2s ease;
+  }
+
+  .slider-track-container:hover {
+    border-color: rgba(255, 255, 255, 0.15);
   }
 
   .slider-fill {
@@ -105,6 +91,7 @@
     height: 100%;
     border-radius: var(--radius-full);
     pointer-events: none;
+    transition: width 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .fill-yellow {

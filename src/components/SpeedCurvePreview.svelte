@@ -71,11 +71,20 @@
   let animFrame: number;
   let animStart: number | null = null;
 
-  // Compute total simulated duration including start & end padding (in relative weight units)
-  // Let photo sequence be approx 8 seconds of normalized motion weight
-  const PHOTO_BASE_DUR = 6.0;
-  $: totalSimDuration = startPadding + PHOTO_BASE_DUR + endPadding;
-  $: animDurationMs = Math.max(3000, Math.min(8000, totalSimDuration * 600));
+  // ─── Proportional Visual Scaling for Hold Periods ─────────────────────────────
+  const PHOTO_BASE_DUR = 7.0;
+  $: totalSimDuration = Math.max(0.1, startPadding + PHOTO_BASE_DUR + endPadding);
+  $: animDurationMs = Math.max(3000, Math.min(8000, totalSimDuration * 650));
+
+  // Visual width percentages for the timeline blocks
+  $: startPct = startPadding > 0 ? (startPadding / totalSimDuration) * 100 : 0;
+  $: endPct = endPadding > 0 ? (endPadding / totalSimDuration) * 100 : 0;
+  $: photoPct = Math.max(10, 100 - startPct - endPct);
+
+  // Normalized time ratios
+  $: startRatio = startPadding / totalSimDuration;
+  $: endRatio = endPadding / totalSimDuration;
+  $: photoRatio = PHOTO_BASE_DUR / totalSimDuration;
 
   function startAnimation() {
     if (!animated) return;
@@ -106,21 +115,16 @@
   $: weights = computeWeights(mode, count);
   $: maxW = Math.max(...weights);
 
-  // Time segment portions [0..1]
-  $: startRatio = totalSimDuration > 0 ? startPadding / totalSimDuration : 0;
-  $: endRatio = totalSimDuration > 0 ? endPadding / totalSimDuration : 0;
-  $: photoRatio = totalSimDuration > 0 ? PHOTO_BASE_DUR / totalSimDuration : 1;
-
-  // Dot position along whole timeline track [0..1]
+  // Precise, smooth dot positioning matching proportional track layout
   $: dotX = (() => {
     if (animProgress < startRatio && startRatio > 0) {
       // In Start Padding Hold
       const t = animProgress / startRatio;
-      return t * 0.14; // start padding area (left 14%)
+      return t * (startPct / 100);
     } else if (animProgress > 1 - endRatio && endRatio > 0) {
       // In End Padding Hold
       const t = (animProgress - (1 - endRatio)) / endRatio;
-      return 0.86 + t * 0.14; // end padding area (right 14%)
+      return (1 - endPct / 100) + t * (endPct / 100);
     } else {
       // In Photo Sequence
       const normProgress = startRatio > 0
@@ -140,8 +144,8 @@
         cum += weights[i];
       }
 
-      const leftBound = startRatio > 0 ? 0.15 : 0;
-      const rightBound = endRatio > 0 ? 0.85 : 1;
+      const leftBound = startPct / 100;
+      const rightBound = 1 - (endPct / 100);
       return leftBound + photoT * (rightBound - leftBound);
     }
   })();
@@ -164,11 +168,11 @@
       <span class="timeline-label">Timeline Pacing &amp; Hold Dynamics:</span>
       <div class="timeline-badges">
         {#if startPadding > 0}
-          <span class="pad-badge pad-start font-mono">Start Hold: {startPadding}s</span>
+          <span class="pad-badge pad-start font-mono">Start Hold: {startPadding.toFixed(1)}s</span>
         {/if}
         <span class="mode-badge font-mono" style="color: {accent};">{mode} Curve</span>
         {#if endPadding > 0}
-          <span class="pad-badge pad-end font-mono">End Hold: {endPadding}s</span>
+          <span class="pad-badge pad-end font-mono">End Hold: {endPadding.toFixed(1)}s</span>
         {/if}
       </div>
     </div>
@@ -178,15 +182,18 @@
       {#if startPadding > 0}
         <div
           class="padding-block start-pad-block"
-          style="width: 14%;"
-          title="Start Hold: {startPadding}s holding first frame"
+          style="width: {startPct.toFixed(1)}%; min-width: {startPct > 15 ? '64px' : '44px'};"
+          title="Start Hold: {startPadding.toFixed(1)}s holding first frame"
         >
-          <span class="pad-block-label">Hold</span>
+          <div class="pad-block-content">
+            <span class="pad-block-tag">START</span>
+            <span class="pad-block-val font-mono">{startPadding.toFixed(1)}s</span>
+          </div>
         </div>
       {/if}
 
       <!-- Main Photo Sequence Bars -->
-      <div class="photo-sequence-track" style="flex: 1;">
+      <div class="photo-sequence-track" style="width: {photoPct.toFixed(1)}%; flex: 1;">
         {#each weights as w, i}
           {@const barH = 6 + (w / maxW) * 16}
           <div
@@ -204,10 +211,13 @@
       {#if endPadding > 0}
         <div
           class="padding-block end-pad-block"
-          style="width: 14%;"
-          title="End Hold: {endPadding}s holding final frame"
+          style="width: {endPct.toFixed(1)}%; min-width: {endPct > 15 ? '64px' : '44px'};"
+          title="End Hold: {endPadding.toFixed(1)}s holding final frame"
         >
-          <span class="pad-block-label">Hold</span>
+          <div class="pad-block-content">
+            <span class="pad-block-tag">END</span>
+            <span class="pad-block-val font-mono">{endPadding.toFixed(1)}s</span>
+          </div>
         </div>
       {/if}
 
@@ -290,6 +300,18 @@
     color: var(--text-secondary);
   }
 
+  .pad-badge.pad-start {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: #7dd3fc;
+  }
+
+  .pad-badge.pad-end {
+    background: rgba(244, 114, 182, 0.12);
+    border: 1px solid rgba(244, 114, 182, 0.25);
+    color: #f472b6;
+  }
+
   .mode-badge {
     font-size: 10.5px;
     font-weight: 600;
@@ -310,21 +332,56 @@
 
   .padding-block {
     height: 24px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px dashed rgba(255, 255, 255, 0.18);
-    border-radius: 2px;
+    border-radius: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
+    position: relative;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+    padding: 0 4px;
+    flex-shrink: 0;
   }
 
-  .pad-block-label {
-    font-size: 9px;
+  .start-pad-block {
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px dashed rgba(56, 189, 248, 0.45);
+  }
+
+  .end-pad-block {
+    background: rgba(244, 114, 182, 0.12);
+    border: 1px dashed rgba(244, 114, 182, 0.45);
+  }
+
+  .pad-block-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .pad-block-tag {
+    font-size: 8px;
     font-family: var(--font-mono);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .start-pad-block .pad-block-tag {
+    color: #38bdf8;
+  }
+
+  .end-pad-block .pad-block-tag {
+    color: #f472b6;
+  }
+
+  .pad-block-val {
+    font-size: 9px;
+    font-weight: 600;
+    color: #ffffff;
   }
 
   .photo-sequence-track {
@@ -332,12 +389,14 @@
     align-items: flex-end;
     gap: 2px;
     height: 100%;
+    min-width: 60px;
+    transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .slot-bar {
     flex: 1;
     border-radius: 2px 2px 0 0;
-    transition: background 0.08s;
+    transition: background 0.08s, height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     min-width: 0;
   }
 

@@ -265,8 +265,12 @@
     position: relative;
     cursor: pointer;
     flex-shrink: 0;
-    transition: all var(--transition-fast);
+    transition: background 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1);
     outline: none;
+  }
+
+  .switch-btn:hover:not(:disabled) {
+    border-color: var(--border-focus);
   }
 
   .thumb {
@@ -275,7 +279,7 @@
     height: 18px;
     background: #a1a1aa;
     border-radius: 50%;
-    transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.22s ease, box-shadow 0.22s ease;
     transform: translateX(0);
   }
 
