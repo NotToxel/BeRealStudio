@@ -352,6 +352,12 @@ export interface ExplorerFilterState {
   hasLocationOnly: boolean;
   hasBtsOnly: boolean;
   hasCaptionOnly: boolean;
-  retakesOnly: boolean;
+}
+
+export interface MemoryHeaderSettings {
+  showLocation: boolean;
+  locationFormat: 'city_country' | 'suburb_city_country' | 'suburb_city' | 'city_only' | 'full';
+  showTimeTag: boolean;
+  timeTagFormat: 'time_only' | 'date_only' | 'late_duration' | 'datetime';
 }
 

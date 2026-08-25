@@ -13,7 +13,6 @@ export const initialFilterState: ExplorerFilterState = {
   hasLocationOnly: false,
   hasBtsOnly: false,
   hasCaptionOnly: false,
-  retakesOnly: false,
 };
 
 // ─── Core Stores ──────────────────────────────────────────────────────────────
@@ -115,7 +114,6 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
       if ($filter.hasLocationOnly && !m.location && !m.locationName) return false;
       if ($filter.hasBtsOnly && !m.btsPath) return false;
       if ($filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
-      if ($filter.retakesOnly && m.retakeCounter === 0) return false;
 
       return true;
     });
@@ -134,7 +132,6 @@ export const activeFilterCount = derived(explorerFilter, ($f) => {
   if ($f.hasLocationOnly) count++;
   if ($f.hasBtsOnly) count++;
   if ($f.hasCaptionOnly) count++;
-  if ($f.retakesOnly) count++;
   return count;
 });
 
@@ -380,4 +377,70 @@ export function closeExportModal() {
     isOpen: false,
     memory: null,
   });
+}
+
+// ─── Header Display Customization Settings ────────────────────────────────────
+import type { MemoryHeaderSettings } from './types';
+
+export const defaultMemoryHeaderSettings: MemoryHeaderSettings = {
+  showLocation: true,
+  locationFormat: 'city_country',
+  showTimeTag: true,
+  timeTagFormat: 'time_only',
+};
+
+function loadMemoryHeaderSettings(): MemoryHeaderSettings {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_header_settings');
+      if (saved) return { ...defaultMemoryHeaderSettings, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...defaultMemoryHeaderSettings };
+}
+
+export const memoryHeaderSettings = writable<MemoryHeaderSettings>(loadMemoryHeaderSettings());
+
+if (typeof window !== 'undefined') {
+  memoryHeaderSettings.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_header_settings', JSON.stringify(val));
+    } catch {}
+  });
+}
+
+export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
+  if (!settings.showLocation) return '';
+
+  if (settings.locationFormat === 'city_country') {
+    if (memory.city && memory.country) return `${memory.city}, ${memory.country}`;
+    if (memory.city) return memory.city;
+    if (memory.country) return memory.country;
+  } else if (settings.locationFormat === 'suburb_city_country') {
+    const parts = [memory.suburb, memory.city, memory.country].filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+  } else if (settings.locationFormat === 'suburb_city') {
+    const parts = [memory.suburb, memory.city].filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+  } else if (settings.locationFormat === 'city_only') {
+    if (memory.city) return memory.city;
+  }
+
+  return memory.locationName || '';
+}
+
+export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
+  if (!settings.showTimeTag) return '';
+
+  if (settings.timeTagFormat === 'late_duration' && memory.lateDuration) {
+    return memory.lateDuration;
+  }
+  if (settings.timeTagFormat === 'date_only') {
+    return memory.dateFormatted;
+  }
+  if (settings.timeTagFormat === 'datetime') {
+    return `${memory.dateFormatted} • ${memory.timeFormatted}`;
+  }
+
+  return memory.timeFormatted;
 }

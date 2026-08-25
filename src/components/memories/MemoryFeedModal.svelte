@@ -7,6 +7,9 @@
     explorerData,
     openExportModal,
     exportPreferences,
+    memoryHeaderSettings,
+    formatMemoryLocation,
+    formatMemoryTimeTag,
   } from '$lib/memoriesStore';
   import { exportSingleMemory } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
@@ -157,6 +160,9 @@
         on:scroll={handleScroll}
       >
         {#each $filteredMemories as memory (memory.id)}
+          {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
+          {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
+
           <article
             id="feed-item-{memory.id}"
             class="feed-post-card"
@@ -176,16 +182,21 @@
               <div class="user-meta-column">
                 <div class="user-name-row">
                   <span class="user-name">{userName}</span>
-                  {#if userFullname}
-                    <span class="user-fullname">• {userFullname}</span>
-                  {/if}
                 </div>
-                <div class="post-time-row">
-                  <span class="date-badge">{memory.dateFormatted}</span>
-                  <span class="separator">•</span>
-                  <Clock size={11} class="text-muted" />
-                  <span class="time-text">{memory.timeFormatted}</span>
-                </div>
+
+                {#if locText || timeText}
+                  <div class="user-subtitle-row">
+                    {#if locText}
+                      <span class="location-text">{locText}</span>
+                    {/if}
+                    {#if locText && timeText}
+                      <span class="subtitle-bullet">•</span>
+                    {/if}
+                    {#if timeText}
+                      <span class="time-text">{timeText}</span>
+                    {/if}
+                  </div>
+                {/if}
               </div>
 
               <div class="post-header-actions">
@@ -415,32 +426,35 @@
   }
 
   .user-name {
-    font-size: 13.5px;
+    font-size: 15px;
     font-weight: 700;
     color: #ffffff;
+    letter-spacing: -0.01em;
   }
 
-  .user-fullname {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .post-time-row {
+  .user-subtitle-row {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    color: var(--text-muted);
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a1a1aa;
+    line-height: 1.3;
   }
 
-  .date-badge {
-    color: #ffffff;
-    font-weight: 600;
+  .location-text {
+    color: #d4d4d8;
+    font-weight: 500;
   }
 
-  .separator {
-    color: var(--text-muted);
-    opacity: 0.5;
+  .subtitle-bullet {
+    color: #71717a;
+    font-size: 10px;
+  }
+
+  .time-text {
+    color: #a1a1aa;
+    font-weight: 400;
   }
 
   .post-header-actions {

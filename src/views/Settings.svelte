@@ -42,6 +42,10 @@
   import Database from 'lucide-svelte/icons/database';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Camera from 'lucide-svelte/icons/camera';
+  import Eye from 'lucide-svelte/icons/eye';
+  import Clock from 'lucide-svelte/icons/clock';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import { memoryHeaderSettings } from '$lib/memoriesStore';
 
   let statusMessage = '';
   let isSuccessStatus = true;
@@ -569,11 +573,139 @@
       {/if}
     </div>
 
-    <!-- 3. Local Storage & Privacy Management -->
+    <!-- 3. Memories & Feed Display Settings -->
+    <div class="card section-card">
+      <div class="card-head">
+        <div class="head-title">
+          <Eye size={18} class="text-sky-400" />
+          <h2 class="title-sm">3. Memories &amp; Feed Header Customization</h2>
+        </div>
+        <span class="badge badge-sky font-mono text-xs">Feed View</span>
+      </div>
+
+      <p class="text-secondary text-desc">
+        Customize how location and time information are formatted directly above photos in the Memories viewer, matching authentic BeReal design.
+      </p>
+
+      <div class="settings-grid-2col">
+        <!-- Location Display Toggle & Format -->
+        <div class="setting-item-box">
+          <div class="setting-item-header">
+            <MapPin size={15} class="text-emerald-400" />
+            <span class="font-bold text-white text-sm">Location Display</span>
+          </div>
+
+          <label class="toggle-control-row">
+            <input
+              type="checkbox"
+              bind:checked={$memoryHeaderSettings.showLocation}
+            />
+            <span class="text-xs text-secondary">Show location above photos in feed</span>
+          </label>
+
+          {#if $memoryHeaderSettings.showLocation}
+            <div class="setting-select-wrap">
+              <label class="text-xs text-muted" for="location-format-select">Format</label>
+              <select
+                id="location-format-select"
+                class="setting-dropdown-select"
+                bind:value={$memoryHeaderSettings.locationFormat}
+              >
+                <option value="city_country">City, Country (e.g. Constanța, Romania)</option>
+                <option value="suburb_city_country">Suburb, City, Country (e.g. Soho, London, UK)</option>
+                <option value="suburb_city">Suburb, City (e.g. Soho, London)</option>
+                <option value="city_only">City Only (e.g. London)</option>
+                <option value="full">Full Geocoded Address</option>
+              </select>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Time & Late Tag Toggle & Format -->
+        <div class="setting-item-box">
+          <div class="setting-item-header">
+            <Clock size={15} class="text-amber-400" />
+            <span class="font-bold text-white text-sm">Time / Date Subtitle</span>
+          </div>
+
+          <label class="toggle-control-row">
+            <input
+              type="checkbox"
+              bind:checked={$memoryHeaderSettings.showTimeTag}
+            />
+            <span class="text-xs text-secondary">Show timestamp / late tag next to location</span>
+          </label>
+
+          {#if $memoryHeaderSettings.showTimeTag}
+            <div class="setting-select-wrap">
+              <label class="text-xs text-muted" for="time-format-select">Format</label>
+              <select
+                id="time-format-select"
+                class="setting-dropdown-select"
+                bind:value={$memoryHeaderSettings.timeTagFormat}
+              >
+                <option value="time_only">Time Only (e.g. 14:20)</option>
+                <option value="late_duration">Late Tag if late (e.g. 3h late or 3h ago)</option>
+                <option value="date_only">Date Only (e.g. 25 August 2024)</option>
+                <option value="datetime">Date &amp; Time (e.g. 25 Aug 2024 • 14:20)</option>
+              </select>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Live Header Preview -->
+      <div class="header-live-preview-box">
+        <span class="preview-box-label">LIVE HEADER PREVIEW</span>
+        <div class="preview-header-row">
+          <div class="preview-avatar">
+            <span>C</span>
+          </div>
+          <div class="preview-text-col">
+            <span class="preview-username">cold.lin</span>
+            <div class="preview-subtitle">
+              {#if $memoryHeaderSettings.showLocation}
+                <span class="preview-loc">
+                  {#if $memoryHeaderSettings.locationFormat === 'city_country'}
+                    Constanța, Romania
+                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city_country'}
+                    Tomis Nord, Constanța, Romania
+                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city'}
+                    Tomis Nord, Constanța
+                  {:else if $memoryHeaderSettings.locationFormat === 'city_only'}
+                    Constanța
+                  {:else}
+                    Constanța, Romania
+                  {/if}
+                </span>
+              {/if}
+              {#if $memoryHeaderSettings.showLocation && $memoryHeaderSettings.showTimeTag}
+                <span class="preview-bullet">•</span>
+              {/if}
+              {#if $memoryHeaderSettings.showTimeTag}
+                <span class="preview-time">
+                  {#if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
+                    3h ago
+                  {:else if $memoryHeaderSettings.timeTagFormat === 'date_only'}
+                    25 August 2024
+                  {:else if $memoryHeaderSettings.timeTagFormat === 'datetime'}
+                    25 Aug 2024 • 14:20
+                  {:else}
+                    14:20
+                  {/if}
+                </span>
+              {/if}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Local Storage & Privacy Management -->
     <div class="card section-card">
       <div class="head-title">
         <ShieldCheck size={18} class="text-emerald-400" />
-        <h2 class="title-sm">3. Local Storage &amp; Factory Reset</h2>
+        <h2 class="title-sm">4. Local Storage &amp; Factory Reset</h2>
       </div>
 
       <p class="text-secondary text-desc">
@@ -859,6 +991,136 @@
     border-radius: 999px;
     box-shadow: 0 0 10px rgba(255, 230, 0, 0.5);
     transition: width 0.15s ease;
+  }
+
+  /* Memories Header Settings Styles */
+  .settings-grid-2col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .setting-item-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #09090e;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px;
+  }
+
+  .setting-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .toggle-control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .setting-select-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .setting-dropdown-select {
+    height: 34px;
+    background: #14141d;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    color: #ffffff;
+    padding: 0 10px;
+    font-size: 12.5px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .setting-dropdown-select:focus {
+    border-color: #38bdf8;
+  }
+
+  .header-live-preview-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #09090d;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    position: relative;
+  }
+
+  .preview-box-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .preview-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #000000;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .preview-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .preview-text-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .preview-username {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+  }
+
+  .preview-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: #a1a1aa;
+    font-weight: 500;
+  }
+
+  .preview-loc {
+    color: #d4d4d8;
+  }
+
+  .preview-bullet {
+    color: #71717a;
+    font-size: 10px;
+  }
+
+  .preview-time {
+    color: #a1a1aa;
   }
 
   /* Modal Backdrop */
