@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ACTIONS_NODE_DEPRECATION_WARNING: 'false'
+
 jobs:
   create-release:
     permissions:
