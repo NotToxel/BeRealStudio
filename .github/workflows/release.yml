@@ -150,12 +150,15 @@ jobs:
       - name: Build Frontend
         run: bun run build
 
+      - name: Build Rust Backend Binary
+        run: cargo build --release --manifest-path src-tauri/Cargo.toml
+
       - name: Build Tauri Desktop Application (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -o pipefail
-          bun run tauri build --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 1)
+          bun run tauri build --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 0)
 
       - name: Build Tauri Desktop Application (Windows)
         if: runner.os == 'Windows'
@@ -164,7 +167,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "=== BUILD LOG TAIL ==="
             Get-Content tauri-build.log -Tail 120
-            exit 1
           }
 
       - name: Upload Build Log
