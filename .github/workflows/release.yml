@@ -118,6 +118,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri"
+          key: ${{ matrix.platform }}-v2
 
       - name: Install Linux system dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
