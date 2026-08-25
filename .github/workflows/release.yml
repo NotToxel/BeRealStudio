@@ -171,41 +171,37 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/release-artifacts"
           
-          # 1. Package Linux binaries
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            if [ -f "src-tauri/target/release/bereal-studio" ]; then
-              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
-              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
-              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-Linux-x86_64"
+          # Find and copy all installer packages
+          echo "=== Scanning for release files in src-tauri/target/ ==="
+          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.msi" -o -name "*.exe" \) | while read -r f; do
+            echo "Found bundle: $f"
+            cp "$f" "$GITHUB_WORKSPACE/release-artifacts/"
+          done
+
+          # Check for compiled standalone binaries
+          for bin in "src-tauri/target/release/bereal-studio" "src-tauri/target/release/BeReal Studio" "src-tauri/target/release/bereal_studio"; do
+            if [ -f "$bin" ]; then
+              echo "Found standalone binary: $bin"
+              if [ "${{ runner.os }}" = "Linux" ]; then
+                cp "$bin" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+                chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+                tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-Linux-x86_64"
+              elif [ "${{ runner.os }}" = "macOS" ]; then
+                cp "$bin" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+                chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+                tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-macOS-arm64"
+              fi
             fi
+          done
+
+          # Package macOS .app directory into tarball if present
+          if [ -d "src-tauri/target/release/bundle/macos" ]; then
+            cd src-tauri/target/release/bundle/macos
+            tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS.app.tar.gz" *.app 2>/dev/null || true
+            cd -
           fi
 
-          # 2. Package macOS binaries
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            if [ -f "src-tauri/target/release/bereal-studio" ]; then
-              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
-              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
-              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-macOS-arm64"
-            fi
-            if [ -d "src-tauri/target/release/bundle/macos" ]; then
-              cd src-tauri/target/release/bundle/macos
-              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS.app.tar.gz" *.app 2>/dev/null || true
-              cd -
-            fi
-          fi
-
-          # 3. Package Windows binaries
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            if [ -f "src-tauri/target/release/bereal-studio.exe" ]; then
-              cp "src-tauri/target/release/bereal-studio.exe" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Windows-x64.exe"
-            fi
-          fi
-
-          # 4. Copy all generated installer packages (.dmg, .deb, .AppImage, .msi, .exe)
-          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.msi" \) -exec cp {} "$GITHUB_WORKSPACE/release-artifacts/" \; 2>/dev/null || true
-          find src-tauri/target/release/bundle/ -type f \( -name "*.exe" \) -exec cp {} "$GITHUB_WORKSPACE/release-artifacts/" \; 2>/dev/null || true
-
-          echo "=== Staged files in release-artifacts/ ==="
+          echo "=== Final files in release-artifacts/ ==="
           ls -la "$GITHUB_WORKSPACE/release-artifacts/"
 
       - name: Upload Release Binaries
