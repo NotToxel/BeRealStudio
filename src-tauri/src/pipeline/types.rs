@@ -43,6 +43,15 @@ pub struct Location {
     pub longitude: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DestinationStatus {
+    pub exists: bool,
+    pub is_directory: bool,
+    pub is_file: bool,
+    pub file_count: usize,
+}
+
 // ─── Processing Configuration ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +117,8 @@ pub struct RecapperConfig {
     pub location_offset: (i32, i32),
     pub location_rules: Vec<LocationRule>,
     pub geocoding_mode: GeocodingMode,
+    pub min_duration_secs: Option<f64>,
+    pub max_duration_secs: Option<f64>,
 }
 
 impl Default for RecapperConfig {
@@ -141,6 +152,8 @@ impl Default for RecapperConfig {
                 },
             ],
             geocoding_mode: GeocodingMode::Online,
+            min_duration_secs: None,
+            max_duration_secs: None,
         }
     }
 }
@@ -209,11 +222,77 @@ pub struct LocationRule {
     pub format: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleCondition {
     Default,
     Match(HashMap<String, String>),
+}
+
+impl<'de> serde::Deserialize<'de> for RuleCondition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct RuleConditionVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for RuleConditionVisitor {
+            type Value = RuleCondition;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string 'Default'/'default', null, or a map of conditions")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v.eq_ignore_ascii_case("default") {
+                    Ok(RuleCondition::Default)
+                } else {
+                    Err(serde::de::Error::custom(format!("unexpected rule condition string: {}", v)))
+                }
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(RuleCondition::Default)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(RuleCondition::Default)
+            }
+
+            fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                let mut map = HashMap::new();
+                while let Some((k, v)) = access.next_entry()? {
+                    map.insert(k, v);
+                }
+                Ok(RuleCondition::Match(map))
+            }
+        }
+
+        deserializer.deserialize_any(RuleConditionVisitor)
+    }
+}
+
+impl serde::Serialize for RuleCondition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            RuleCondition::Default => serializer.serialize_str("Default"),
+            RuleCondition::Match(map) => map.serialize(serializer),
+        }
+    }
 }
 
 // ─── Archive Scan Results ────────────────────────────────────────────────────

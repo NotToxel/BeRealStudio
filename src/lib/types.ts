@@ -16,7 +16,7 @@ export interface ActivityRecord {
   outputPath: string;
   inputPath: string;
   durationSecs: number;
-  status: 'success' | 'warning' | 'error';
+  status: 'success' | 'warning' | 'error' | 'cancelled';
   itemCount: number;
   memoriesCount?: number;
   dateRange?: string;
@@ -85,6 +85,8 @@ export interface RecapperConfig {
   locationOffset: [number, number];
   locationRules: LocationRule[];
   geocodingMode: GeocodingMode;
+  minDurationSecs: number;
+  maxDurationSecs: number;
 }
 
 export interface MonthCount {
@@ -253,4 +255,11 @@ export interface AudioAnalysis {
   sampleRate: number;
   channels: number;
   waveform: number[];
+}
+
+export interface DestinationStatus {
+  exists: boolean;
+  isDirectory: boolean;
+  isFile: boolean;
+  fileCount: number;
 }

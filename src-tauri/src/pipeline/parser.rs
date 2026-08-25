@@ -458,8 +458,82 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
     let posts_json_path = match posts_json_res {
         Ok(p) => p,
         Err(_) => {
+            // Check if this directory is an image folder (e.g. Toolkit export output folder with images)
+            let images = crate::pipeline::date_filter::filter_images_by_date(base_dir, None, None).unwrap_or_default();
+            if !images.is_empty() {
+                let mut histogram_map: HashMap<String, usize> = HashMap::new();
+                let mut earliest: Option<DateTime<Utc>> = None;
+                let mut latest: Option<DateTime<Utc>> = None;
+
+                for img in &images {
+                    if let Some(dt) = crate::pipeline::date_filter::extract_date_from_path(img) {
+                        let month_key = dt.format("%Y-%m").to_string();
+                        *histogram_map.entry(month_key).or_insert(0) += 1;
+
+                        if earliest.is_none() || Some(dt) < earliest {
+                            earliest = Some(dt);
+                        }
+                        if latest.is_none() || Some(dt) > latest {
+                            latest = Some(dt);
+                        }
+                    }
+                }
+
+                let mut months: Vec<String> = histogram_map.keys().cloned().collect();
+                months.sort();
+
+                let monthly_histogram = months
+                    .into_iter()
+                    .map(|month| {
+                        let count = histogram_map.get(&month).copied().unwrap_or(0) as u32;
+                        MonthCount {
+                            month,
+                            count,
+                        }
+                    })
+                    .collect();
+
+                let earliest_date = earliest.map(|d| d.format("%Y-%m-%d").to_string());
+                let latest_date = latest.map(|d| d.format("%Y-%m-%d").to_string());
+
+                return Ok(ArchiveInfo {
+                    is_valid: true,
+                    archive_type: "ImageFolder".into(),
+                    entry_count: images.len(),
+                    valid_post_count: images.len(),
+                    corrupted_post_count: 0,
+                    total_media_count: images.len(),
+                    found_media_count: images.len(),
+                    missing_media_count: 0,
+                    missing_files_sample: Vec::new(),
+                    earliest_date,
+                    latest_date,
+                    primary_photo_count: images.len(),
+                    secondary_photo_count: 0,
+                    primary_video_count: 0,
+                    secondary_video_count: 0,
+                    bts_count: 0,
+                    with_location_count: 0,
+                    with_caption_count: 0,
+                    retake_stats: None,
+                    has_posts_json: false,
+                    has_photos_dir: false,
+                    has_user_json: false,
+                    has_videos: false,
+                    has_bts: false,
+                    monthly_histogram,
+                    validation_errors: Vec::new(),
+                    warnings: Vec::new(),
+                    posts_json_path: String::new(),
+                    media_base_path: base_dir.to_string_lossy().to_string(),
+                    user_name: None,
+                    user_fullname: None,
+                    profile_picture_data_url: None,
+                });
+            }
+
             validation_errors.push(format!(
-                "Missing 'posts.json': Could not find posts.json in '{}'. Make sure you selected the unzipped BeReal export folder.",
+                "Missing 'posts.json': Could not find posts.json or photos in '{}'. Make sure you selected a valid BeReal export or photos folder.",
                 base_dir.display()
             ));
             let has_photos = base_dir.join("Photos").exists() || base_dir.join("photos").exists();

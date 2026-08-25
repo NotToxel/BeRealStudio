@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import {
     currentView,
     toolkitConfig,
+    toolkitResult,
     archiveMetadata,
     lastScannedArchivePath,
     isProcessing,
@@ -25,7 +27,10 @@
     onToolkitLog,
     onJobProgress,
     onJobLog,
+    checkDestinationStatus,
+    checkToolkitConflicts,
   } from '$lib/tauri';
+  import Modal from '$components/Modal.svelte';
   import FolderArchive from 'lucide-svelte/icons/folder-archive';
   import Sliders from 'lucide-svelte/icons/sliders';
   import Layers from 'lucide-svelte/icons/layers';
@@ -221,19 +226,19 @@
   $: isArchiveValid = Boolean($archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.entryCount > 0);
   $: isConfigValid = Boolean($toolkitConfig.inputPath && $toolkitConfig.outputPath && isArchiveValid && !scanning);
 
-  async function handleStart() {
-    missingInputPath = !$toolkitConfig.inputPath;
-    missingOutputPath = !$toolkitConfig.outputPath;
+  let showOverwriteModal = false;
+  let overwriteFileCount = 0;
 
-    if (!isConfigValid) {
-      if (!isArchiveValid && $archiveMetadata) {
-        activeError.set({
-          title: 'Invalid BeReal Export',
-          message: 'The selected archive cannot be processed because it is missing essential required BeReal data.',
-          details: $archiveMetadata.validationErrors.join('\n') || 'No valid post memories found in archive.',
-        });
-        return;
-      }
+  async function handleStartProcessing() {
+    missingInputPath = !$toolkitConfig.inputPath || $toolkitConfig.inputPath.trim() === '';
+    missingOutputPath = !$toolkitConfig.outputPath || $toolkitConfig.outputPath.trim() === '';
+
+    if (missingInputPath || missingOutputPath) {
+      activeError.set({
+        title: 'Missing Required Folder Paths',
+        message:
+          'Please specify both the BeReal GDPR source folder and the destination export directory before starting.',
+      });
 
       const firstMissingId = missingInputPath
         ? 'toolkit-input-path'
@@ -248,14 +253,29 @@
       return;
     }
 
+    try {
+      const destStatus = await checkToolkitConflicts($toolkitConfig);
+      if (destStatus.exists && destStatus.fileCount > 0) {
+        overwriteFileCount = destStatus.fileCount;
+        showOverwriteModal = true;
+        return;
+      }
+    } catch (e) {
+      console.warn('Toolkit conflict check error:', e);
+    }
+
+    executeToolkitStart();
+  }
+
+  async function executeToolkitStart() {
+    showOverwriteModal = false;
     const targetCount = selectedMemoriesCount || $archiveMetadata?.entryCount || 0;
-    const finalOutputPath = disambiguateOutputPath($toolkitConfig.outputPath, $activeJobs);
-    $toolkitConfig.outputPath = finalOutputPath;
+    const finalOutputPath = $toolkitConfig.outputPath;
 
     // Create unique Active Job for parallel execution
     const job = createActiveJob({
       type: 'toolkit',
-      title: `Photo Processing (${targetCount} Memories)`,
+      title: 'Photo Processing',
       inputPath: $toolkitConfig.inputPath,
       outputPath: finalOutputPath,
       memoriesCount: targetCount,
@@ -285,9 +305,10 @@
     startToolkit($toolkitConfig, job.id)
       .then((res) => {
         completeActiveJob(job.id, res);
+        toolkitResult.set(res);
         recordActivity({
           type: 'toolkit',
-          title: `Photo Processing (${res.entriesProcessed} Memories)`,
+          title: 'Photo Processing',
           outputPath: finalOutputPath,
           inputPath: $toolkitConfig.inputPath,
           durationSecs: res.durationSecs,
@@ -297,6 +318,9 @@
           dateRange: dateRangeLabel,
           details: `${dateRangeLabel} • Processed in ${res.durationSecs.toFixed(1)}s`,
         });
+        if (get(currentView) === 'processing') {
+          currentView.set('complete');
+        }
       })
       .catch((e: any) => {
         errorActiveJob(job.id, String(e));
@@ -305,6 +329,9 @@
           message: 'An error occurred during BeReal photo processing.',
           details: String(e),
         });
+        if (get(currentView) === 'processing') {
+          currentView.set('toolkit-config');
+        }
       })
       .finally(() => {
         isProcessing.set(false);
@@ -978,7 +1005,7 @@
             type="button"
             class="btn btn-accent-yellow btn-lg w-full"
             class:btn-disabled-look={!isConfigValid}
-            on:click={handleStart}
+            on:click={handleStartProcessing}
           >
             <Play size={16} fill="currentColor" />
             <span>Start Processing Archive &rarr;</span>
@@ -988,6 +1015,42 @@
     </div>
   </div>
 </div>
+
+<!-- Overwrite Confirmation Modal -->
+<Modal
+  bind:open={showOverwriteModal}
+  title="Overwrite Existing Export?"
+  maxWidth="460px"
+>
+  <div class="overwrite-modal-content">
+    <div class="overwrite-modal-icon-wrap">
+      <AlertTriangle size={26} class="text-amber-400" />
+    </div>
+    <div class="overwrite-modal-text">
+      <p class="text-white font-semibold">
+        The destination folder already contains <strong class="text-amber-400 font-mono">{overwriteFileCount}</strong> existing files:
+      </p>
+      <p class="text-secondary text-xs font-mono path-preview-box">
+        {$toolkitConfig.outputPath}
+      </p>
+      <p class="text-muted text-xs">
+        Would you like to overwrite and replace existing files with this new export?
+      </p>
+    </div>
+  </div>
+
+  <svelte:fragment slot="footer">
+    <div class="modal-actions-row">
+      <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showOverwriteModal = false)}>
+        Cancel
+      </button>
+      <button type="button" class="btn btn-accent-yellow btn-sm" on:click={executeToolkitStart}>
+        <Repeat size={14} />
+        <span>Overwrite Existing Files</span>
+      </button>
+    </div>
+  </svelte:fragment>
+</Modal>
 
 <style>
   .config-view {
@@ -2164,6 +2227,48 @@
     color: var(--text-secondary);
     font-weight: 500;
     text-align: center;
+  }
+
+  .overwrite-modal-content {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .overwrite-modal-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .overwrite-modal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .path-preview-box {
+    background: #09090d;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    word-break: break-all;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .modal-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 100%;
   }
 
   @media (max-width: 900px) {

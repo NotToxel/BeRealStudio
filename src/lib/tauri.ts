@@ -16,6 +16,7 @@ import type {
   DownloadProgressEvent,
   AudioAnalysis,
   ActivityRecord,
+  DestinationStatus,
 } from './types';
 
 export function isTauri(): boolean {
@@ -41,6 +42,10 @@ export async function extractZip(zipPath: string, destDir: string): Promise<stri
 // Processing
 export async function startToolkit(config: ToolkitConfig, jobId?: string): Promise<ProcessingResult> {
   return await safeInvoke<ProcessingResult>('start_toolkit', { config, jobId });
+}
+
+export async function checkToolkitConflicts(config: ToolkitConfig): Promise<DestinationStatus> {
+  return await safeInvoke<DestinationStatus>('check_toolkit_conflicts', { config });
 }
 
 export async function cancelToolkit(): Promise<void> {
@@ -107,6 +112,10 @@ export async function checkFfmpeg(): Promise<string> {
   return await safeInvoke<string>('check_ffmpeg');
 }
 
+export async function checkExiftool(): Promise<string> {
+  return await safeInvoke<string>('check_exiftool');
+}
+
 export async function detectFfmpeg(): Promise<string | null> {
   ffmpegInfo.update((s) => ({ ...s, checking: true }));
   try {
@@ -123,6 +132,10 @@ export async function listSystemFonts(): Promise<FontInfo[]> {
   return await safeInvoke<FontInfo[]>('list_system_fonts');
 }
 
+export async function checkDestinationStatus(path: string): Promise<DestinationStatus> {
+  return await safeInvoke<DestinationStatus>('check_destination_status', { path });
+}
+
 // Debug logs
 export async function exportDebugLog(outputPath: string): Promise<string> {
   return await safeInvoke<string>('export_debug_log', { outputPath });
@@ -134,6 +147,10 @@ export async function getDebugLogs(): Promise<LogEvent[]> {
 
 export async function clearDebugLogs(): Promise<void> {
   return await safeInvoke<void>('clear_debug_logs');
+}
+
+export async function cleanupCancelledOutput(path: string): Promise<void> {
+  return await safeInvoke<void>('cleanup_cancelled_output', { path });
 }
 
 // File / Folder Pickers

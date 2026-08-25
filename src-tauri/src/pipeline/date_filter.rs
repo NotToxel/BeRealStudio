@@ -120,7 +120,7 @@ fn parse_date_bound(s: &str, is_end: bool) -> Option<DateTime<Utc>> {
 }
 
 /// Try to extract a DateTime from a filename like "2024-03-15T14-30-00_primary.jpg".
-fn extract_date_from_path(path: &Path) -> Option<DateTime<Utc>> {
+pub fn extract_date_from_path(path: &Path) -> Option<DateTime<Utc>> {
     let stem = path.file_stem()?.to_str()?;
     // Take the first 19 chars: "2024-03-15T14-30-00"
     if stem.len() < 19 {

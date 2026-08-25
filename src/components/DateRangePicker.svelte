@@ -53,19 +53,75 @@
     return true;
   }
 
-  // Reactively calculate selected entries count from histogram
-  $: {
-    if (!startDate && !endDate) {
-      selectedCount = totalCount;
-    } else if (histogram.length > 0) {
-      const count = histogram
-        .filter((h) => isMonthInRange(h.month))
-        .reduce((sum, h) => sum + h.count, 0);
-      selectedCount = count;
-    } else {
-      selectedCount = totalCount;
+  // Precise day-level memory count calculator that dynamically updates with slider dragging
+  function computeSelectedCount(
+    hist: MonthCount[],
+    start: string,
+    end: string,
+    total: number,
+    minD: string,
+    maxD: string
+  ): number {
+    if (!start && !end) return total;
+    if (minD && maxD && start <= minD && end >= maxD) return total;
+    if (hist.length === 0) return total;
+
+    const sDate = start ? new Date(start) : (minD ? new Date(minD) : new Date(`${hist[0].month}-01`));
+    const eDate = end ? new Date(end) : (maxD ? new Date(maxD) : new Date());
+
+    const sTime = sDate.getTime();
+    const eTime = eDate.getTime();
+
+    if (isNaN(sTime) || isNaN(eTime) || sTime > eTime) {
+      return total;
     }
+
+    let calculated = 0;
+
+    for (const h of hist) {
+      const parts = h.month.split('-');
+      if (parts.length < 2) continue;
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const totalDays = new Date(y, m, 0).getDate();
+
+      const mStart = new Date(y, m - 1, 1).getTime();
+      const mEnd = new Date(y, m - 1, totalDays).getTime();
+
+      // Check overlap
+      if (eTime < mStart || sTime > mEnd) {
+        // Month completely outside range
+        continue;
+      }
+
+      if (sTime <= mStart && eTime >= mEnd) {
+        // Month completely inside range
+        calculated += h.count;
+        continue;
+      }
+
+      // Month partially overlaps
+      const overlapStart = Math.max(sTime, mStart);
+      const overlapEnd = Math.min(eTime, mEnd);
+
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const overlapDays = Math.max(1, Math.round((overlapEnd - overlapStart) / msPerDay) + 1);
+      const fraction = Math.min(1, overlapDays / totalDays);
+      calculated += Math.round(fraction * h.count);
+    }
+
+    return Math.max(0, Math.min(calculated, total));
   }
+
+  // Reactively calculate selected entries count from histogram with continuous day-level precision
+  $: selectedCount = computeSelectedCount(
+    histogram,
+    startDate,
+    endDate,
+    totalCount,
+    normalizedMinDate,
+    normalizedMaxDate
+  );
 
   // ─── Smooth Curve Math (Monotone Spline / Catmull-Rom) ───────────────────────
 
@@ -1136,11 +1192,14 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+    row-gap: 10px;
+    width: 100%;
   }
 
   .title-group {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
@@ -1149,16 +1208,19 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
+    max-width: 100%;
   }
 
   .presets {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 3px;
     background: #0d0d12;
     padding: 3px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-subtle);
+    max-width: 100%;
   }
 
   .preset-btn {

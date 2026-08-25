@@ -60,6 +60,8 @@ export const defaultRecapperConfig: RecapperConfig = {
     },
   ],
   geocodingMode: 'Online',
+  minDurationSecs: 0,
+  maxDurationSecs: 0,
 };
 
 // Navigation & Active Mode
@@ -140,6 +142,8 @@ export const progressState = writable<ProgressEvent>({
 });
 export const liveLogs = writable<LogEvent[]>([]);
 export const processingResult = writable<ProcessingResult | null>(null);
+export const toolkitResult = writable<ProcessingResult | null>(null);
+export const recapperResult = writable<ProcessingResult | null>(null);
 
 // ─── Parallel Multi-Job Active Queue ─────────────────────────────────────────
 export const activeJobs = writable<ActiveJob[]>([]);
@@ -324,6 +328,10 @@ if (typeof window !== 'undefined') {
 }
 
 export function recordActivity(entry: Omit<ActivityRecord, 'id' | 'timestamp'>) {
+  // If task was cancelled and produced 0 files/memories, do not pollute generation history
+  if (entry.status === 'cancelled' && (!entry.itemCount || entry.itemCount === 0) && (!entry.memoriesCount || entry.memoriesCount === 0)) {
+    return;
+  }
   const newRecord: ActivityRecord = {
     ...entry,
     id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,

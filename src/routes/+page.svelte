@@ -13,7 +13,34 @@
   import Activity from '../views/Activity.svelte';
   import About from '../views/About.svelte';
 
+  let isHydrated = false;
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function persistSettingsNow() {
+    if (!isHydrated || !$toolkitConfig || !$recapperConfig) return;
+    const payload = {
+      toolkit: $toolkitConfig,
+      recapper: $recapperConfig,
+      lastInputPath: $toolkitConfig.inputPath,
+      lastOutputPath: $toolkitConfig.outputPath,
+    };
+    saveSettings(payload).catch(() => {});
+    try {
+      localStorage.setItem('bereal_studio_live_settings', JSON.stringify(payload));
+    } catch {}
+  }
+
   onMount(async () => {
+    // Immediate hydration from fast browser storage
+    try {
+      const cached = localStorage.getItem('bereal_studio_live_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.toolkit) toolkitConfig.update((c) => ({ ...c, ...parsed.toolkit }));
+        if (parsed.recapper) recapperConfig.update((c) => ({ ...c, ...parsed.recapper }));
+      }
+    } catch {}
+
     // Register native dual-layer disk persistence for activity history
     registerNativeActivitySync(saveActivityHistory, clearNativeActivityHistory);
 
@@ -30,6 +57,8 @@
       }
     } catch (e) {
       console.warn('Could not load native settings:', e);
+    } finally {
+      isHydrated = true;
     }
 
     // Hydrate native activity history from disk if available
@@ -66,18 +95,16 @@
     }
   });
 
-  // Auto-save settings on config changes
-  $: {
-    if ($toolkitConfig && $recapperConfig) {
-      saveSettings({
-        toolkit: $toolkitConfig,
-        recapper: $recapperConfig,
-        lastInputPath: $toolkitConfig.inputPath,
-        lastOutputPath: $toolkitConfig.outputPath,
-      }).catch(() => {});
-    }
+  // Continuous auto-save whenever any option, slider, toggle, or field changes
+  $: if (isHydrated && $toolkitConfig && $recapperConfig) {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      persistSettingsNow();
+    }, 200);
   }
 </script>
+
+<svelte:window on:beforeunload={persistSettingsNow} />
 
 {#key $currentView}
   <div class="view-transition-stage" in:fly={{ y: 6, duration: 220, easing: cubicOut }}>

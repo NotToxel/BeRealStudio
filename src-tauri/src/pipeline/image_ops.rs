@@ -82,7 +82,7 @@ pub fn combine_pip(primary_path: &Path, secondary_path: &Path) -> Result<Dynamic
     let new_sw = ((sw as f32 * PIP_SCALE) as u32).max(1);
     let new_sh = ((sh as f32 * PIP_SCALE) as u32).max(1);
     let secondary_resized = secondary
-        .resize_exact(new_sw, new_sh, image::imageops::FilterType::Lanczos3)
+        .resize_exact(new_sw, new_sh, image::imageops::FilterType::Triangle)
         .to_rgba8();
 
     // Create rounded mask for secondary
@@ -145,7 +145,7 @@ pub fn combine_side_by_side(primary_path: &Path, secondary_path: &Path) -> Resul
     // Scale secondary to same height as primary
     let new_sw = (sw.saturating_mul(target_h) / sh.max(1)).max(1);
     let secondary_resized = secondary
-        .resize_exact(new_sw, target_h, image::imageops::FilterType::Lanczos3)
+        .resize_exact(new_sw, target_h, image::imageops::FilterType::Triangle)
         .to_rgb8();
     let primary_rgb = primary.to_rgb8();
 

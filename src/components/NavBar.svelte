@@ -350,6 +350,12 @@
     box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
   }
 
+  .bg-queue-pill.multi-jobs {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(168, 85, 247, 0.18));
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.2);
+  }
+
   .queue-text {
     display: flex;
     align-items: center;

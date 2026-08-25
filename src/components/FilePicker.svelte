@@ -15,6 +15,7 @@
   export let disabled: boolean = false;
   export let isMissing: boolean = false;
   export let id: string = '';
+  export let accentColor: 'yellow' | 'purple' = 'yellow';
 
   async function handleBrowse(folderMode: boolean = isDirectory) {
     if (disabled) return;
@@ -36,7 +37,7 @@
   }
 </script>
 
-<div {id} class="picker-group" class:has-missing-error={isMissing}>
+<div {id} class="picker-group theme-{accentColor}" class:has-missing-error={isMissing}>
   <div class="header">
     <label class="label" for={id ? `${id}-input` : 'path-input'}>{label}</label>
     {#if isMissing}
@@ -93,9 +94,9 @@
         {disabled}
       >
         {#if isDirectory}
-          <FolderOpen size={14} class="text-amber-400" />
+          <FolderOpen size={14} class={accentColor === 'purple' ? 'text-purple-400' : 'text-amber-400'} />
         {:else}
-          <FileCode size={14} class="text-sky-400" />
+          <FileCode size={14} class={accentColor === 'purple' ? 'text-purple-400' : 'text-sky-400'} />
         {/if}
         <span>Browse</span>
       </button>
@@ -128,6 +129,15 @@
     font-size: 11px;
     color: var(--status-warning);
     font-weight: 600;
+  }
+
+  .theme-purple .required-tag {
+    color: #c084fc;
+  }
+
+  .theme-purple .input-text:focus {
+    border-color: rgba(168, 85, 247, 0.65) !important;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15) !important;
   }
 
   .missing-alert-tag {

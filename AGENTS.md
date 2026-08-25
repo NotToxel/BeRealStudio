@@ -31,7 +31,7 @@ BeRealStudio/
 │   ├── views/                              # Primary Application Views
 │   │   ├── Home.svelte                     # Main dashboard with hero & feature cards
 │   │   ├── ToolkitConfig.svelte            # Photo processing configuration view
-│   │   ├── RecapperConfig.svelte           # Recap video configuration view with live 9:16 preview
+│   │   ├── RecapperConfig.svelte           # Recap video configuration view with live preview
 │   │   ├── Processing.svelte               # Real-time progress & live streaming log view
 │   │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
 │   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & reset

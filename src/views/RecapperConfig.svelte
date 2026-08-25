@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import {
     currentView,
     toolkitConfig,
     recapperConfig,
+    recapperResult,
     isProcessing,
     progressState,
     liveLogs,
@@ -25,6 +27,7 @@
     archiveMetadata,
   } from '$lib/stores';
   import {
+    scanArchive,
     startRecapper,
     onRecapperProgress,
     onRecapperLog,
@@ -35,8 +38,10 @@
     setActiveGeoDbTier,
     onDownloadProgress,
     analyzeAudio,
+    checkDestinationStatus,
   } from '$lib/tauri';
-  import type { SpeedMode } from '$lib/types';
+  import Modal from '$components/Modal.svelte';
+  import type { SpeedMode, ArchiveInfo } from '$lib/types';
   import Music from 'lucide-svelte/icons/music';
   import Type from 'lucide-svelte/icons/type';
   import Activity from 'lucide-svelte/icons/activity';
@@ -68,6 +73,43 @@
 
   let audioWaveform: number[] = [];
   let isAnalyzingAudio = false;
+  let selectedMemoriesCount = 0;
+  let recapperArchiveMeta: ArchiveInfo | null = null;
+  let isScanningInputFolder = false;
+  let lastScannedFolder = '';
+
+  async function handleFolderScan(folderPath: string) {
+    if (!folderPath || folderPath.trim().length === 0) {
+      recapperArchiveMeta = null;
+      lastScannedFolder = '';
+      return;
+    }
+    if (folderPath === lastScannedFolder && recapperArchiveMeta?.isValid) {
+      return;
+    }
+    lastScannedFolder = folderPath;
+    isScanningInputFolder = true;
+    try {
+      const meta = await scanArchive(folderPath);
+      if (meta.isValid && meta.entryCount > 0) {
+        recapperArchiveMeta = meta;
+      } else {
+        recapperArchiveMeta = null;
+      }
+    } catch (e) {
+      recapperArchiveMeta = null;
+    } finally {
+      isScanningInputFolder = false;
+    }
+  }
+
+  let folderDebounce: ReturnType<typeof setTimeout> | null = null;
+  $: if ($recapperConfig.inputFolder !== lastScannedFolder) {
+    if (folderDebounce) clearTimeout(folderDebounce);
+    folderDebounce = setTimeout(() => {
+      handleFolderScan($recapperConfig.inputFolder);
+    }, 350);
+  }
 
   $: if ($recapperConfig.musicPath) {
     loadWaveform($recapperConfig.musicPath);
@@ -351,10 +393,12 @@
     return 'Full Timeline';
   })();
 
-  async function handleStart() {
-    missingInputFolder = !$recapperConfig.inputFolder;
-    missingMusicPath = !$recapperConfig.musicPath;
-    missingOutputPath = !$recapperConfig.outputPath;
+  let showOverwriteModal = false;
+
+  async function handleStartRecapper() {
+    missingInputFolder = !$recapperConfig.inputFolder || $recapperConfig.inputFolder.trim() === '';
+    missingMusicPath = !$recapperConfig.musicPath || $recapperConfig.musicPath.trim() === '';
+    missingOutputPath = !$recapperConfig.outputPath || $recapperConfig.outputPath.trim() === '';
 
     if (!isConfigValid) {
       const firstMissingId = missingInputFolder
@@ -372,13 +416,27 @@
       return;
     }
 
-    const finalOutputPath = disambiguateOutputPath($recapperConfig.outputPath, $activeJobs);
-    $recapperConfig.outputPath = finalOutputPath;
+    try {
+      const destStatus = await checkDestinationStatus($recapperConfig.outputPath);
+      if (destStatus.exists) {
+        showOverwriteModal = true;
+        return;
+      }
+    } catch (e) {
+      console.warn('Destination status check error:', e);
+    }
 
-    // Create unique Active Job for parallel execution
+    executeRecapperStart();
+  }
+
+  async function executeRecapperStart() {
+    showOverwriteModal = false;
+    const finalOutputPath = $recapperConfig.outputPath;
+
+    // Create Active Job
     const job = createActiveJob({
       type: 'recapper',
-      title: `Recap Video (${$recapperConfig.fps} FPS)`,
+      title: 'Recap Video Generation',
       inputPath: $recapperConfig.inputFolder,
       outputPath: finalOutputPath,
       dateRange: dateRangeLabel,
@@ -410,9 +468,10 @@
     startRecapper($recapperConfig, job.id)
       .then((res) => {
         completeActiveJob(job.id, res);
+        recapperResult.set(res);
         recordActivity({
           type: 'recapper',
-          title: `Recap Video (${$recapperConfig.fps} FPS)`,
+          title: 'Recap Video Generation',
           outputPath: finalOutputPath,
           inputPath: $recapperConfig.inputFolder,
           durationSecs: res.durationSecs,
@@ -422,6 +481,9 @@
           dateRange: dateRangeLabel,
           details: `${dateRangeLabel} • Generated in ${res.durationSecs.toFixed(1)}s`,
         });
+        if (get(currentView) === 'processing') {
+          currentView.set('complete');
+        }
       })
       .catch((e: any) => {
         errorActiveJob(job.id, String(e));
@@ -430,6 +492,9 @@
           message: 'An error occurred during recap video generation.',
           details: String(e),
         });
+        if (get(currentView) === 'processing') {
+          currentView.set('recapper-config');
+        }
       })
       .finally(() => {
         isProcessing.set(false);
@@ -460,7 +525,7 @@
       <!-- 1. Input & Music Files -->
       <div class="card section-card" id="media-sources-section">
         <div class="section-title-row">
-          <Music size={18} class="text-amber-400" />
+          <Music size={18} class="text-purple-400" />
           <h2 class="title-sm">1. Media Sources</h2>
         </div>
 
@@ -468,7 +533,7 @@
           <div class="toolkit-source-suggestion">
             <div class="suggestion-header">
               <div class="suggestion-left">
-                <Sparkles size={13} class="text-amber-400" />
+                <Sparkles size={13} class="text-purple-400" />
                 <span class="suggestion-title">Photo Suite Output Detected</span>
               </div>
               <span class="suggestion-path font-mono text-muted">{$toolkitConfig.outputPath}</span>
@@ -524,6 +589,7 @@
           isDirectory={true}
           dialogTitle="Select Processed Images Folder"
           required={true}
+          accentColor="purple"
           isMissing={missingInputFolder}
           bind:value={$recapperConfig.inputFolder}
         />
@@ -536,6 +602,7 @@
           fileExtensions={['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg']}
           dialogTitle="Select Soundtrack Audio"
           required={true}
+          accentColor="purple"
           isMissing={missingMusicPath}
           bind:value={$recapperConfig.musicPath}
         />
@@ -548,6 +615,7 @@
           fileExtensions={['mp4']}
           dialogTitle="Save Recap Video"
           required={true}
+          accentColor="purple"
           isMissing={missingOutputPath}
           bind:value={$recapperConfig.outputPath}
         />
@@ -557,12 +625,13 @@
       <DateRangePicker
         title="2. Date Range & Timeline Filter"
         accentColor="purple"
-        histogram={$currentArchive?.monthlyHistogram || $archiveMetadata?.monthlyHistogram || []}
-        minDate={$currentArchive?.earliestDate?.slice(0, 10) || $archiveMetadata?.earliestDate?.slice(0, 10) || ''}
-        maxDate={$currentArchive?.latestDate?.slice(0, 10) || $archiveMetadata?.latestDate?.slice(0, 10) || ''}
-        totalCount={$currentArchive?.entryCount || $archiveMetadata?.entryCount || 0}
+        histogram={recapperArchiveMeta?.monthlyHistogram || $archiveMetadata?.monthlyHistogram || []}
+        minDate={recapperArchiveMeta?.earliestDate?.slice(0, 10) || $archiveMetadata?.earliestDate?.slice(0, 10) || ''}
+        maxDate={recapperArchiveMeta?.latestDate?.slice(0, 10) || $archiveMetadata?.latestDate?.slice(0, 10) || ''}
+        totalCount={recapperArchiveMeta?.entryCount || $archiveMetadata?.entryCount || 0}
         bind:startDate={$recapperConfig.dateRangeStart}
         bind:endDate={$recapperConfig.dateRangeEnd}
+        bind:selectedCount={selectedMemoriesCount}
       />
 
       <!-- 3. Typography & Overlays -->
@@ -1000,6 +1069,40 @@
           />
         </div>
 
+        <div class="options-grid">
+          <Stepper
+            label="Min Video Length"
+            bind:value={$recapperConfig.minDurationSecs}
+            min={0}
+            max={300}
+            step={5}
+            unit="s"
+            presets={[
+              { label: 'Auto', value: 0 },
+              { label: '15s', value: 15 },
+              { label: '30s', value: 30 },
+              { label: '60s', value: 60 },
+            ]}
+            accentColor="violet"
+          />
+
+          <Stepper
+            label="Max Video Length"
+            bind:value={$recapperConfig.maxDurationSecs}
+            min={0}
+            max={600}
+            step={5}
+            unit="s"
+            presets={[
+              { label: 'Full Track', value: 0 },
+              { label: '30s', value: 30 },
+              { label: '60s', value: 60 },
+              { label: '120s', value: 120 },
+            ]}
+            accentColor="violet"
+          />
+        </div>
+
         <div class="divider"></div>
 
         <!-- Framerate Selector -->
@@ -1093,7 +1196,7 @@
             type="button"
             class="btn btn-accent-violet btn-lg w-full"
             class:btn-disabled-look={!isConfigValid}
-            on:click={handleStart}
+            on:click={handleStartRecapper}
           >
             <Play size={16} fill="currentColor" />
             <span>Generate Recap Video &rarr;</span>
@@ -1103,6 +1206,42 @@
     </div>
   </div>
 </div>
+
+<!-- Overwrite Confirmation Modal -->
+<Modal
+  bind:open={showOverwriteModal}
+  title="Overwrite Existing Video?"
+  maxWidth="460px"
+>
+  <div class="overwrite-modal-content">
+    <div class="overwrite-modal-icon-wrap">
+      <AlertTriangle size={26} class="text-purple-400" />
+    </div>
+    <div class="overwrite-modal-text">
+      <p class="text-white font-semibold">
+        A video file already exists at the specified export destination:
+      </p>
+      <p class="text-secondary text-xs font-mono path-preview-box">
+        {$recapperConfig.outputPath}
+      </p>
+      <p class="text-muted text-xs">
+        Would you like to overwrite and replace the existing video?
+      </p>
+    </div>
+  </div>
+
+  <svelte:fragment slot="footer">
+    <div class="modal-actions-row">
+      <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showOverwriteModal = false)}>
+        Cancel
+      </button>
+      <button type="button" class="btn btn-accent-violet btn-sm" on:click={executeRecapperStart}>
+        <RotateCcw size={14} />
+        <span>Overwrite Video</span>
+      </button>
+    </div>
+  </svelte:fragment>
+</Modal>
 
 <style>
   .config-view {
@@ -2104,10 +2243,10 @@
     flex-direction: column;
     gap: 8px;
     background: #0d0d12;
-    border: 1px solid rgba(255, 230, 0, 0.25);
+    border: 1px solid rgba(168, 85, 247, 0.28);
     border-radius: var(--radius-md);
     padding: 10px 12px;
-    box-shadow: 0 4px 16px rgba(255, 230, 0, 0.05);
+    box-shadow: 0 4px 16px rgba(168, 85, 247, 0.08);
   }
 
   .suggestion-header {
@@ -2127,7 +2266,7 @@
   .suggestion-title {
     font-size: 12px;
     font-weight: 600;
-    color: #ffe600;
+    color: #c084fc;
   }
 
   .suggestion-path {
@@ -2172,10 +2311,10 @@
   }
 
   .quick-pill-btn.active {
-    background: rgba(255, 230, 0, 0.15);
-    border-color: rgba(255, 230, 0, 0.45);
-    color: #ffe600;
-    box-shadow: 0 0 10px rgba(255, 230, 0, 0.12);
+    background: rgba(168, 85, 247, 0.18);
+    border-color: rgba(168, 85, 247, 0.45);
+    color: #c084fc;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
   }
 
   /* Font Class Bindings */
@@ -2186,6 +2325,48 @@
   .font-playfair { font-family: 'font-playfair', serif; }
   .font-jetbrains { font-family: 'font-jetbrains', monospace; }
   .font-caveat { font-family: 'font-caveat', cursive; }
+
+  .overwrite-modal-content {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .overwrite-modal-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: rgba(168, 85, 247, 0.12);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .overwrite-modal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .path-preview-box {
+    background: #09090d;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    word-break: break-all;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .modal-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 100%;
+  }
 
   @media (max-width: 900px) {
     .main-layout {

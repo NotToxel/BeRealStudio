@@ -5,7 +5,7 @@
   <p>Restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
   <p>
     <a href="https://github.com/NotToxel/BeRealStudio"><img src="https://img.shields.io/badge/GitHub-NotToxel%2FBeRealStudio-yellow?style=flat&logo=github" alt="GitHub Repo" /></a>
-    <img src="https://img.shields.io/badge/Version-1.5.0-blue?style=flat" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.6.0-blue?style=flat" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
     <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat" alt="Cross Platform" />
   </p>
@@ -29,43 +29,22 @@
 
 ---
 
-## ⚡ Key Highlights & Features
+## ✨ Key Features
 
 ### 📸 Photo Processing Suite
-- **Metadata Restoration & EXIF Synchronization:** Reads `posts.json` timestamps and GPS coordinates, embedding `DateTimeOriginal`, `GPSLatitude`, `GPSLongitude`, and caption descriptions into EXIF/IPTC image headers without lossy re-encoding.
-- **Picture-in-Picture & Dual-Camera Compositing:** Recreates BeReal's authentic in-app look with smooth rounded corners (60px radius) and crisp black borders (7px) overlaid at `(55, 55)`, with optional Side-by-Side and Reversed (secondary as background) layouts.
-- **Reverse-Angled Dual Camera Export:** 3-way perspective selector lets you export **Standard Only**, **Reversed Only** (selfie as full-bleed canvas with landscape lens inset), or **Both Angles** concurrently.
-- **Samsung & Google Motion Photos:** Muxes BTS (Behind-the-Scenes) video into standard JPEG containers via pure Rust binary tag generation (`SEFH`/`SEFT`) and GCamera XMP injection.
-- **Format Flexibility:** Convert to JPEG (with quality control 50–100%), preserve WebP, or export to lossless PNG.
-- **Visual Date Range Filter:** Interactive monthly density curve histogram with range sliders to select and batch-process specific periods.
-- **Multi-Core Rayon Concurrency:** Parallel image conversion and compositing utilizing all available CPU threads for 5–10× throughput gains.
+- **Metadata Restoration & EXIF Synchronization:** Losslessly embeds original capture dates, times, GPS coordinates, and caption descriptions into EXIF/IPTC photo headers.
+- **Authentic Dual-Camera Compositing:** Recreates BeReal's signature in-app aesthetic with rounded corners and crisp borders, supporting Picture-in-Picture and Side-by-Side layouts.
+- **Dual-Angle Perspective Export:** Choose between **Standard** (primary background), **Reversed** (selfie background), or export **Both Angles** concurrently.
+- **Samsung & Google Motion Photos:** Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos.
+- **Visual Timeline & Date Range Filter:** Interactive monthly activity density curve and calendar picker to easily filter memories by year, month, or custom dates.
+- **Fast Batch Processing:** Multi-threaded pipeline processes hundreds of archive photos in seconds.
 
 ### 🎬 Recap Video Generator
-- **Zero-Copy Frame Streaming:** Renders frames directly to raw RGB buffers piped directly into FFmpeg `stdin`, keeping peak memory usage at ~30MB even for large 4K video exports.
-- **Symphonia Audio Decoding & Waveform Visualization:** Pure Rust multi-format audio decoding (MP3, WAV, M4A, AAC, FLAC, OGG) with real-time 100+ bin peak amplitude waveform visualization.
-- **Dynamic Timing Curves:** Quadratic ramp (slower opening and finale, dynamic middle), even pacing, accelerate, decelerate, or rhythmic wave pacing.
-- **Offline & Online Geocoding Engine:** Resolves coordinates using Nominatim API or 3 downloadable offline GeoNames tiers (Lite 25k cities, Standard 55k towns, Ultra Detailed 140k+ villages) with configurable country formatting rules.
-- **Custom Visual Overlays:** System font enumeration, customizable date stamps, text shadow effects, and multiple resolution presets (9:16 vertical, 1080p, 4K).
-
-### ⚡ Architecture & Efficiency
-- **Streaming ZIP Parser:** Extracts and parses massive multi-gigabyte BeReal GDPR archives with buffered streams, scanning 120+ posts in under 20ms.
-- **Multi-Job Parallel Queue:** Run photo batch exports and video renders simultaneously in the background without UI blocking.
-- **Native File Explorer Integration:** Cross-platform `show_in_folder` command accurately reveals output files and folders in Windows Explorer, macOS Finder, or Linux file managers.
-- **Developer Demo Mode:** Press `Ctrl+Shift+D` or toggle **Dev Mode** in development to instantly hydrate mock GDPR archives, parallel jobs, waveforms, and activity history for rapid UI testing.
-
----
-
-## 📊 Performance Benchmarks
-
-Automated end-to-end integration benchmarks measured with synthetic BeReal GDPR archives (`cargo test --test benchmark_suite`):
-
-| Operation | Scale / Dataset | Measured Throughput | Peak RAM |
-|:---|:---|:---|:---|
-| **Archive Scan & JSON Parse** | 50 Posts | `17.13 ms` ⚡ | < 10 MB |
-| **Large Archive Scan & Histogram** | 120 Posts (Full Year) | `19.97 ms` ⚡ | < 12 MB |
-| **Side-by-Side Compositing** | 1080p Dual Lenses | `139.94 ms / image` | ~25 MB |
-| **Picture-in-Picture Compositing** | 1080p + 60px Radius Lens | `359.21 ms / image` | ~30 MB |
-| **Zero-Copy Recap Video Stream** | 1080x1920 @ 30 FPS (H.264) | `~45 FPS direct pipe` | **~30 MB (Flat)** |
+- **Music-Synchronized Recap Slideshows:** Automatically paces memories to your chosen soundtrack (MP3, WAV, M4A, AAC, FLAC) with real-time waveform visualization.
+- **Dynamic Timing Curves:** Customize video pacing with quadratic ramp, even timing, accelerate, decelerate, or wave timing curves.
+- **Smart Location & Date Stamps:** Automatically formats reverse-geocoded location stamps and custom date text on each memory slide.
+- **Live Video Preview:** Interactive player to preview your recap sequence before rendering.
+- **Background Multi-Job Queue:** Render videos and process photo batches simultaneously in the background without UI interruption.
 
 ---
 
@@ -181,7 +160,7 @@ BeRealStudio/
 │   ├── views/                              # Application Primary Views
 │   │   ├── Home.svelte                     # Main dashboard with hero & feature cards
 │   │   ├── ToolkitConfig.svelte            # Photo processing configuration view
-│   │   ├── RecapperConfig.svelte           # Recap video configuration view with 9:16 preview
+│   │   ├── RecapperConfig.svelte           # Recap video configuration view with live preview
 │   │   ├── Activity.svelte                 # Parallel active operations & generation history
 │   │   ├── Processing.svelte               # Real-time progress & live streaming log view
 │   │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
@@ -221,7 +200,7 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-├── package.json                            # App manifest & dependencies (v1.5.0)
+├── package.json                            # App manifest & dependencies (v1.6.0)
 └── README.md                               # User documentation & GDPR guide
 ```
 

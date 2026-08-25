@@ -514,6 +514,14 @@ fn geocode_online(lat: f64, lon: f64, rules: &[LocationRule]) -> Result<String> 
     Ok(apply_rules(&geocoded, rules))
 }
 
+pub fn spatial_grid_city_count() -> usize {
+    spatial_grid_store()
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().map(|s| s.total_count))
+        .unwrap_or(0)
+}
+
 /// Offline geocoding with sub-millisecond 2D spatial grid lookup.
 fn geocode_offline(lat: f64, lon: f64, rules: &[LocationRule], app: Option<&AppHandle>) -> Result<String> {
     let needs_load = {
@@ -542,8 +550,17 @@ fn geocode_offline(lat: f64, lon: f64, rules: &[LocationRule], app: Option<&AppH
         }
     }
 
-    log::warn!("Offline geocoding DB not available. Falling back to online.");
-    geocode_online(lat, lon, rules)
+    // If offline DB not loaded, format coordinates directly as fallback instead of blocking on 1.1s HTTP rate-limit
+    log::warn!("Offline geocoding DB not available. Returning formatted coordinates.");
+    let geocoded = GeocodedAddress {
+        city: format!("{:.2}°, {:.2}°", lat, lon),
+        suburb: String::new(),
+        state: String::new(),
+        country: String::new(),
+        country_code: String::new(),
+        road: String::new(),
+    };
+    Ok(apply_rules(&geocoded, rules))
 }
 
 fn first_non_empty(options: &[Option<&str>]) -> String {

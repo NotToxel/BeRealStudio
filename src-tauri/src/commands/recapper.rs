@@ -4,6 +4,7 @@ use tauri::{AppHandle, State};
 use crate::{
     pipeline::{
         date_filter,
+        exif_writer,
         types::*,
         parser::parse_taken_at,
     },
@@ -91,8 +92,19 @@ async fn run_recapper(
         current_file: None,
     });
     emitter.info("Analysing audio...");
-    let audio_duration = audio::get_audio_duration(Path::new(&config.music_path))?;
-    emitter.info(format!("Audio duration: {:.1}s", audio_duration));
+    let raw_audio_duration = audio::get_audio_duration(Path::new(&config.music_path))?;
+    let mut audio_duration = raw_audio_duration;
+    if let Some(min_d) = config.min_duration_secs {
+        if min_d > 0.0 && audio_duration < min_d {
+            audio_duration = min_d;
+        }
+    }
+    if let Some(max_d) = config.max_duration_secs {
+        if max_d > 0.0 && audio_duration > max_d {
+            audio_duration = max_d;
+        }
+    }
+    emitter.info(format!("Slideshow target duration: {:.1}s (audio: {:.1}s)", audio_duration, raw_audio_duration));
 
     // ── Step 3: Calculate per-image durations ─────────────────────────────────
     let durations = timing::calculate_durations(
@@ -109,27 +121,50 @@ async fn run_recapper(
 
     if config.location_enabled {
         emitter.emit_progress(&ProgressEvent {
-        job_id: None,
+            job_id: None,
             stage: ProcessingStage::Geocoding,
             current: 0,
             total,
             percentage: 8.0,
             current_file: None,
         });
-        emitter.info("Geocoding locations (this may take a while for large archives)...");
 
+        let is_offline = config.geocoding_mode == GeocodingMode::Offline;
+        if is_offline {
+            if let Err(e) = geocoder::load_spatial_grid(&emitter.app, None) {
+                emitter.warn(format!("Could not pre-load offline geodata: {}", e));
+            } else {
+                let count = geocoder::spatial_grid_city_count();
+                emitter.info(format!("Loaded offline GeoNames database ({} cities in RAM) for instantaneous reverse geocoding.", count));
+            }
+        } else {
+            emitter.info("Using online Nominatim reverse geocoder (1 req/sec rate limit)...");
+        }
+
+        // 1. Batch extract GPS from all images in a single call using ExifTool
+        let gps_map = if let Some(tool) = exif_writer::detect_exiftool() {
+            emitter.info("Extracting GPS coordinates from image EXIF metadata...");
+            exif_writer::extract_gps_batch(&tool, &image_paths)
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        if !gps_map.is_empty() {
+            emitter.info(format!("Found GPS metadata on {} of {} images.", gps_map.len(), total));
+        }
+
+        // 2. Resolve locations instantly (sub-millisecond RAM lookups)
         for (i, img_path) in image_paths.iter().enumerate() {
             if emitter.is_aborted() { break; }
-            // Try to read GPS from EXIF
-            if let Some(loc_str) = read_gps_from_exif(img_path) {
-                if let Some((lat, lon)) = parse_coords(&loc_str) {
-                    let resolved = geocoder::resolve_location(lat, lon, &config.location_rules, &config.geocoding_mode, Some(&emitter.app));
-                    location_strings[i] = resolved;
-                }
+
+            if let Some(&(lat, lon)) = gps_map.get(img_path) {
+                let resolved = geocoder::resolve_location(lat, lon, &config.location_rules, &config.geocoding_mode, Some(&emitter.app));
+                location_strings[i] = resolved;
             }
+
             let pct = 8.0 + (i as f32 / total as f32) * 12.0;
             emitter.emit_progress(&ProgressEvent {
-        job_id: None,
+                job_id: None,
                 stage: ProcessingStage::Geocoding,
                 current: i + 1,
                 total,
@@ -157,7 +192,7 @@ async fn run_recapper(
     let config_clone = config.clone();
     let emitter_clone = emitter.clone();
 
-    video_encoder::encode_slideshow_streaming(
+    let res = video_encoder::encode_slideshow_streaming(
         total_video_frames,
         || {
             if emitter_clone.is_aborted() || current_idx >= total {
@@ -207,7 +242,18 @@ async fn run_recapper(
         |_pct| {
             // Streaming progress is emitted per frame batch
         },
-    )?;
+    );
+
+    if emitter.is_aborted() || res.is_err() {
+        if out_path.exists() {
+            let _ = std::fs::remove_file(out_path);
+        }
+        if emitter.is_aborted() {
+            emitter.warn("Recap video generation cancelled by user.");
+            anyhow::bail!("Recap video generation cancelled by user.");
+        }
+    }
+    res?;
 
     emitter.info(format!(
         "Recap complete! Output: {} ({:.1}s)",
@@ -240,21 +286,7 @@ fn make_result(entries: usize, output_path: &str, duration: f64) -> ProcessingRe
     }
 }
 
-fn read_gps_from_exif(_path: &Path) -> Option<String> {
-    // Try to read existing GPS from EXIF as a "lat,lon" string
-    // Returns None if no GPS in EXIF (simplified — just try extracting from filename)
-    None // Placeholder: GPS is typically in the output images from the toolkit phase
-}
 
-fn parse_coords(s: &str) -> Option<(f64, f64)> {
-    let parts: Vec<&str> = s.split(',').collect();
-    if parts.len() == 2 {
-        let lat = parts[0].trim().parse::<f64>().ok()?;
-        let lon = parts[1].trim().parse::<f64>().ok()?;
-        return Some((lat, lon));
-    }
-    None
-}
 
 fn extract_date_from_filename(path: &Path) -> Option<chrono::DateTime<chrono::Utc>> {
     let stem = path.file_stem()?.to_str()?;

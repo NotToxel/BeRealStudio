@@ -53,6 +53,138 @@ pub async fn start_toolkit(
     res.map_err(|e| e.to_string())
 }
 
+/// Check whether running this toolkit export will actually overwrite any existing files on disk.
+#[tauri::command]
+pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<DestinationStatus, String> {
+    let out_base = Path::new(&config.output_path);
+    if !out_base.exists() {
+        return Ok(DestinationStatus {
+            exists: false,
+            is_directory: true,
+            is_file: false,
+            file_count: 0,
+        });
+    }
+
+    let input_path = Path::new(&config.input_path);
+    if !input_path.exists() {
+        return Ok(DestinationStatus {
+            exists: false,
+            is_directory: true,
+            is_file: false,
+            file_count: 0,
+        });
+    }
+
+    let is_zip = input_path.is_file()
+        || input_path.extension().map(|e| e.eq_ignore_ascii_case("zip")).unwrap_or(false);
+
+    let all_posts = if is_zip {
+        if let Ok(file) = File::open(input_path) {
+            if let Ok(mut archive) = ZipArchive::new(file) {
+                let mut found_posts = Vec::new();
+                for i in 0..archive.len() {
+                    if let Ok(mut entry) = archive.by_index(i) {
+                        let name = entry.name().to_string();
+                        if name.ends_with("posts.json") || name.ends_with("memories.json") {
+                            let mut buf = Vec::new();
+                            if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
+                                if let Ok(posts) = serde_json::from_slice::<Vec<BeRealPost>>(&buf) {
+                                    found_posts = posts;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                found_posts
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        }
+    } else {
+        let json_path = input_path.join("posts.json");
+        let alt_json_path = input_path.join("memories.json");
+        if json_path.exists() {
+            parser::parse_posts(&json_path).unwrap_or_default()
+        } else if alt_json_path.exists() {
+            parser::parse_posts(&alt_json_path).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    };
+
+    let posts = date_filter::filter_by_date_range(
+        all_posts,
+        config.date_range_start.as_deref(),
+        config.date_range_end.as_deref(),
+    );
+
+    let dir_singles = out_base.join("singles");
+    let dir_combined = out_base.join("combined");
+    let dir_reversed = out_base.join("combined_reversed");
+
+    let mut conflicting_files_count = 0;
+    let ext = config.convert_format.extension();
+
+    for post in &posts {
+        let dt = match DateTime::parse_from_rfc3339(&post.taken_at) {
+            Ok(d) => d.with_timezone(&chrono::Utc),
+            Err(_) => match chrono::NaiveDateTime::parse_from_str(&post.taken_at, "%Y-%m-%dT%H:%M:%S%.fZ") {
+                Ok(ndt) => DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc),
+                Err(_) => continue,
+            },
+        };
+        let time_str = dt.format("%Y-%m-%dT%H-%M-%S").to_string();
+
+        // 1. Singles
+        if post.primary.is_some() {
+            let p_ext = if post.primary.as_ref().map(|p| p.is_video()).unwrap_or(false) { "mp4" } else { ext };
+            if dir_singles.join(format!("{}_primary.{}", time_str, p_ext)).exists() {
+                conflicting_files_count += 1;
+            }
+        }
+        if post.secondary.is_some() {
+            let s_ext = if post.secondary.as_ref().map(|s| s.is_video()).unwrap_or(false) { "mp4" } else { ext };
+            if dir_singles.join(format!("{}_secondary.{}", time_str, s_ext)).exists() {
+                conflicting_files_count += 1;
+            }
+        }
+        if post.bts_media.is_some() {
+            if dir_singles.join(format!("{}_bts.mp4", time_str)).exists() {
+                conflicting_files_count += 1;
+            }
+        }
+
+        // 2. Combined
+        if config.create_combined {
+            if dir_combined.join(format!("{}_combined.{}", time_str, ext)).exists()
+                || dir_combined.join(format!("{}_combined.mp4", time_str)).exists()
+            {
+                conflicting_files_count += 1;
+            }
+        }
+
+        // 3. Reversed
+        if config.create_reversed {
+            if dir_reversed.join(format!("{}_combined_reversed.{}", time_str, ext)).exists()
+                || dir_reversed.join(format!("{}_combined_reversed.mp4", time_str)).exists()
+            {
+                conflicting_files_count += 1;
+            }
+        }
+    }
+
+    Ok(DestinationStatus {
+        exists: conflicting_files_count > 0,
+        is_directory: true,
+        is_file: false,
+        file_count: conflicting_files_count,
+    })
+}
+
 /// Cancel an in-progress toolkit run.
 #[tauri::command]
 pub async fn cancel_toolkit(state: State<'_, AppState>) -> Result<(), String> {
@@ -303,16 +435,28 @@ async fn run_toolkit(
 
             let result: anyhow::Result<PathBuf> = if asset.is_video() {
                 let ext = src.extension().unwrap_or_default().to_string_lossy();
-                let dest = unique_path(&dir_singles.join(format!("{}.{}", filename_base, ext)));
-                std::fs::copy(&src, &dest).map(|_| dest.clone()).map_err(|e| e.into())
+                let dest = dir_singles.join(format!("{}.{}", filename_base, ext));
+                std::fs::copy(&src, &dest)
+                    .map(|_| {
+                        let ft = filetime::FileTime::from_unix_time(dt.timestamp(), 0);
+                        let _ = filetime::set_file_times(&dest, ft, ft);
+                        if config.embed_exif {
+                            let _ = exif_writer::write_metadata(&dest, &dt, post.location.as_ref(), post.caption.as_deref());
+                        }
+                        dest.clone()
+                    })
+                    .map_err(|e| e.into())
             } else {
                 let ext = config.convert_format.extension();
-                let dest = unique_path(&dir_singles.join(format!("{}.{}", filename_base, ext)));
+                let dest = dir_singles.join(format!("{}.{}", filename_base, ext));
                 image_ops::convert_image(&src, &dest, &config.convert_format, config.quality)
                     .map(|_| {
+                        let ft = filetime::FileTime::from_unix_time(dt.timestamp(), 0);
+                        let _ = filetime::set_file_times(&dest, ft, ft);
                         if config.embed_exif && matches!(config.convert_format, OutputFormat::Jpeg) {
-                            let _ = exif_writer::write_exif(&dest, &dt, post.location.as_ref(), post.caption.as_deref());
-                            let _ = exif_writer::write_iptc(&dest, post.caption.as_deref(), "BeReal app", "BeReal Studio");
+                            if let Err(e) = exif_writer::write_metadata(&dest, &dt, post.location.as_ref(), post.caption.as_deref()) {
+                                emitter.warn(format!("EXIF write error for {}: {}", dest.display(), e));
+                            }
                         }
                         dest.clone()
                     })
@@ -357,18 +501,11 @@ async fn run_toolkit(
     });
 
     if emitter.is_aborted() {
+        if is_temp_dir {
+            let _ = std::fs::remove_dir_all(&working_dir);
+        }
         emitter.warn("Processing cancelled by user.");
-        return Ok(make_result(
-            counter.load(Ordering::Relaxed),
-            files_converted.load(Ordering::Relaxed),
-            combined_created.load(Ordering::Relaxed),
-            reversed_created.load(Ordering::Relaxed),
-            motion_photos_created.load(Ordering::Relaxed),
-            files_skipped.load(Ordering::Relaxed),
-            errors.lock().unwrap().clone(),
-            start.elapsed().as_secs_f64(),
-            &config.output_path,
-        ));
+        anyhow::bail!("Photo processing cancelled by user.");
     }
 
     // ── Stage 5: Create combined images ──────────────────────────────────────
@@ -376,7 +513,9 @@ async fn run_toolkit(
     let combo_total = pairs_vec.len();
 
     if (config.create_combined || config.create_reversed) && !pairs_vec.is_empty() {
-        emitter.info("Creating combined images...");
+        emitter.info("Creating combined images in parallel...");
+        let combo_counter = Arc::new(AtomicUsize::new(0));
+
         emitter.emit_progress(&ProgressEvent {
             job_id: None,
             stage: ProcessingStage::Compositing,
@@ -386,15 +525,17 @@ async fn run_toolkit(
             current_file: None,
         });
 
-        for (i, (prim_path, sec_path, dt, location, caption, bts_path)) in pairs_vec.iter().enumerate() {
-            if emitter.is_aborted() { break; }
+        pairs_vec.par_iter().for_each(|(prim_path, sec_path, dt, location, caption, bts_path)| {
+            if emitter.is_aborted() {
+                return;
+            }
 
             let timestamp = dt.format("%Y-%m-%dT%H-%M-%S").to_string();
 
             if config.create_combined {
                 let ext = config.convert_format.extension();
-                let dest = unique_path(&dir_combined.join(format!("{}_combined.{}", timestamp, ext)));
-                match combine_and_save(prim_path, sec_path, &dest, &config, &dt, location.as_ref(), caption.as_deref()) {
+                let dest = dir_combined.join(format!("{}_combined.{}", timestamp, ext));
+                match combine_and_save(prim_path, sec_path, &dest, &config, dt, location.as_ref(), caption.as_deref()) {
                     Ok(_) => {
                         combined_created.fetch_add(1, Ordering::Relaxed);
                         // Motion photo
@@ -419,8 +560,8 @@ async fn run_toolkit(
 
             if config.create_reversed {
                 let ext = config.convert_format.extension();
-                let dest = unique_path(&dir_reversed.join(format!("{}_combined_reversed.{}", timestamp, ext)));
-                if let Err(e) = combine_and_save(sec_path, prim_path, &dest, &config, &dt, location.as_ref(), caption.as_deref()) {
+                let dest = dir_reversed.join(format!("{}_combined_reversed.{}", timestamp, ext));
+                if let Err(e) = combine_and_save(sec_path, prim_path, &dest, &config, dt, location.as_ref(), caption.as_deref()) {
                     if let Ok(mut errs) = errors.lock() {
                         errs.push(format!("Reversed combined error: {}", e));
                     }
@@ -429,16 +570,17 @@ async fn run_toolkit(
                 }
             }
 
-            let pct = 65.0 + ((i + 1) as f32 / combo_total as f32) * 25.0;
+            let done = combo_counter.fetch_add(1, Ordering::Relaxed) + 1;
+            let pct = 65.0 + (done as f32 / combo_total as f32) * 25.0;
             emitter.emit_progress(&ProgressEvent {
-            job_id: None,
+                job_id: None,
                 stage: ProcessingStage::Compositing,
-                current: i + 1,
+                current: done,
                 total: combo_total,
                 percentage: pct,
                 current_file: Some(timestamp),
             });
-        }
+        });
     }
 
     // ── Stage 6: Cleanup ──────────────────────────────────────────────────────
@@ -502,28 +644,14 @@ fn combine_and_save(
     };
     let rgb = combined.to_rgb8();
     image_ops::save_rgb_image(&rgb, dest, &config.convert_format, config.quality)?;
+
+    let ft = filetime::FileTime::from_unix_time(dt.timestamp(), 0);
+    let _ = filetime::set_file_times(dest, ft, ft);
+
     if config.embed_exif && matches!(config.convert_format, OutputFormat::Jpeg) {
-        let _ = exif_writer::write_exif(dest, dt, location, caption);
-        let _ = exif_writer::write_iptc(dest, caption, "BeReal app", "BeReal Studio");
+        let _ = exif_writer::write_metadata(dest, dt, location, caption);
     }
     Ok(())
-}
-
-fn unique_path(path: &Path) -> PathBuf {
-    if !path.exists() {
-        return path.to_path_buf();
-    }
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let ext = path.extension().unwrap_or_default().to_string_lossy().to_string();
-    let parent = path.parent().unwrap_or(Path::new("."));
-    let mut counter = 1;
-    loop {
-        let candidate = parent.join(format!("{}_{}.{}", stem, counter, ext));
-        if !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
 }
 
 fn make_result(

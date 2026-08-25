@@ -10,9 +10,11 @@
     deleteActivityRecord,
     isProcessing,
     progressState,
+    liveLogs,
     activeFeature,
   } from '$lib/stores';
-  import { showInFolder, cancelJob, cancelToolkit, cancelRecapper } from '$lib/tauri';
+  import { showInFolder, cancelJob, cancelToolkit, cancelRecapper, cleanupCancelledOutput } from '$lib/tauri';
+  import Modal from '$components/Modal.svelte';
   import type { ActiveJob } from '$lib/types';
   import History from 'lucide-svelte/icons/history';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
@@ -23,6 +25,7 @@
   import Calendar from 'lucide-svelte/icons/calendar';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
+  import Check from 'lucide-svelte/icons/check';
   import Clock from 'lucide-svelte/icons/clock';
   import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
@@ -32,19 +35,21 @@
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Layers from 'lucide-svelte/icons/layers';
+  import Maximize2 from 'lucide-svelte/icons/minimize-2';
 
   let showClearConfirm = false;
   let expandedLogs: Record<string, boolean> = {};
+  let jobToCancel: ActiveJob | null = null;
+  let showJobCancelModal = false;
 
-  function toggleLogs(jobId: string) {
-    expandedLogs[jobId] = !expandedLogs[jobId];
-    expandedLogs = { ...expandedLogs };
+  function toggleLogs(id: string) {
+    expandedLogs[id] = !expandedLogs[id];
   }
 
   function formatTime(isoStr: string): string {
     try {
       const d = new Date(isoStr);
-      return d.toLocaleString('en-GB', {
+      return d.toLocaleString(undefined, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -87,11 +92,37 @@
   }
 
   async function handleCancelSpecificJob(job: ActiveJob) {
+    if (job.type === 'recapper') {
+      try {
+        await cancelJob(job.id);
+        if (job.outputPath) {
+          await cleanupCancelledOutput(job.outputPath);
+        }
+      } catch (e) {
+        console.warn(`Failed to cancel job ${job.id}:`, e);
+      } finally {
+        cancelActiveJobById(job.id);
+      }
+    } else {
+      jobToCancel = job;
+      showJobCancelModal = true;
+    }
+  }
+
+  async function handleConfirmJobCancel(deleteFiles: boolean) {
+    if (!jobToCancel) return;
+    const job = jobToCancel;
+    showJobCancelModal = false;
     try {
       await cancelJob(job.id);
-      cancelActiveJobById(job.id);
+      if (deleteFiles && job.outputPath) {
+        await cleanupCancelledOutput(job.outputPath);
+      }
     } catch (e) {
-      console.warn(`Failed to cancel job ${job.id}:`, e);
+      console.warn(`Failed to cancel toolkit job ${job.id}:`, e);
+    } finally {
+      cancelActiveJobById(job.id);
+      jobToCancel = null;
     }
   }
 
@@ -217,6 +248,28 @@
               </div>
 
               <div class="job-actions-right">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  on:click={() => {
+                    activeFeature.set(job.type);
+                    isProcessing.set(true);
+                    progressState.set({
+                      jobId: job.id,
+                      stage: job.stage,
+                      current: job.current,
+                      total: job.total,
+                      percentage: job.percentage,
+                      currentFile: job.currentFile,
+                    });
+                    liveLogs.set(job.logs);
+                    currentView.set('processing');
+                  }}
+                  title="View full-screen live progress and streaming logs"
+                >
+                  <Maximize2 size={13} />
+                  <span>Live View</span>
+                </button>
                 <button
                   type="button"
                   class="btn btn-ghost btn-sm"
@@ -441,9 +494,15 @@
             </div>
 
             <div class="head-right">
-              <span class="badge badge-success font-mono">
-                <CheckCircle size={11} /> {item.itemCount} {item.itemCount === 1 ? 'Item' : 'Items'}
-              </span>
+              {#if item.status === 'cancelled'}
+                <span class="badge badge-error font-mono">
+                  <XCircle size={11} /> Cancelled
+                </span>
+              {:else}
+                <span class="badge badge-success font-mono">
+                  <CheckCircle size={11} /> {item.itemCount} {item.itemCount === 1 ? 'Item' : 'Items'}
+                </span>
+              {/if}
               <button
                 type="button"
                 class="btn-delete"
@@ -476,29 +535,75 @@
           </div>
 
           <!-- Quick Action Buttons -->
-          <div class="card-actions">
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              on:click={() => handleOpen(item.outputPath)}
-            >
-              <FolderOpen size={13} />
-              <span>Show in File Explorer</span>
-            </button>
+          {#if item.status !== 'cancelled' && item.itemCount > 0}
+            <div class="card-actions">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                on:click={() => handleOpen(item.outputPath)}
+              >
+                <FolderOpen size={13} />
+                <span>Show in File Explorer</span>
+              </button>
 
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              on:click={() => handleOpen(item.outputPath)}
-            >
-              <ExternalLink size={13} />
-              <span>Open Directly</span>
-            </button>
-          </div>
+              {#if item.type === 'recapper' || item.outputPath.endsWith('.mp4')}
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  on:click={() => handleOpen(item.outputPath)}
+                >
+                  <ExternalLink size={13} />
+                  <span>Open Video Directly</span>
+                </button>
+              {/if}
+            </div>
+          {:else if item.status === 'cancelled'}
+            <div class="card-actions">
+              <span class="text-xs text-muted font-mono">
+                Cancelled by user &bull; Output files cleaned up
+              </span>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
   {/if}
+
+  <Modal bind:open={showJobCancelModal} title="Cancel Photo Processing?" maxWidth="460px">
+    <svelte:fragment slot="title">
+      <div class="flex items-center gap-2">
+        <AlertTriangle size={20} class="text-amber-400" />
+        <h3 class="title-sm font-bold text-white">Cancel Photo Processing?</h3>
+      </div>
+    </svelte:fragment>
+
+    <div class="py-2 flex flex-col gap-3">
+      <p class="text-secondary text-sm">
+        This operation will be stopped immediately. What would you like to do with the files that have already been generated in the output folder?
+      </p>
+      {#if jobToCancel}
+        <div class="p-2 bg-black/40 border border-white/10 rounded font-mono text-xs text-muted break-all">
+          {jobToCancel.outputPath}
+        </div>
+      {/if}
+    </div>
+
+    <svelte:fragment slot="footer">
+      <div class="flex justify-end gap-2 flex-wrap">
+        <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showJobCancelModal = false)}>
+          Continue Processing
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm text-amber-400" on:click={() => handleConfirmJobCancel(false)}>
+          <Check size={13} />
+          <span>Keep Files &amp; Cancel</span>
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" on:click={() => handleConfirmJobCancel(true)}>
+          <Trash2 size={13} />
+          <span>Delete Files &amp; Cancel</span>
+        </button>
+      </div>
+    </svelte:fragment>
+  </Modal>
 </div>
 
 <style>

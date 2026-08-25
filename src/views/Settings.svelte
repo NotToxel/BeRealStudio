@@ -12,6 +12,7 @@
   } from '$lib/stores';
   import {
     detectFfmpeg,
+    checkExiftool,
     saveSettings,
     resetSettings,
     clearDebugLogs,
@@ -37,15 +38,30 @@
   import Sliders from 'lucide-svelte/icons/sliders';
   import Database from 'lucide-svelte/icons/database';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import Camera from 'lucide-svelte/icons/camera';
 
   let statusMessage = '';
   let isSuccessStatus = true;
   let showResetModal = false;
+  let exiftoolPath: string | null = null;
+  let checkingExiftool = false;
+
+  async function detectExiftoolHandler() {
+    checkingExiftool = true;
+    try {
+      exiftoolPath = await checkExiftool();
+    } catch {
+      exiftoolPath = null;
+    } finally {
+      checkingExiftool = false;
+    }
+  }
 
   onMount(async () => {
     if (!$ffmpegInfo.checked) {
       await detectFfmpeg();
     }
+    await detectExiftoolHandler();
     try {
       const dbStatus = await checkOfflineGeoDb();
       offlineGeoDbStatus.set(dbStatus);
@@ -317,15 +333,26 @@
           <Cpu size={18} class="text-sky-400" />
           <h2 class="title-sm">2. System &amp; Video Encoders</h2>
         </div>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          on:click={() => detectFfmpeg()}
-          disabled={$ffmpegInfo.checking}
-        >
-          <RefreshCw size={12} class={$ffmpegInfo.checking ? 'animate-spin' : ''} />
-          <span>{$ffmpegInfo.checking ? 'Checking...' : 'Recheck FFmpeg'}</span>
-        </button>
+        <div class="head-actions-row">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            on:click={() => detectFfmpeg()}
+            disabled={$ffmpegInfo.checking}
+          >
+            <RefreshCw size={12} class={$ffmpegInfo.checking ? 'animate-spin' : ''} />
+            <span>{$ffmpegInfo.checking ? 'Checking...' : 'Recheck FFmpeg'}</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            on:click={detectExiftoolHandler}
+            disabled={checkingExiftool}
+          >
+            <RefreshCw size={12} class={checkingExiftool ? 'animate-spin' : ''} />
+            <span>{checkingExiftool ? 'Checking...' : 'Recheck ExifTool'}</span>
+          </button>
+        </div>
       </div>
 
       <div class="dependency-status">
@@ -355,6 +382,38 @@
               Scanning system PATH for FFmpeg...
             {:else}
               {$ffmpegInfo.path || 'FFmpeg is required to generate recap slideshows and video PIP overlays.'}
+            {/if}
+          </p>
+        </div>
+      </div>
+
+      <div class="dependency-status" style="margin-top: 10px;">
+        <div class="dep-icon" class:found={Boolean(exiftoolPath)}>
+          {#if checkingExiftool}
+            <RefreshCw size={18} class="animate-spin text-sky-400" />
+          {:else if exiftoolPath}
+            <CheckCircle size={18} />
+          {:else}
+            <AlertTriangle size={18} />
+          {/if}
+        </div>
+
+        <div class="dep-info">
+          <div class="dep-name">
+            <strong>ExifTool Metadata Sidecar</strong>
+            {#if checkingExiftool}
+              <span class="badge badge-info">Detecting...</span>
+            {:else if exiftoolPath}
+              <span class="badge badge-success">Detected</span>
+            {:else}
+              <span class="badge badge-warning">Fallback to Native Rust EXIF</span>
+            {/if}
+          </div>
+          <p class="dep-path text-secondary">
+            {#if checkingExiftool}
+              Scanning system for ExifTool binary...
+            {:else}
+              {exiftoolPath || 'Using built-in native Rust EXIF/IPTC engine. Install ExifTool for enhanced multi-tag synchronization.'}
             {/if}
           </p>
         </div>
@@ -581,6 +640,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .head-actions-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .head-title {

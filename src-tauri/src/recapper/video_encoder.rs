@@ -9,6 +9,65 @@ use std::{
 use crate::pipeline::types::RecapperConfig;
 use crate::pipeline::video_ops::detect_ffmpeg;
 
+/// Detect the best available video encoder (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox, or CPU libx264).
+fn detect_best_encoder(ffmpeg: &Path) -> (Vec<String>, &'static str) {
+    if let Ok(output) = Command::new(ffmpeg).args(["-hide_banner", "-encoders"]).output() {
+        let text = String::from_utf8_lossy(&output.stdout);
+        // 1. NVIDIA NVENC GPU
+        if text.contains("h264_nvenc") {
+            return (
+                vec![
+                    "-c:v".into(), "h264_nvenc".into(),
+                    "-preset".into(), "p4".into(),
+                    "-cq".into(), "23".into(),
+                ],
+                "NVIDIA NVENC (GPU)",
+            );
+        }
+        // 2. Apple VideoToolbox GPU
+        if text.contains("h264_videotoolbox") {
+            return (
+                vec![
+                    "-c:v".into(), "h264_videotoolbox".into(),
+                    "-q:v".into(), "65".into(),
+                ],
+                "Apple VideoToolbox (GPU)",
+            );
+        }
+        // 3. Intel QuickSync GPU
+        if text.contains("h264_qsv") {
+            return (
+                vec![
+                    "-c:v".into(), "h264_qsv".into(),
+                    "-global_quality".into(), "23".into(),
+                ],
+                "Intel QuickSync (GPU)",
+            );
+        }
+        // 4. AMD AMF GPU
+        if text.contains("h264_amf") {
+            return (
+                vec![
+                    "-c:v".into(), "h264_amf".into(),
+                    "-quality".into(), "balanced".into(),
+                ],
+                "AMD AMF (GPU)",
+            );
+        }
+    }
+
+    // High-performance CPU fallback with multi-threaded libx264
+    (
+        vec![
+            "-c:v".into(), "libx264".into(),
+            "-preset".into(), "veryfast".into(),
+            "-crf".into(), "23".into(),
+            "-threads".into(), "0".into(),
+        ],
+        "libx264 (Multi-threaded CPU)",
+    )
+}
+
 /// Encode a slideshow by streaming rendered RGB frames on-demand into FFmpeg stdin.
 /// Memory usage is strictly bounded to a single active frame buffer (zero-copy buffer streaming).
 pub fn encode_slideshow_streaming<F>(
@@ -30,26 +89,29 @@ where
     let (width, height) = config.resolution;
     let fps = config.fps;
 
-    // Spawn FFmpeg: read rawvideo from stdin, audio from file
-    let mut child = Command::new(&ffmpeg)
-        .args([
-            "-f", "rawvideo",
-            "-pixel_format", "rgb24",
-            "-video_size", &format!("{}x{}", width, height),
-            "-framerate", &fps.to_string(),
-            "-i", "pipe:0",                           // Video from stdin
-            "-i", audio_path.to_str().unwrap_or(""),  // Audio file
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", "23",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-shortest",
-            "-threads", "0",
-            "-y",
-            output_path.to_str().unwrap_or(""),
-        ])
+    let (encoder_args, encoder_name) = detect_best_encoder(&ffmpeg);
+    log::info!("🎬 Recapper video encoder selected: {}", encoder_name);
+
+    let mut base_cmd = Command::new(&ffmpeg);
+    base_cmd.args([
+        "-f", "rawvideo",
+        "-pixel_format", "rgb24",
+        "-video_size", &format!("{}x{}", width, height),
+        "-framerate", &fps.to_string(),
+        "-i", "pipe:0",                           // Video from stdin
+        "-i", audio_path.to_str().unwrap_or(""),  // Audio file
+    ]);
+    base_cmd.args(&encoder_args);
+    base_cmd.args([
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest",
+        "-y",
+        output_path.to_str().unwrap_or(""),
+    ]);
+
+    let mut child = base_cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
