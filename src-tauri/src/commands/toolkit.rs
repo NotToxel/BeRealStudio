@@ -27,18 +27,30 @@ use crate::{
 #[tauri::command]
 pub async fn start_toolkit(
     config: ToolkitConfig,
+    job_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ProcessingResult, String> {
-    state.clear_abort();
-
     let log_buf = state.log_buffer.clone();
     let abort_flag = state.abort_flag.clone();
-    let emitter = ProgressEmitter::new(app.clone(), log_buf, abort_flag, "toolkit");
 
-    run_toolkit(config, emitter)
-        .await
-        .map_err(|e| e.to_string())
+    let (emitter, jid_clean) = if let Some(jid) = job_id {
+        let job_flag = state.register_job(&jid);
+        let em = ProgressEmitter::with_job(app.clone(), log_buf, abort_flag, job_flag, jid.clone(), "toolkit");
+        (em, Some(jid))
+    } else {
+        state.clear_abort();
+        let em = ProgressEmitter::new(app.clone(), log_buf, abort_flag, "toolkit");
+        (em, None)
+    };
+
+    let res = run_toolkit(config, emitter).await;
+
+    if let Some(ref jid) = jid_clean {
+        state.unregister_job(jid);
+    }
+
+    res.map_err(|e| e.to_string())
 }
 
 /// Cancel an in-progress toolkit run.
@@ -66,6 +78,7 @@ async fn run_toolkit(
     // If input is a ZIP archive, automatically extract it safely to a temporary working folder
     let (working_dir, is_temp_dir): (PathBuf, bool) = if is_zip {
         emitter.emit_progress(&ProgressEvent {
+            job_id: None,
             stage: ProcessingStage::Extracting,
             current: 0,
             total: 0,
@@ -113,6 +126,7 @@ async fn run_toolkit(
             if i % 30 == 0 || i == total_entries - 1 {
                 let pct = 1.0 + (i as f32 / total_entries.max(1) as f32) * 5.0;
                 emitter.emit_progress(&ProgressEvent {
+            job_id: None,
                     stage: ProcessingStage::Extracting,
                     current: i + 1,
                     total: total_entries,
@@ -130,6 +144,7 @@ async fn run_toolkit(
 
     // ── Stage 1: Parse JSON ───────────────────────────────────────────────────
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Scanning,
         current: 0,
         total: 0,
@@ -150,6 +165,7 @@ async fn run_toolkit(
     let media_base = posts_json.parent().unwrap_or(&working_dir).to_path_buf();
 
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Parsing,
         current: 0,
         total: 0,
@@ -222,6 +238,7 @@ async fn run_toolkit(
 
     emitter.info("Processing individual files...");
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Converting,
         current: 0,
         total,
@@ -323,6 +340,7 @@ async fn run_toolkit(
         let done = counter.fetch_add(1, Ordering::Relaxed) + 1;
         let pct = 5.0 + (done as f32 / total as f32) * 60.0;
         emitter.emit_progress(&ProgressEvent {
+            job_id: None,
             stage: ProcessingStage::Converting,
             current: done,
             total,
@@ -353,6 +371,7 @@ async fn run_toolkit(
     if (config.create_combined || config.create_reversed) && !pairs_vec.is_empty() {
         emitter.info("Creating combined images...");
         emitter.emit_progress(&ProgressEvent {
+            job_id: None,
             stage: ProcessingStage::Compositing,
             current: 0,
             total: combo_total,
@@ -405,6 +424,7 @@ async fn run_toolkit(
 
             let pct = 65.0 + ((i + 1) as f32 / combo_total as f32) * 25.0;
             emitter.emit_progress(&ProgressEvent {
+            job_id: None,
                 stage: ProcessingStage::Compositing,
                 current: i + 1,
                 total: combo_total,
@@ -449,6 +469,7 @@ async fn run_toolkit(
         result.duration_secs,
     ));
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Complete,
         current: total,
         total,

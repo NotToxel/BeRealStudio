@@ -21,15 +21,30 @@ use crate::{
 #[tauri::command]
 pub async fn start_recapper(
     config: RecapperConfig,
+    job_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ProcessingResult, String> {
-    state.clear_abort();
     let log_buf = state.log_buffer.clone();
     let abort_flag = state.abort_flag.clone();
-    let emitter = ProgressEmitter::new(app.clone(), log_buf, abort_flag, "recapper");
 
-    run_recapper(config, emitter).await.map_err(|e| e.to_string())
+    let (emitter, jid_clean) = if let Some(jid) = job_id {
+        let job_flag = state.register_job(&jid);
+        let em = ProgressEmitter::with_job(app.clone(), log_buf, abort_flag, job_flag, jid.clone(), "recapper");
+        (em, Some(jid))
+    } else {
+        state.clear_abort();
+        let em = ProgressEmitter::new(app.clone(), log_buf, abort_flag, "recapper");
+        (em, None)
+    };
+
+    let res = run_recapper(config, emitter).await;
+
+    if let Some(ref jid) = jid_clean {
+        state.unregister_job(jid);
+    }
+
+    res.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -47,6 +62,7 @@ async fn run_recapper(
 
     // ── Step 1: Collect and filter images ────────────────────────────────────
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Scanning,
         current: 0,
         total: 0,
@@ -67,6 +83,7 @@ async fn run_recapper(
 
     // ── Step 2: Load audio duration ───────────────────────────────────────────
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::LoadingAudio,
         current: 0,
         total: 0,
@@ -92,6 +109,7 @@ async fn run_recapper(
 
     if config.location_enabled {
         emitter.emit_progress(&ProgressEvent {
+        job_id: None,
             stage: ProcessingStage::Geocoding,
             current: 0,
             total,
@@ -105,12 +123,13 @@ async fn run_recapper(
             // Try to read GPS from EXIF
             if let Some(loc_str) = read_gps_from_exif(img_path) {
                 if let Some((lat, lon)) = parse_coords(&loc_str) {
-                    let resolved = geocoder::resolve_location(lat, lon, &config.location_rules, &config.geocoding_mode);
+                    let resolved = geocoder::resolve_location(lat, lon, &config.location_rules, &config.geocoding_mode, Some(&emitter.app));
                     location_strings[i] = resolved;
                 }
             }
             let pct = 8.0 + (i as f32 / total as f32) * 12.0;
             emitter.emit_progress(&ProgressEvent {
+        job_id: None,
                 stage: ProcessingStage::Geocoding,
                 current: i + 1,
                 total,
@@ -123,6 +142,7 @@ async fn run_recapper(
     // ── Step 5: Render frames ─────────────────────────────────────────────────
     emitter.info("Rendering frames...");
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::RenderingFrames,
         current: 0,
         total,
@@ -153,6 +173,7 @@ async fn run_recapper(
 
         let pct = 20.0 + (i as f32 / total as f32) * 50.0;
         emitter.emit_progress(&ProgressEvent {
+        job_id: None,
             stage: ProcessingStage::RenderingFrames,
             current: i + 1,
             total,
@@ -181,6 +202,7 @@ async fn run_recapper(
         &config,
         |pct| {
             let _ = emitter.emit_progress(&ProgressEvent {
+                job_id: None,
                 stage: ProcessingStage::EncodingVideo,
                 current: (pct * n_frames as f32) as usize,
                 total: n_frames,
@@ -196,6 +218,7 @@ async fn run_recapper(
         start.elapsed().as_secs_f64()
     ));
     emitter.emit_progress(&ProgressEvent {
+        job_id: None,
         stage: ProcessingStage::Complete,
         current: total,
         total,

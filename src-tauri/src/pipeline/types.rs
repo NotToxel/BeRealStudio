@@ -322,6 +322,7 @@ impl Default for ArchiveInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressEvent {
+    pub job_id: Option<String>,
     pub stage: ProcessingStage,
     pub current: usize,
     pub total: usize,
@@ -332,9 +333,48 @@ pub struct ProgressEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogEvent {
+    pub job_id: Option<String>,
     pub level: LogLevel,
     pub message: String,
     pub timestamp: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgressEvent {
+    pub bytes_downloaded: u64,
+    pub total_bytes: u64,
+    pub percentage: f32,
+    pub speed_mbps: f32,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeoTierInfo {
+    pub id: String,
+    pub name: String,
+    pub subtitle: String,
+    pub min_population: u32,
+    pub approx_cities: String,
+    pub approx_download_mb: f32,
+    pub is_installed: bool,
+    pub is_active: bool,
+    pub file_size_bytes: u64,
+    pub city_count: usize,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfflineGeoDbStatus {
+    pub is_installed: bool,
+    pub active_tier: String,
+    pub file_size_bytes: u64,
+    pub city_count: usize,
+    pub path: String,
+    pub version: String,
+    pub tiers: Vec<GeoTierInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -9,12 +9,20 @@
     progressState,
     liveLogs,
     activeError,
+    createActiveJob,
+    updateActiveJobProgress,
+    appendActiveJobLog,
+    completeActiveJob,
+    errorActiveJob,
+    recordActivity,
   } from '$lib/stores';
   import {
     scanArchive,
     startToolkit,
     onToolkitProgress,
     onToolkitLog,
+    onJobProgress,
+    onJobLog,
   } from '$lib/tauri';
   import FolderArchive from 'lucide-svelte/icons/folder-archive';
   import Sliders from 'lucide-svelte/icons/sliders';
@@ -126,38 +134,63 @@
       return;
     }
 
+    // Create unique Active Job for parallel execution
+    const job = createActiveJob({
+      type: 'toolkit',
+      title: `Photo Processing (${$archiveMetadata?.entryCount || 0} posts)`,
+      inputPath: $toolkitConfig.inputPath,
+      outputPath: $toolkitConfig.outputPath,
+    });
+
     liveLogs.set([]);
     progressState.set({
+      jobId: job.id,
       stage: 'Scanning',
       current: 0,
-      total: 0,
+      total: $archiveMetadata?.entryCount || 0,
       percentage: 0,
     });
     isProcessing.set(true);
-    currentView.set('processing');
 
-    const unlistenProgress = await onToolkitProgress((p) => {
+    const unlistenProgress = await onJobProgress(job.id, (p) => {
+      updateActiveJobProgress(job.id, p);
       progressState.set(p);
-      if (p.stage === 'Complete') {
-        isProcessing.set(false);
-        currentView.set('complete');
-      }
     });
 
-    const unlistenLog = await onToolkitLog((l) => {
+    const unlistenLog = await onJobLog(job.id, (l) => {
+      appendActiveJobLog(job.id, l);
       liveLogs.update((logs) => [...logs, l]);
     });
 
-    try {
-      await startToolkit($toolkitConfig);
-    } catch (e: any) {
-      isProcessing.set(false);
-      activeError.set({
-        title: 'Processing Failed',
-        message: 'An error occurred during BeReal photo processing.',
-        details: String(e),
+    startToolkit($toolkitConfig, job.id)
+      .then((res) => {
+        completeActiveJob(job.id, res);
+        recordActivity({
+          type: 'toolkit',
+          title: `Photo Processing (${res.entriesProcessed} Memories)`,
+          outputPath: $toolkitConfig.outputPath,
+          inputPath: $toolkitConfig.inputPath,
+          durationSecs: res.durationSecs,
+          status: 'success',
+          itemCount: res.filesConverted,
+          details: `Processed in ${res.durationSecs.toFixed(1)}s`,
+        });
+      })
+      .catch((e: any) => {
+        errorActiveJob(job.id, String(e));
+        activeError.set({
+          title: 'Processing Failed',
+          message: 'An error occurred during BeReal photo processing.',
+          details: String(e),
+        });
+      })
+      .finally(() => {
+        isProcessing.set(false);
+        unlistenProgress();
+        unlistenLog();
       });
-    }
+
+    currentView.set('processing');
   }
 </script>
 
@@ -1460,8 +1493,8 @@
   }
 
   .mockup-frame.is-sbs {
-    aspect-ratio: 4 / 3;
-    max-width: 320px;
+    aspect-ratio: 3 / 2;
+    max-width: 340px;
   }
 
   .morph-stage {
@@ -1496,7 +1529,7 @@
   .morph-stage.mode-pip .layer-secondary {
     top: 14px;
     left: 14px;
-    width: 32%;
+    width: 30%;
     aspect-ratio: 3 / 4;
     border-radius: 12px;
     border: 2.5px solid #000000;

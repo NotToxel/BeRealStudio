@@ -5,7 +5,7 @@
   export let label: string;
   export let description: string = '';
   export let tooltip: string = '';
-  export let icon: ComponentType | null = null;
+  export let icon: any = null;
   export let checked: boolean = false;
   export let disabled: boolean = false;
   export let accentColor: 'yellow' | 'violet' | 'emerald' | 'cyan' = 'yellow';

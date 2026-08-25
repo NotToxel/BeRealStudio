@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     currentView,
     recapperConfig,
@@ -6,11 +7,26 @@
     progressState,
     liveLogs,
     activeError,
+    createActiveJob,
+    updateActiveJobProgress,
+    appendActiveJobLog,
+    completeActiveJob,
+    errorActiveJob,
+    offlineGeoDbStatus,
+    isDownloadingGeoDb,
+    downloadGeoDbProgress,
+    recordActivity,
   } from '$lib/stores';
   import {
     startRecapper,
     onRecapperProgress,
     onRecapperLog,
+    onJobProgress,
+    onJobLog,
+    checkOfflineGeoDb,
+    downloadOfflineGeoDb,
+    setActiveGeoDbTier,
+    onDownloadProgress,
   } from '$lib/tauri';
   import type { SpeedMode } from '$lib/types';
   import Music from 'lucide-svelte/icons/music';
@@ -26,6 +42,12 @@
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Cloud from 'lucide-svelte/icons/cloud';
   import Database from 'lucide-svelte/icons/database';
+  import Download from 'lucide-svelte/icons/download';
+  import CheckCircle from 'lucide-svelte/icons/circle-check';
+  import HardDrive from 'lucide-svelte/icons/hard-drive';
+  import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import User from 'lucide-svelte/icons/circle-user';
+  import Mountain from 'lucide-svelte/icons/mountain';
   import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import FontPicker from '$components/FontPicker.svelte';
@@ -139,6 +161,103 @@
     { id: 'Wave', name: 'Rhythm Wave', desc: 'Pulsating rhythmic speed wave' },
   ];
 
+  const DEFAULT_GEO_TIERS = [
+    {
+      id: 'cities15000',
+      name: 'Lite',
+      subtitle: 'Major Cities (>15,000 Pop)',
+      minPopulation: 15000,
+      approxCities: '25,000+ Cities',
+      approxDownloadMb: 2.5,
+      isInstalled: false,
+      isActive: false,
+      fileSizeBytes: 0,
+      cityCount: 0,
+      path: '',
+    },
+    {
+      id: 'cities5000',
+      name: 'Standard',
+      subtitle: 'Towns & Cities (>5,000 Pop)',
+      minPopulation: 5000,
+      approxCities: '55,000+ Towns',
+      approxDownloadMb: 4.5,
+      isInstalled: false,
+      isActive: false,
+      fileSizeBytes: 0,
+      cityCount: 0,
+      path: '',
+    },
+    {
+      id: 'cities500',
+      name: 'Ultra Detailed',
+      subtitle: 'Villages & Towns (>500 Pop)',
+      minPopulation: 500,
+      approxCities: '200,000+ Towns & Villages',
+      approxDownloadMb: 12.5,
+      isInstalled: false,
+      isActive: true,
+      fileSizeBytes: 0,
+      cityCount: 0,
+      path: '',
+    },
+  ];
+
+  let selectedTierId = 'cities500';
+
+  $: availableTiers = $offlineGeoDbStatus?.tiers?.length ? $offlineGeoDbStatus.tiers : DEFAULT_GEO_TIERS;
+  $: selectedTier = availableTiers.find((t) => t.id === selectedTierId) || availableTiers[2];
+
+  onMount(async () => {
+    try {
+      const status = await checkOfflineGeoDb();
+      offlineGeoDbStatus.set(status);
+      if (status.activeTier) {
+        selectedTierId = status.activeTier;
+      }
+    } catch (e) {
+      console.warn('Failed to check offline geodb:', e);
+    }
+  });
+
+  async function handleSelectTier(tierId: string) {
+    selectedTierId = tierId;
+    const tierInfo = availableTiers.find((t) => t.id === tierId);
+    if (tierInfo?.isInstalled) {
+      try {
+        const status = await setActiveGeoDbTier(tierId);
+        offlineGeoDbStatus.set(status);
+      } catch (e) {
+        console.warn('Failed to switch active tier:', e);
+      }
+    }
+  }
+
+  async function handleDownloadSelectedTier() {
+    isDownloadingGeoDb.set(true);
+    const unlisten = await onDownloadProgress((p) => {
+      downloadGeoDbProgress.set(p);
+      if (p.percentage >= 100) {
+        setTimeout(async () => {
+          isDownloadingGeoDb.set(false);
+          const status = await checkOfflineGeoDb();
+          offlineGeoDbStatus.set(status);
+          unlisten();
+        }, 800);
+      }
+    });
+
+    try {
+      await downloadOfflineGeoDb(selectedTierId);
+      const status = await checkOfflineGeoDb();
+      offlineGeoDbStatus.set(status);
+    } catch (e: any) {
+      alert(`Offline database download error:\n${e}`);
+    } finally {
+      isDownloadingGeoDb.set(false);
+    }
+  }
+
   // Location position toggle helper: checked = AboveDate, unchecked = BelowDate
   $: locationAboveDate = $recapperConfig.locationPosition === 'AboveDate';
   function handleLocationPositionToggle(checked: boolean) {
@@ -172,38 +291,67 @@
       return;
     }
 
+    // Create unique Active Job for parallel execution
+    const job = createActiveJob({
+      type: 'recapper',
+      title: `Recap Video (${$recapperConfig.fps} FPS)`,
+      inputPath: $recapperConfig.inputFolder,
+      outputPath: $recapperConfig.outputPath,
+    });
+
+    // Also update legacy single-job stores
     liveLogs.set([]);
     progressState.set({
+      jobId: job.id,
       stage: 'Scanning',
       current: 0,
       total: 0,
       percentage: 0,
     });
     isProcessing.set(true);
-    currentView.set('processing');
 
-    const unlistenProgress = await onRecapperProgress((p) => {
+    // Targeted listeners
+    const unlistenProgress = await onJobProgress(job.id, (p) => {
+      updateActiveJobProgress(job.id, p);
       progressState.set(p);
-      if (p.stage === 'Complete') {
-        isProcessing.set(false);
-        currentView.set('complete');
-      }
     });
 
-    const unlistenLog = await onRecapperLog((l) => {
+    const unlistenLog = await onJobLog(job.id, (l) => {
+      appendActiveJobLog(job.id, l);
       liveLogs.update((logs) => [...logs, l]);
     });
 
-    try {
-      await startRecapper($recapperConfig);
-    } catch (e: any) {
-      isProcessing.set(false);
-      activeError.set({
-        title: 'Recapper Error',
-        message: 'An error occurred during recap video generation.',
-        details: String(e),
+    // Start background processing
+    startRecapper($recapperConfig, job.id)
+      .then((res) => {
+        completeActiveJob(job.id, res);
+        recordActivity({
+          type: 'recapper',
+          title: `Recap Video (${$recapperConfig.fps} FPS)`,
+          outputPath: $recapperConfig.outputPath,
+          inputPath: $recapperConfig.inputFolder,
+          durationSecs: res.durationSecs,
+          status: 'success',
+          itemCount: res.filesConverted || res.entriesProcessed,
+          details: `Generated in ${res.durationSecs.toFixed(1)}s`,
+        });
+      })
+      .catch((e: any) => {
+        errorActiveJob(job.id, String(e));
+        activeError.set({
+          title: 'Recapper Error',
+          message: 'An error occurred during recap video generation.',
+          details: String(e),
+        });
+      })
+      .finally(() => {
+        isProcessing.set(false);
+        unlistenProgress();
+        unlistenLog();
       });
-    }
+
+    // Navigate to processing view or activity
+    currentView.set('processing');
   }
 </script>
 
@@ -387,7 +535,7 @@
                       type="button"
                       class="pos-card-btn"
                       class:active={$recapperConfig.datePosition === pos.id}
-                      on:click={() => ($recapperConfig.datePosition = pos.id)}
+                      on:click={() => ($recapperConfig.datePosition = pos.id as import('$lib/types').TextPosition)}
                     >
                       <div class="pos-mini-screen">
                         <div class="screen-pip-hint"></div>
@@ -497,10 +645,126 @@
               </div>
 
               {#if $recapperConfig.geocodingMode === 'Offline'}
-                <div class="geo-warning-banner">
-                  <AlertTriangle size={13} class="text-amber-400 flex-shrink-0" />
-                  <span>Offline geocoding database is not yet bundled. The engine will automatically fall back to online Nominatim.</span>
+                <!-- Precision Tier Selector -->
+                <div class="field-group">
+                  <div class="tier-header-row">
+                    <span class="label">Database Precision Tier</span>
+                    <span class="text-xs text-muted">Select precision level &amp; switch instantly</span>
+                  </div>
+
+                  <div class="geo-tiers-grid">
+                    {#each availableTiers as tier}
+                      <button
+                        type="button"
+                        class="geo-tier-card"
+                        class:active={selectedTierId === tier.id}
+                        class:installed={tier.isInstalled}
+                        on:click={() => handleSelectTier(tier.id)}
+                      >
+                        <div class="tier-card-top">
+                          <span class="tier-name font-semibold">{tier.name}</span>
+                          {#if tier.isInstalled}
+                            <span class="badge {tier.isActive ? 'badge-success' : 'badge-subtle'} text-xs font-mono">
+                              {#if tier.isActive}✓ Active{:else}Installed{/if}
+                            </span>
+                          {:else}
+                            <span class="badge badge-yellow text-xs font-mono">~{tier.approxDownloadMb} MB</span>
+                          {/if}
+                        </div>
+                        <span class="tier-sub text-xs text-secondary">{tier.subtitle}</span>
+                        <span class="tier-cities text-xs font-mono text-muted">{tier.approxCities}</span>
+                      </button>
+                    {/each}
+                  </div>
                 </div>
+
+                <!-- Current Selected Tier Status Card -->
+                {#if $isDownloadingGeoDb}
+                  <div class="geo-download-card card">
+                    <div class="geo-download-head">
+                      <div class="geo-download-title-row">
+                        <Loader2 size={16} class="animate-spin text-amber-400" />
+                        <span class="font-bold text-white text-sm">Downloading {selectedTier?.name || 'Offline'} Dataset...</span>
+                      </div>
+                      <span class="badge badge-yellow font-mono text-xs">
+                        {$downloadGeoDbProgress ? `${$downloadGeoDbProgress.percentage.toFixed(2)}%` : 'Connecting...'}
+                      </span>
+                    </div>
+
+                    <p class="text-xs text-secondary">
+                      {$downloadGeoDbProgress?.status || `Connecting to GeoNames server (~${selectedTier?.approxDownloadMb || 12.5} MB)...`}
+                    </p>
+
+                    <div class="geo-download-track">
+                      <div
+                        class="geo-download-fill"
+                        style="width: {Math.min(Math.max($downloadGeoDbProgress?.percentage || 5, 0), 100)}%;"
+                      ></div>
+                    </div>
+
+                    <div class="geo-download-meta font-mono text-xs text-muted">
+                      {#if $downloadGeoDbProgress}
+                        <span>{($downloadGeoDbProgress.bytesDownloaded / 1048576).toFixed(1)} MB / {($downloadGeoDbProgress.totalBytes / 1048576).toFixed(1)} MB</span>
+                        <span>&bull;</span>
+                        <span>{$downloadGeoDbProgress.speedMbps.toFixed(1)} MB/s</span>
+                      {:else}
+                        <span>Initializing stream...</span>
+                      {/if}
+                    </div>
+                  </div>
+                {:else if selectedTier?.isInstalled}
+                  <div class="geo-installed-card card">
+                    <div class="installed-left">
+                      <div class="installed-icon-circle">
+                        <CheckCircle size={16} class="text-emerald-400" />
+                      </div>
+                      <div class="installed-titles">
+                        <div class="installed-title-row">
+                          <span class="font-bold text-white text-sm">{selectedTier.name} Dataset Active &amp; Ready</span>
+                          <span class="badge badge-success font-mono text-xs">{selectedTier.approxCities}</span>
+                        </div>
+                        <span class="text-xs text-muted font-mono">
+                          {(selectedTier.fileSizeBytes / 1048576).toFixed(1)} MB on disk &bull; Sub-millisecond lookup &bull; 100% Offline
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs text-muted hover:text-white"
+                      on:click={handleDownloadSelectedTier}
+                      title="Update or re-download dataset"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Re-download</span>
+                    </button>
+                  </div>
+                {:else}
+                  <div class="geo-prompt-card card">
+                    <div class="geo-prompt-left">
+                      <div class="geo-prompt-icon-circle">
+                        <HardDrive size={18} class="text-amber-400" />
+                      </div>
+                      <div class="geo-prompt-titles">
+                        <div class="geo-prompt-title-row">
+                          <span class="font-bold text-white text-sm">{selectedTier?.name || 'Precision'} Dataset Required</span>
+                          <span class="badge badge-yellow font-mono text-xs">~{selectedTier?.approxDownloadMb || 12.5} MB</span>
+                        </div>
+                        <p class="text-xs text-secondary">
+                          Download the {selectedTier?.subtitle || 'GeoNames'} dataset ({selectedTier?.approxCities || '200,000+ towns'}) for instant reverse geocoding.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="btn btn-accent-yellow btn-sm flex-shrink-0"
+                      on:click={handleDownloadSelectedTier}
+                    >
+                      <Download size={14} />
+                      <span>Download {selectedTier?.name || ''} Dataset (~{selectedTier?.approxDownloadMb || 12.5} MB)</span>
+                    </button>
+                  </div>
+                {/if}
               {/if}
 
               <RuleEditor bind:rules={$recapperConfig.locationRules} />
@@ -614,13 +878,21 @@
           </div>
         </div>
 
-        <!-- Phone Mockup Canvas (9:16 portrait) -->
+        <!-- Live Mockup Canvas (3:4 portrait) -->
         <div class="mockup-frame">
           <div class="mockup-screen">
             <div class="simulated-photo">
+              <!-- Primary Background Camera Badge -->
+              <div class="camera-badge badge-primary" title="Landscape & Environment (Main Camera)">
+                <Mountain size={13} class="badge-icon text-sky-300" />
+              </div>
+
               <!-- Secondary PIP in top-left -->
               <div class="simulated-pip">
-                <div class="pip-camera-lens"></div>
+                <div class="pip-lens-circle"></div>
+                <div class="camera-badge badge-secondary" title="Person Silhouette (Selfie)">
+                  <User size={13} class="badge-icon text-purple-300" />
+                </div>
               </div>
 
               <!-- Overlaid Text Elements -->
@@ -868,16 +1140,204 @@
     margin-top: 4px;
   }
 
-  .geo-warning-banner {
+  /* Offline Precision Tier Selector */
+  .tier-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .geo-tiers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .geo-tier-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: #13131a;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+    position: relative;
+  }
+
+  .geo-tier-card:hover {
+    background: #191924;
+    border-color: var(--border-medium);
+  }
+
+  .geo-tier-card.active {
+    background: #181826;
+    border-color: rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.15);
+  }
+
+  .tier-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tier-name {
+    font-size: 13px;
+    color: var(--text-main);
+  }
+
+  .geo-tier-card.active .tier-name {
+    color: #ffe600;
+  }
+
+  .tier-sub {
+    font-size: 10.5px;
+    line-height: 1.25;
+  }
+
+  .tier-cities {
+    font-size: 10px;
+    margin-top: 2px;
+  }
+
+  /* Offline Geocoding Dataset Cards */
+  .geo-download-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #14141d;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.08);
+  }
+
+  .geo-download-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .geo-download-title-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(245, 158, 11, 0.08);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    padding: 8px 12px;
+  }
+
+  .geo-download-track {
+    width: 100%;
+    height: 6px;
+    background: #09090d;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .geo-download-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #ffe600);
+    border-radius: 999px;
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.5);
+    transition: width 0.15s ease;
+  }
+
+  .geo-download-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .geo-installed-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .installed-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .installed-icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .installed-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .installed-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .geo-prompt-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    background: #14141c;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+  }
+
+  .geo-prompt-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .geo-prompt-icon-circle {
+    width: 38px;
+    height: 38px;
     border-radius: var(--radius-sm);
-    font-size: 12px;
-    color: var(--text-main);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .geo-prompt-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .geo-prompt-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   /* Speed Modes Grid */
@@ -1033,7 +1493,7 @@
     width: 100%;
     max-width: 270px;
     margin: 0 auto;
-    aspect-ratio: 9 / 16;
+    aspect-ratio: 3 / 4;
     background: #000000;
     border-radius: var(--radius-lg);
     border: 2px solid var(--border-medium);
@@ -1051,7 +1511,7 @@
   .simulated-photo {
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle at 75% 30%, #475569 0%, #1e293b 40%, #0f172a 75%, #080c14 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1061,23 +1521,57 @@
     position: absolute;
     top: 14px;
     left: 14px;
-    width: 28%;
+    width: 30%;
     aspect-ratio: 3 / 4;
-    background: #334155;
-    border: 2px solid #000000;
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+    border: 2.5px solid #000000;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+    z-index: 10;
   }
 
-  .pip-camera-lens {
-    width: 16px;
-    height: 16px;
+  .camera-badge {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #ffffff;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .badge-primary {
+    bottom: 12px;
+    left: 12px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    z-index: 2;
+  }
+
+  .badge-secondary {
+    top: 6px;
+    left: 6px;
+    padding: 2px 5px;
+    font-size: 9.5px;
+    font-weight: 700;
+    z-index: 12;
+  }
+
+  .pip-lens-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    background: #1e293b;
-    border: 1px solid #475569;
+    background: #0f172a;
+    border: 1.5px solid #475569;
   }
 
   /* Overlay text positions */

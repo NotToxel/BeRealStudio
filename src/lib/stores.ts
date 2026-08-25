@@ -8,6 +8,10 @@ import type {
   ProgressEvent,
   LogEvent,
   AppSettings,
+  ActiveJob,
+  OfflineGeoDbStatus,
+  DownloadProgressEvent,
+  ActivityRecord,
 } from './types';
 
 // Default configurations
@@ -71,11 +75,10 @@ export const currentArchive = writable<ArchiveInfo | null>(null);
 export const archiveMetadata = currentArchive;
 export const isScanning = writable<boolean>(false);
 
-// Archive scan persistence — tracks the last successfully scanned path so we
-// don't re-scan the same archive when switching tabs.
+// Archive scan persistence
 export const lastScannedArchivePath = writable<string>('');
 
-// Processing & Progress
+// Processing & Progress (Active Primary Single View)
 export const isProcessing = writable<boolean>(false);
 export const progressState = writable<ProgressEvent>({
   stage: 'Scanning',
@@ -86,6 +89,114 @@ export const progressState = writable<ProgressEvent>({
 });
 export const liveLogs = writable<LogEvent[]>([]);
 export const processingResult = writable<ProcessingResult | null>(null);
+
+// ─── Parallel Multi-Job Active Queue ─────────────────────────────────────────
+export const activeJobs = writable<ActiveJob[]>([]);
+
+export function createActiveJob(
+  params: {
+    type: 'toolkit' | 'recapper';
+    title: string;
+    inputPath: string;
+    outputPath: string;
+  }
+): ActiveJob {
+  const newJob: ActiveJob = {
+    id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    type: params.type,
+    title: params.title,
+    inputPath: params.inputPath,
+    outputPath: params.outputPath,
+    startTime: Date.now(),
+    stage: 'Scanning',
+    current: 0,
+    total: 0,
+    percentage: 0,
+    status: 'running',
+    logs: [],
+  };
+
+  activeJobs.update((list) => [newJob, ...list]);
+  return newJob;
+}
+
+export function updateActiveJobProgress(jobId: string, event: ProgressEvent) {
+  activeJobs.update((list) =>
+    list.map((j) => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        stage: event.stage,
+        current: event.current,
+        total: event.total,
+        percentage: event.percentage,
+        currentFile: event.currentFile ?? j.currentFile,
+        status: event.stage === 'Complete' ? 'completed' : j.status,
+      };
+    })
+  );
+}
+
+export function appendActiveJobLog(jobId: string, event: LogEvent) {
+  activeJobs.update((list) =>
+    list.map((j) => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        logs: [...j.logs.slice(-200), event],
+      };
+    })
+  );
+}
+
+export function completeActiveJob(jobId: string, result: ProcessingResult) {
+  activeJobs.update((list) =>
+    list.map((j) => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        status: 'completed',
+        percentage: 100,
+        stage: 'Complete',
+        result,
+      };
+    })
+  );
+}
+
+export function cancelActiveJobById(jobId: string) {
+  activeJobs.update((list) =>
+    list.map((j) => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        status: 'cancelled',
+      };
+    })
+  );
+}
+
+export function errorActiveJob(jobId: string, errorMsg: string) {
+  activeJobs.update((list) =>
+    list.map((j) => {
+      if (j.id !== jobId) return j;
+      return {
+        ...j,
+        status: 'error',
+        errorMessage: errorMsg,
+      };
+    })
+  );
+}
+
+export function removeActiveJob(jobId: string) {
+  activeJobs.update((list) => list.filter((j) => j.id !== jobId));
+}
+
+// ─── Offline Geocoding Database Stores ───────────────────────────────────────
+export const offlineGeoDbStatus = writable<OfflineGeoDbStatus | null>(null);
+export const isDownloadingGeoDb = writable<boolean>(false);
+export const downloadGeoDbProgress = writable<DownloadProgressEvent | null>(null);
 
 // Error Modal
 export interface ModalError {

@@ -12,6 +12,8 @@ import type {
   FontInfo,
   ProgressEvent,
   LogEvent,
+  OfflineGeoDbStatus,
+  DownloadProgressEvent,
 } from './types';
 
 // Archive & Scanning
@@ -24,20 +26,28 @@ export async function extractZip(zipPath: string, destDir: string): Promise<stri
 }
 
 // Processing
-export async function startToolkit(config: ToolkitConfig): Promise<ProcessingResult> {
-  return await invoke<ProcessingResult>('start_toolkit', { config });
+export async function startToolkit(config: ToolkitConfig, jobId?: string): Promise<ProcessingResult> {
+  return await invoke<ProcessingResult>('start_toolkit', { config, jobId });
 }
 
 export async function cancelToolkit(): Promise<void> {
   return await invoke<void>('cancel_toolkit');
 }
 
-export async function startRecapper(config: RecapperConfig): Promise<ProcessingResult> {
-  return await invoke<ProcessingResult>('start_recapper', { config });
+export async function startRecapper(config: RecapperConfig, jobId?: string): Promise<ProcessingResult> {
+  return await invoke<ProcessingResult>('start_recapper', { config, jobId });
 }
 
 export async function cancelRecapper(): Promise<void> {
   return await invoke<void>('cancel_recapper');
+}
+
+export async function cancelJob(jobId: string): Promise<boolean> {
+  return await invoke<boolean>('cancel_job', { jobId });
+}
+
+export async function listActiveJobs(): Promise<string[]> {
+  return await invoke<string[]>('list_active_jobs');
 }
 
 // Settings
@@ -129,6 +139,24 @@ export async function revealInFolder(path: string): Promise<void> {
   await openPath(path);
 }
 
+
+// Geocoding Database
+export async function checkOfflineGeoDb(): Promise<OfflineGeoDbStatus> {
+  return await invoke<OfflineGeoDbStatus>('check_offline_geodb');
+}
+
+export async function downloadOfflineGeoDb(tier?: string): Promise<void> {
+  return await invoke<void>('download_offline_geodb', { tier });
+}
+
+export async function setActiveGeoDbTier(tier: string): Promise<OfflineGeoDbStatus> {
+  return await invoke<OfflineGeoDbStatus>('set_active_geodb_tier', { tier });
+}
+
+export async function deleteOfflineGeoDb(tier?: string): Promise<OfflineGeoDbStatus> {
+  return await invoke<OfflineGeoDbStatus>('delete_offline_geodb', { tier });
+}
+
 // Event Subscriptions
 export async function onToolkitProgress(
   cb: (event: ProgressEvent) => void
@@ -152,4 +180,24 @@ export async function onRecapperLog(
   cb: (event: LogEvent) => void
 ): Promise<UnlistenFn> {
   return await listen<LogEvent>('recapper-log', (e) => cb(e.payload));
+}
+
+export async function onJobProgress(
+  jobId: string,
+  cb: (event: ProgressEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<ProgressEvent>(`job-progress-${jobId}`, (e) => cb(e.payload));
+}
+
+export async function onJobLog(
+  jobId: string,
+  cb: (event: LogEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<LogEvent>(`job-log-${jobId}`, (e) => cb(e.payload));
+}
+
+export async function onDownloadProgress(
+  cb: (event: DownloadProgressEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<DownloadProgressEvent>('download-progress', (e) => cb(e.payload));
 }

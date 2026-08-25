@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentView, isProcessing, progressState, activeFeature, activityHistory } from '$lib/stores';
+  import { currentView, isProcessing, progressState, activeFeature, activityHistory, activeJobs } from '$lib/stores';
   import type { ViewMode } from '$lib/types';
   import Home from 'lucide-svelte/icons/house';
   import Images from 'lucide-svelte/icons/images';
@@ -8,10 +8,13 @@
   import Settings from 'lucide-svelte/icons/settings';
   import Info from 'lucide-svelte/icons/info';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
 
   function navigate(mode: ViewMode) {
     currentView.set(mode);
   }
+
+  $: runningJobs = $activeJobs.filter((j) => j.status === 'running');
 </script>
 
 <header class="app-header">
@@ -44,7 +47,7 @@
           on:click={() => navigate('toolkit-config')}
         >
           <Images size={15} />
-          <span>Photos</span>
+          <span>Photos Suite</span>
         </button>
 
         <button
@@ -61,7 +64,35 @@
 
     <!-- Zone 3 (Right): Auxiliary Navigation & Background Queue Pill -->
     <div class="nav-zone-right">
-      {#if $isProcessing}
+      {#if runningJobs.length > 1}
+        <button
+          type="button"
+          class="bg-queue-pill multi-jobs"
+          class:active={$currentView === 'activity'}
+          on:click={() => currentView.set('activity')}
+          title="{runningJobs.length} operations running in parallel — Click to manage queue"
+        >
+          <Sparkles size={13} class="text-amber-400 animate-pulse" />
+          <div class="queue-text">
+            <span class="queue-stage">{runningJobs.length} Parallel Jobs</span>
+            <span class="queue-pct font-mono">Running</span>
+          </div>
+        </button>
+      {:else if runningJobs.length === 1}
+        <button
+          type="button"
+          class="bg-queue-pill"
+          class:active={$currentView === 'activity' || $currentView === 'processing'}
+          on:click={() => currentView.set('activity')}
+          title="Background task in progress — Click to manage in Activity"
+        >
+          <Loader2 size={13} class="animate-spin text-amber-400" />
+          <div class="queue-text">
+            <span class="queue-stage">{runningJobs[0].stage || 'Processing'}</span>
+            <span class="queue-pct font-mono">{runningJobs[0].percentage.toFixed(2)}%</span>
+          </div>
+        </button>
+      {:else if $isProcessing}
         <button
           type="button"
           class="bg-queue-pill"

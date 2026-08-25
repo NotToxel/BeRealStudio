@@ -152,6 +152,7 @@ export type ProcessingStage =
   | 'EncodingVideo';
 
 export interface ProgressEvent {
+  jobId?: string;
   stage: ProcessingStage;
   current: number;
   total: number;
@@ -160,9 +161,60 @@ export interface ProgressEvent {
 }
 
 export interface LogEvent {
+  jobId?: string;
   level: 'Info' | 'Warn' | 'Error' | 'Debug';
   message: string;
   timestamp: string;
+}
+
+export interface DownloadProgressEvent {
+  bytesDownloaded: number;
+  totalBytes: number;
+  percentage: number;
+  speedMbps: number;
+  status: string;
+}
+
+export interface GeoTierInfo {
+  id: string; // 'cities15000' | 'cities5000' | 'cities500'
+  name: string; // 'Lite' | 'Standard' | 'Ultra Detailed'
+  subtitle: string;
+  minPopulation: number;
+  approxCities: string;
+  approxDownloadMb: number;
+  isInstalled: boolean;
+  isActive: boolean;
+  fileSizeBytes: number;
+  cityCount: number;
+  path: string;
+}
+
+export interface OfflineGeoDbStatus {
+  isInstalled: boolean;
+  activeTier: string;
+  fileSizeBytes: number;
+  cityCount: number;
+  path: string;
+  version: string;
+  tiers: GeoTierInfo[];
+}
+
+export interface ActiveJob {
+  id: string;
+  type: 'toolkit' | 'recapper';
+  title: string;
+  inputPath: string;
+  outputPath: string;
+  startTime: number;
+  stage: ProcessingStage;
+  current: number;
+  total: number;
+  percentage: number;
+  currentFile?: string;
+  status: 'running' | 'completed' | 'cancelled' | 'error';
+  errorMessage?: string;
+  logs: LogEvent[];
+  result?: ProcessingResult;
 }
 
 export interface ProcessingResult {
