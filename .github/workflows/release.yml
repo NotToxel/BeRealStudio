@@ -147,6 +147,9 @@ jobs:
       - name: Install Frontend Dependencies
         run: bun install
 
+      - name: Build Frontend
+        run: bun run build
+
       - name: Build Tauri Desktop Application
         run: bun run tauri build --verbose
 
