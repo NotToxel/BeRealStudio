@@ -71,6 +71,10 @@ export const currentArchive = writable<ArchiveInfo | null>(null);
 export const archiveMetadata = currentArchive;
 export const isScanning = writable<boolean>(false);
 
+// Archive scan persistence — tracks the last successfully scanned path so we
+// don't re-scan the same archive when switching tabs.
+export const lastScannedArchivePath = writable<string>('');
+
 // Processing & Progress
 export const isProcessing = writable<boolean>(false);
 export const progressState = writable<ProgressEvent>({
@@ -97,3 +101,43 @@ export const ffmpegInfo = writable<{ path: string | null; checking: boolean; che
   checking: false,
   checked: false,
 });
+
+// Activity History Store
+function loadStoredActivity(): ActivityRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('bereal_studio_activity_history');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export const activityHistory = writable<ActivityRecord[]>(loadStoredActivity());
+
+if (typeof window !== 'undefined') {
+  activityHistory.subscribe((list) => {
+    try {
+      localStorage.setItem('bereal_studio_activity_history', JSON.stringify(list));
+    } catch {
+      // Ignore storage quota errors
+    }
+  });
+}
+
+export function recordActivity(entry: Omit<ActivityRecord, 'id' | 'timestamp'>) {
+  const newRecord: ActivityRecord = {
+    ...entry,
+    id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date().toISOString(),
+  };
+  activityHistory.update((list) => [newRecord, ...list.slice(0, 49)]);
+}
+
+export function clearActivityHistory() {
+  activityHistory.set([]);
+}
+
+export function deleteActivityRecord(id: string) {
+  activityHistory.update((list) => list.filter((item) => item.id !== id));
+}

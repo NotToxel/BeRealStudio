@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     currentView,
     activeFeature,
@@ -6,16 +7,48 @@
     recapperConfig,
     progressState,
     liveLogs,
+    recordActivity,
   } from '$lib/stores';
-  import { exportDebugLog } from '$lib/tauri';
+  import { exportDebugLog, openPath } from '$lib/tauri';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
+  import ExternalLink from 'lucide-svelte/icons/external-link';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import Download from 'lucide-svelte/icons/download';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Film from 'lucide-svelte/icons/film';
   import Camera from 'lucide-svelte/icons/camera';
+  import History from 'lucide-svelte/icons/history';
   import LogConsole from '$components/LogConsole.svelte';
+
+  onMount(() => {
+    const isTk = $activeFeature === 'toolkit';
+    const out = isTk ? $toolkitConfig.outputPath : $recapperConfig.outputPath;
+    const inp = isTk ? $toolkitConfig.inputPath : $recapperConfig.inputFolder;
+    recordActivity({
+      type: isTk ? 'toolkit' : 'recapper',
+      title: isTk ? 'Photo Processing Suite' : 'Recap Video Generator',
+      outputPath: out,
+      inputPath: inp,
+      itemCount: $progressState.total || $progressState.current || 1,
+      durationSecs: 0,
+      status: 'success',
+      details: isTk
+        ? `Format: ${$toolkitConfig.convertFormat} • Combined: ${$toolkitConfig.createCombined ? 'Yes' : 'No'}`
+        : `Speed: ${$recapperConfig.speedMode} • ${$recapperConfig.fps} FPS`,
+    });
+  });
+
+  async function handleOpenOutput() {
+    const out = $activeFeature === 'toolkit' ? $toolkitConfig.outputPath : $recapperConfig.outputPath;
+    if (out) {
+      try {
+        await openPath(out);
+      } catch (e) {
+        console.error('Failed to open output path:', e);
+      }
+    }
+  }
 
   async function handleExportLogs() {
     try {
@@ -25,10 +58,6 @@
     } catch (e) {
       alert(`Export failed: ${e}`);
     }
-  }
-
-  function handleOpenToolkit() {
-    currentView.set('toolkit-config');
   }
 
   function handleOpenRecapper() {
@@ -58,16 +87,28 @@
     </div>
 
     <div class="actions-row">
+      <button type="button" class="btn btn-primary btn-sm" on:click={handleOpenOutput}>
+        <FolderOpen size={14} />
+        <span>Open Output in File Explorer</span>
+      </button>
+
       {#if $activeFeature === 'toolkit'}
         <button type="button" class="btn btn-accent-violet btn-sm" on:click={handleOpenRecapper}>
           <Film size={14} />
           <span>Generate Recap Video Now &rarr;</span>
         </button>
       {/if}
+
+      <button type="button" class="btn btn-secondary btn-sm" on:click={() => currentView.set('activity')}>
+        <History size={14} />
+        <span>View Activity History</span>
+      </button>
+
       <button type="button" class="btn btn-secondary btn-sm" on:click={() => currentView.set('home')}>
         <RotateCcw size={14} />
         <span>Return to Home</span>
       </button>
+
       <button type="button" class="btn btn-ghost btn-sm" on:click={handleExportLogs}>
         <Download size={14} />
         <span>Export Activity Log</span>

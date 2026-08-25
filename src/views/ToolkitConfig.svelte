@@ -4,6 +4,7 @@
     currentView,
     toolkitConfig,
     archiveMetadata,
+    lastScannedArchivePath,
     isProcessing,
     progressState,
     liveLogs,
@@ -33,6 +34,9 @@
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import RefreshCw from 'lucide-svelte/icons/refresh-cw';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import MessageSquare from 'lucide-svelte/icons/message-square';
+  import Clapperboard from 'lucide-svelte/icons/clapperboard';
   import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import Stepper from '$components/Stepper.svelte';
@@ -41,16 +45,25 @@
   let scanning = false;
   let previewTab: 'standard' | 'reversed' = 'standard';
   let showMissingDetails = false;
-  let lastScannedPath = '';
 
-  // Synchronize preview tab with reversed toggle
-  $: if ($toolkitConfig.createReversed && previewTab === 'standard') {
-    // keep as user selects or allow toggle
+  function formatDisplayDate(dStr?: string): string {
+    if (!dStr) return '—';
+    try {
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return dStr;
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return dStr;
+    }
   }
 
   async function handleArchiveChange(path: string) {
-    if (!path || path === lastScannedPath) return;
-    lastScannedPath = path;
+    if (!path) return;
+    // Skip re-scan if this path was already successfully scanned
+    if (path === $lastScannedArchivePath && $archiveMetadata && $archiveMetadata.isValid) {
+      return;
+    }
+    $lastScannedArchivePath = path;
     scanning = true;
     showMissingDetails = false;
     try {
@@ -74,7 +87,7 @@
     }
   }
 
-  $: if ($toolkitConfig.inputPath && $toolkitConfig.inputPath !== lastScannedPath) {
+  $: if ($toolkitConfig.inputPath && ($toolkitConfig.inputPath !== $lastScannedArchivePath || !$archiveMetadata)) {
     handleArchiveChange($toolkitConfig.inputPath);
   }
 
@@ -227,26 +240,54 @@
 
               <div class="metadata-banner">
                 <div class="meta-item">
-                  <span class="meta-label">Total Memories</span>
-                  <strong class="text-amber-400">{$archiveMetadata.validPostCount}</strong>
+                  <div class="meta-icon-label">
+                    <Camera size={12} class="text-amber-400" />
+                    <span class="meta-label">Total Memories</span>
+                  </div>
+                  <strong class="text-amber-400 font-mono">{$archiveMetadata.validPostCount}</strong>
                 </div>
+
                 <div class="meta-item">
-                  <span class="meta-label">Media Files</span>
-                  <strong class="text-emerald-400">
-                    {$archiveMetadata.foundMediaCount}/{$archiveMetadata.totalMediaCount}
+                  <div class="meta-icon-label">
+                    <CheckCircle size={12} class="text-emerald-400" />
+                    <span class="meta-label">Primary / Selfie</span>
+                  </div>
+                  <strong class="text-emerald-400 font-mono">
+                    {$archiveMetadata.primaryPhotoCount} / {$archiveMetadata.secondaryPhotoCount}
                   </strong>
                 </div>
+
                 <div class="meta-item">
-                  <span class="meta-label">BTS / Videos</span>
-                  <strong class="text-sky-400">
-                    {$archiveMetadata.hasBts ? 'BTS' : '—'} / {$archiveMetadata.hasVideos ? 'Video' : '—'}
+                  <div class="meta-icon-label">
+                    <Clapperboard size={12} class="text-sky-400" />
+                    <span class="meta-label">BTS / Videos</span>
+                  </div>
+                  <strong class="text-sky-400 font-mono">
+                    {$archiveMetadata.btsCount} BTS · {$archiveMetadata.primaryVideoCount + $archiveMetadata.secondaryVideoCount} vids
                   </strong>
                 </div>
+
                 <div class="meta-item">
-                  <span class="meta-label">Date Span</span>
-                  <strong class="text-purple-300">
-                    {$archiveMetadata.earliestDate ? $archiveMetadata.earliestDate.slice(0, 4) : '—'}–{$archiveMetadata.latestDate ? $archiveMetadata.latestDate.slice(0, 4) : '—'}
+                  <div class="meta-icon-label">
+                    <MapPin size={12} class="text-purple-400" />
+                    <span class="meta-label">With GPS / Captions</span>
+                  </div>
+                  <strong class="text-purple-300 font-mono">
+                    {$archiveMetadata.withLocationCount} GPS · {$archiveMetadata.withCaptionCount} caps
                   </strong>
+                </div>
+
+                <!-- Span info full row -->
+                <div class="meta-span-row">
+                  <span class="meta-label">Date Span:</span>
+                  <span class="meta-span-val font-mono">
+                    {formatDisplayDate($archiveMetadata.earliestDate)} &rarr; {formatDisplayDate($archiveMetadata.latestDate)}
+                  </span>
+                  {#if $archiveMetadata.retakeStats}
+                    <span class="meta-retake-pill">
+                      Avg {$archiveMetadata.retakeStats.avg.toFixed(1)} retakes (max {$archiveMetadata.retakeStats.max})
+                    </span>
+                  {/if}
                 </div>
               </div>
 
@@ -270,9 +311,17 @@
                   </button>
                   {#if showMissingDetails && $archiveMetadata.missingFilesSample && $archiveMetadata.missingFilesSample.length > 0}
                     <div class="missing-files-list">
-                      <div class="missing-files-title">Sample missing file paths:</div>
-                      {#each $archiveMetadata.missingFilesSample as samplePath}
-                        <div class="missing-file-item font-mono">{samplePath}</div>
+                      <div class="missing-files-title">Sample missing files &amp; associated metadata:</div>
+                      {#each $archiveMetadata.missingFilesSample as sample}
+                        <div class="missing-file-item font-mono">
+                          {#if sample.date}
+                            <span class="mf-date">[{sample.date}]</span>
+                          {/if}
+                          {#if sample.cameraType}
+                            <span class="mf-cam">[{sample.cameraType}]</span>
+                          {/if}
+                          <span class="mf-path">{sample.path}</span>
+                        </div>
                       {/each}
                     </div>
                   {/if}
@@ -310,8 +359,8 @@
                 <div class="gdpr-guide-tip">
                   <HelpCircle size={14} class="text-sky-400 flex-shrink-0" />
                   <div>
-                    <strong>How to get your authentic BeReal export:</strong><br />
-                    Open the BeReal mobile app &rarr; Profile &rarr; Settings &rarr; Help &amp; Support &rarr; Contact Us &rarr; Select "Request my data (GDPR)".
+                    <strong>How to download your authentic archive from BeReal:</strong><br />
+                    Profile icon &rarr; <strong>Help</strong> &rarr; <strong>Contact Us</strong> &rarr; <strong>Ask a Question</strong> &rarr; <strong>Troubleshooting</strong> &rarr; <strong>Other</strong> &rarr; <strong>Contact Us</strong> &rarr; Topic: <strong>"I'd like to request a copy of my data"</strong> (enter &ge;10 characters in message and submit).
                   </div>
                 </div>
               </div>
@@ -329,7 +378,6 @@
           bind:startDate={$toolkitConfig.dateRangeStart}
           bind:endDate={$toolkitConfig.dateRangeEnd}
           totalCount={$archiveMetadata.entryCount}
-          selectedCount={$archiveMetadata.entryCount}
         />
       {/if}
 
@@ -341,13 +389,37 @@
         </div>
 
         <div class="options-grid">
-          <div class="field-group">
-            <label for="format-select" class="label">Target Format</label>
-            <select id="format-select" class="input-select" bind:value={$toolkitConfig.convertFormat}>
-              <option value="Jpeg">JPEG</option>
-              <option value="WebP">WebP</option>
-              <option value="Png">PNG</option>
-            </select>
+          <div class="field-group format-field-group">
+            <span class="label">Target Format</span>
+            <div class="custom-format-selector">
+              <button
+                type="button"
+                class="format-pill"
+                class:active={$toolkitConfig.convertFormat === 'Jpeg'}
+                on:click={() => ($toolkitConfig.convertFormat = 'Jpeg')}
+              >
+                <span class="pill-name">JPEG</span>
+                <span class="pill-ext">.jpg</span>
+              </button>
+              <button
+                type="button"
+                class="format-pill"
+                class:active={$toolkitConfig.convertFormat === 'WebP'}
+                on:click={() => ($toolkitConfig.convertFormat = 'WebP')}
+              >
+                <span class="pill-name">WebP</span>
+                <span class="pill-ext">.webp</span>
+              </button>
+              <button
+                type="button"
+                class="format-pill"
+                class:active={$toolkitConfig.convertFormat === 'Png'}
+                on:click={() => ($toolkitConfig.convertFormat = 'Png')}
+              >
+                <span class="pill-name">PNG</span>
+                <span class="pill-ext">.png</span>
+              </button>
+            </div>
           </div>
 
           {#if $toolkitConfig.convertFormat === 'Jpeg'}
@@ -359,10 +431,10 @@
               step={5}
               unit="%"
               presets={[
-                { label: 'Max (100%)', value: 100 },
-                { label: 'High (90%)', value: 90 },
-                { label: 'Balanced (80%)', value: 80 },
-                { label: 'Compact (70%)', value: 70 },
+                { label: '100%', value: 100 },
+                { label: '90%', value: 90 },
+                { label: '80%', value: 80 },
+                { label: '70%', value: 70 },
               ]}
               accentColor="yellow"
             />
@@ -610,15 +682,16 @@
 
   .main-layout {
     display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 20px;
     align-items: start;
   }
 
   .form-column {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
+    min-width: 0;
   }
 
   .section-card {
@@ -636,8 +709,8 @@
 
   .options-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
     align-items: center;
   }
 
@@ -645,6 +718,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
   }
 
   .field-group .label {
@@ -652,26 +726,164 @@
     font-weight: 500;
   }
 
+  .format-field-group {
+    max-width: 280px;
+  }
+
+  .custom-format-selector {
+    display: flex;
+    background: #0c0c10;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 3px;
+    height: 34px;
+    align-items: center;
+  }
+
+  .format-pill {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-sm) - 1px);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .format-pill:hover {
+    color: var(--text-main);
+    background: #181822;
+  }
+
+  .format-pill.active {
+    background: rgba(255, 230, 0, 0.16);
+    color: #ffe600;
+    border-color: rgba(255, 230, 0, 0.35);
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.12);
+  }
+
+  .pill-name {
+    font-size: 12px;
+  }
+
+  .pill-ext {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+  }
+
+  .format-pill.active .pill-ext {
+    color: rgba(255, 230, 0, 0.7);
+  }
+
   .metadata-banner {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
     background: #0d0d10;
     border: 1px solid var(--border-subtle);
-    padding: 14px;
+    padding: 10px;
     border-radius: var(--radius-md);
   }
 
   .meta-item {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     text-align: center;
+    align-items: center;
+    background: #111116;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .meta-icon-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
   }
 
   .meta-label {
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+
+  .meta-span-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 11.5px;
+  }
+
+  .meta-span-val {
+    color: var(--text-main);
+    font-weight: 500;
+  }
+
+  .meta-retake-pill {
+    font-size: 10.5px;
+    color: #fb923c;
+    background: rgba(251, 146, 60, 0.1);
+    border: 1px solid rgba(251, 146, 60, 0.25);
+    padding: 1px 7px;
+    border-radius: var(--radius-full);
+  }
+
+  .missing-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .missing-files-title {
     font-size: 11px;
     color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .missing-file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    word-break: break-all;
+  }
+
+  .mf-date {
+    color: #38bdf8;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .mf-cam {
+    color: #fb923c;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .mf-path {
+    color: #fca5a5;
   }
 
   .status-box-scanning {

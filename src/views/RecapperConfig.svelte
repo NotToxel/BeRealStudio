@@ -20,11 +20,14 @@
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Plus from 'lucide-svelte/icons/plus';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+  import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import FontPicker from '$components/FontPicker.svelte';
   import FontSizePicker from '$components/FontSizePicker.svelte';
   import Stepper from '$components/Stepper.svelte';
+  import SpeedCurvePreview from '$components/SpeedCurvePreview.svelte';
   import { BUILTIN_FONT_OPTIONS } from '$lib/fonts';
   import RuleEditor from '$components/RuleEditor.svelte';
 
@@ -67,7 +70,18 @@
 
   const PREVIEW_SCALE = 0.1875;
   $: previewFontSize = Math.max(Math.round($recapperConfig.fontSize * PREVIEW_SCALE), 10);
-  $: previewShadow = Math.max(Math.round($recapperConfig.shadowStrength * PREVIEW_SCALE * 1.5), 0);
+  
+  // High-contrast multi-layer text shadow calculation for prominent live preview
+  $: textShadowCss = (() => {
+    const s = $recapperConfig.shadowStrength;
+    if (!s || s <= 0) return 'none';
+    const d1 = Math.max(1, Math.round(s * 0.18));
+    const b1 = Math.max(2, Math.round(s * 0.35));
+    const d2 = Math.max(2, Math.round(s * 0.45));
+    const b2 = Math.max(4, Math.round(s * 0.9));
+    const b3 = Math.max(6, Math.round(s * 1.6));
+    return `0 ${d1}px ${b1}px rgba(0, 0, 0, 0.98), 0 ${d2}px ${b2}px rgba(0, 0, 0, 0.9), 0 0 ${b3}px rgba(0, 0, 0, 0.85)`;
+  })();
 
   // Date format tokens helper
   const DATE_TOKENS = [
@@ -91,8 +105,22 @@
     { label: 'August 24', format: '%B %d' },
   ];
 
+  let customPatternInput: HTMLInputElement;
+
   function insertToken(token: string) {
-    $recapperConfig.dateFormat = ($recapperConfig.dateFormat || '') + token;
+    if (customPatternInput) {
+      const start = customPatternInput.selectionStart ?? ($recapperConfig.dateFormat?.length || 0);
+      const end = customPatternInput.selectionEnd ?? start;
+      const current = $recapperConfig.dateFormat || '';
+      $recapperConfig.dateFormat = current.slice(0, start) + token + current.slice(end);
+      setTimeout(() => {
+        customPatternInput.focus();
+        const newPos = start + token.length;
+        customPatternInput.setSelectionRange(newPos, newPos);
+      }, 0);
+    } else {
+      $recapperConfig.dateFormat = ($recapperConfig.dateFormat || '') + token;
+    }
   }
 
   function resetDateFormat() {
@@ -106,6 +134,12 @@
     { id: 'Decelerate', name: 'Decelerate', desc: 'High-energy start slowing to emotional finale' },
     { id: 'Wave', name: 'Rhythm Wave', desc: 'Pulsating rhythmic speed wave' },
   ];
+
+  // Location position toggle helper: checked = AboveDate, unchecked = BelowDate
+  $: locationAboveDate = $recapperConfig.locationPosition === 'AboveDate';
+  function handleLocationPositionToggle(checked: boolean) {
+    $recapperConfig.locationPosition = checked ? 'AboveDate' : 'BelowDate';
+  }
 
   let missingInputFolder = false;
   let missingMusicPath = false;
@@ -178,7 +212,7 @@
     </button>
     <div class="header-titles">
       <h1 class="title-md font-bold">Recap Video Generator</h1>
-      <span class="badge badge-violet">Live Preview</span>
+      <span class="badge badge-violet">9:16 Video</span>
     </div>
   </div>
 
@@ -217,7 +251,7 @@
 
         <FilePicker
           id="recapper-output-path"
-          label="Output Video File"
+          label="Output Video Destination (.mp4)"
           placeholder="Choose destination path for the rendered MP4..."
           isDirectory={false}
           fileExtensions={['mp4']}
@@ -250,129 +284,147 @@
             label="Text Shadow"
             bind:value={$recapperConfig.shadowStrength}
             min={0}
-            max={20}
-            step={1}
+            max={35}
+            step={2}
             unit="px"
             presets={[
-              { label: 'None', value: 0 },
-              { label: 'Subtle', value: 3 },
-              { label: 'Medium', value: 6 },
-              { label: 'Strong', value: 10 },
+              { label: 'Off', value: 0 },
+              { label: 'Subtle', value: 4 },
+              { label: 'Medium', value: 10 },
+              { label: 'Strong', value: 20 },
+              { label: 'Heavy', value: 30 },
             ]}
+            accentColor="violet"
           />
         </div>
 
         <div class="divider"></div>
 
-        <!-- Date Overlay -->
-        <Toggle
-          label="Display Date Stamp"
-          bind:checked={$recapperConfig.dateEnabled}
-          accentColor="violet"
-        />
+        <!-- Date Overlay Section -->
+        <div class="overlay-section">
+          <Toggle
+            label="Display Date Stamp"
+            bind:checked={$recapperConfig.dateEnabled}
+            accentColor="violet"
+          />
 
-        {#if $recapperConfig.dateEnabled}
-          <div class="sub-options-box">
-            <!-- Format Presets -->
-            <div class="field-group">
-              <span class="label">Date Format Presets</span>
-              <div class="presets-wrap">
-                {#each DATE_PRESETS as p}
-                  <button
-                    type="button"
-                    class="preset-pill"
-                    class:active={$recapperConfig.dateFormat === p.format}
-                    on:click={() => ($recapperConfig.dateFormat = p.format)}
-                  >
-                    {p.label}
+          {#if $recapperConfig.dateEnabled}
+            <div class="sub-options-box">
+              <!-- Format Presets -->
+              <div class="field-group">
+                <span class="label">Date Format Presets</span>
+                <div class="presets-wrap">
+                  {#each DATE_PRESETS as p}
+                    <button
+                      type="button"
+                      class="preset-pill"
+                      class:active={$recapperConfig.dateFormat === p.format}
+                      on:click={() => ($recapperConfig.dateFormat = p.format)}
+                    >
+                      {p.label}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <!-- Token Inserters -->
+              <div class="field-group">
+                <div class="tokens-header">
+                  <span class="label">Insert Format Tokens (at cursor)</span>
+                  <button type="button" class="btn-token-reset" on:click={resetDateFormat}>
+                    <RotateCcw size={11} /> Reset Pattern
                   </button>
-                {/each}
+                </div>
+                <div class="tokens-wrap">
+                  {#each DATE_TOKENS as tok}
+                    <button
+                      type="button"
+                      class="token-btn"
+                      on:click={() => insertToken(tok.token)}
+                      title="Insert {tok.token} at cursor position"
+                    >
+                      <Plus size={11} class="text-purple-400" />
+                      <span>{tok.label}</span>
+                      <code class="token-code">{tok.token}</code>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div class="options-grid">
+                <div class="field-group">
+                  <label for="date-fmt-input" class="label">Custom Pattern</label>
+                  <input
+                    id="date-fmt-input"
+                    type="text"
+                    class="input-text font-mono"
+                    bind:this={customPatternInput}
+                    bind:value={$recapperConfig.dateFormat}
+                    placeholder="%d %B %Y"
+                  />
+                  <div class="token-preview">
+                    <Sparkles size={11} class="text-purple-400" />
+                    <span>Preview: </span>
+                    <strong class="text-purple-300 font-mono">{formatSampleDate($recapperConfig.dateFormat)}</strong>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <label for="date-pos-select" class="label">Screen Position</label>
+                  <select id="date-pos-select" class="input-select" bind:value={$recapperConfig.datePosition}>
+                    <option value="BottomCenter">Bottom Center (Default)</option>
+                    <option value="BottomLeft">Bottom Left</option>
+                    <option value="BottomRight">Bottom Right</option>
+                    <option value="TopRight">Top Right</option>
+                  </select>
+                </div>
               </div>
             </div>
+          {/if}
+        </div>
 
-            <!-- Token Inserters -->
-            <div class="field-group">
-              <div class="tokens-header">
-                <span class="label">Insert Format Tokens</span>
-                <button type="button" class="btn-token-reset" on:click={resetDateFormat}>
-                  <RotateCcw size={11} /> Reset
-                </button>
+        <div class="divider"></div>
+
+        <!-- Location Overlay Section -->
+        <div class="overlay-section">
+          <Toggle
+            label="Display Location"
+            bind:checked={$recapperConfig.locationEnabled}
+            accentColor="emerald"
+          />
+
+          {#if $recapperConfig.locationEnabled}
+            <div class="sub-options-box">
+              <div class="options-grid">
+                <div class="field-group">
+                  <label for="geo-mode-select" class="label">Geocoding Service</label>
+                  <select id="geo-mode-select" class="input-select" bind:value={$recapperConfig.geocodingMode}>
+                    <option value="Online">Nominatim OpenStreetMap (Online)</option>
+                    <option value="Offline">Offline Reverse Geocoding DB</option>
+                  </select>
+                </div>
+
+                <div class="field-group align-center-toggle">
+                  <Toggle
+                    label="Place Location Above Date"
+                    checked={locationAboveDate}
+                    onChange={handleLocationPositionToggle}
+                    accentColor="cyan"
+                  />
+                </div>
               </div>
-              <div class="tokens-wrap">
-                {#each DATE_TOKENS as tok}
-                  <button
-                    type="button"
-                    class="token-btn"
-                    on:click={() => insertToken(tok.token)}
-                    title="Insert {tok.token}"
-                  >
-                    <Plus size={11} class="text-purple-400" />
-                    <span>{tok.label}</span>
-                    <code class="token-code">{tok.token}</code>
-                  </button>
-                {/each}
-              </div>
+
+              {#if $recapperConfig.geocodingMode === 'Offline'}
+                <div class="geo-warning-banner">
+                  <AlertTriangle size={13} class="text-amber-400 flex-shrink-0" />
+                  <span>Offline geocoding database is not yet bundled. The engine will automatically fall back to online Nominatim.</span>
+                </div>
+              {/if}
+
+              <RuleEditor bind:rules={$recapperConfig.locationRules} />
             </div>
-
-            <div class="options-grid">
-              <div class="field-group">
-                <label for="date-fmt-input" class="label">Custom Pattern</label>
-                <input
-                  id="date-fmt-input"
-                  type="text"
-                  class="input-text font-mono"
-                  bind:value={$recapperConfig.dateFormat}
-                  placeholder="%d %B %Y"
-                />
-              </div>
-
-              <div class="field-group">
-                <label for="date-pos-select" class="label">Date Position</label>
-                <select id="date-pos-select" class="input-select" bind:value={$recapperConfig.datePosition}>
-                  <option value="BottomCenter">Bottom Center (Default)</option>
-                  <option value="BottomLeft">Bottom Left</option>
-                  <option value="BottomRight">Bottom Right</option>
-                  <option value="TopRight">Top Right</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Location Overlay -->
-        <Toggle
-          label="Display Location"
-          bind:checked={$recapperConfig.locationEnabled}
-          accentColor="emerald"
-        />
-
-        {#if $recapperConfig.locationEnabled}
-          <div class="sub-options-box">
-            <div class="options-grid">
-              <div class="field-group">
-                <label for="geo-mode-select" class="label">Geocoding Service</label>
-                <select id="geo-mode-select" class="input-select" bind:value={$recapperConfig.geocodingMode}>
-                  <option value="Online">Nominatim OpenStreetMap (Online)</option>
-                  <option value="Offline">Offline Reverse Geocoding DB</option>
-                </select>
-              </div>
-
-              <div class="field-group">
-                <label for="loc-pos-select" class="label">Location Position</label>
-                <select id="loc-pos-select" class="input-select" bind:value={$recapperConfig.locationPosition}>
-                  <option value="BelowDate">Below Date (Default)</option>
-                  <option value="AboveDate">Above Date</option>
-                  <option value="BottomCenter">Bottom Center</option>
-                  <option value="BottomLeft">Bottom Left</option>
-                  <option value="BottomRight">Bottom Right</option>
-                  <option value="TopRight">Top Right</option>
-                </select>
-              </div>
-            </div>
-
-            <RuleEditor bind:rules={$recapperConfig.locationRules} />
-          </div>
-        {/if}
+          {/if}
+        </div>
       </div>
 
       <!-- 3. Pacing & Timing Settings -->
@@ -382,6 +434,7 @@
           <h2 class="title-sm">3. Speed Transitions &amp; Pacing</h2>
         </div>
 
+        <!-- Speed Mode Cards Grid with Inline Sparklines -->
         <div class="speed-modes-grid">
           {#each SPEED_MODES as m}
             <button
@@ -397,39 +450,54 @@
                 {/if}
               </div>
               <span class="mode-desc text-secondary">{m.desc}</span>
+              <div class="mode-sparkline-wrap">
+                <SpeedCurvePreview mode={m.id} />
+              </div>
             </button>
           {/each}
         </div>
 
+        <!-- Animated Timeline Preview for the Selected Mode with Start & End Padding -->
+        <div class="timeline-preview-card">
+          <SpeedCurvePreview
+            mode={$recapperConfig.speedMode}
+            animated={true}
+            startPadding={$recapperConfig.startPadding}
+            endPadding={$recapperConfig.endPadding}
+          />
+        </div>
+
         <div class="options-grid">
           <Stepper
-            label="Start Padding"
+            label="Start Hold Padding"
             bind:value={$recapperConfig.startPadding}
             min={0}
             max={10}
             step={0.5}
             unit="s"
             presets={[
-              { label: '0s', value: 0 },
-              { label: '1s', value: 1 },
-              { label: '2s', value: 2 },
+              { label: 'Off', value: 0 },
+              { label: '1.5s', value: 1.5 },
               { label: '3s', value: 3 },
+              { label: '5s', value: 5 },
             ]}
+            accentColor="cyan"
           />
 
           <Stepper
-            label="End Padding"
+            label="End Hold Padding"
             bind:value={$recapperConfig.endPadding}
             min={0}
             max={10}
             step={0.5}
             unit="s"
             presets={[
-              { label: '0s', value: 0 },
-              { label: '1s', value: 1 },
-              { label: '2s', value: 2 },
+              { label: 'Off', value: 0 },
+              { label: '1.5s', value: 1.5 },
               { label: '3s', value: 3 },
+              { label: '5s', value: 5 },
             ]}
+            accentColor="cyan"
           />
         </div>
 
@@ -475,10 +543,9 @@
             <span class="preview-dot"></span>
             <span class="title-sm font-semibold">Live Preview</span>
           </div>
-          <span class="badge badge-violet">1440 &times; 1920</span>
         </div>
 
-        <!-- Phone Mockup Canvas -->
+        <!-- Phone Mockup Canvas (9:16 portrait) -->
         <div class="mockup-frame">
           <div class="mockup-screen">
             <div class="simulated-photo">
@@ -498,7 +565,7 @@
                     class="live-location-text {currentCssFont}"
                     style="
                       font-size: {Math.max(Math.round(previewFontSize * 0.82), 9)}px;
-                      filter: drop-shadow(0px {previewShadow}px {previewShadow}px rgba(0, 0, 0, 0.95));
+                      text-shadow: {textShadowCss};
                     "
                   >
                     {sampleLocation}
@@ -510,7 +577,7 @@
                     class="live-date-text {currentCssFont}"
                     style="
                       font-size: {previewFontSize}px;
-                      filter: drop-shadow(0px {previewShadow}px {previewShadow}px rgba(0, 0, 0, 0.95));
+                      text-shadow: {textShadowCss};
                     "
                   >
                     {previewDateStr}
@@ -522,7 +589,7 @@
                     class="live-location-text {currentCssFont}"
                     style="
                       font-size: {Math.max(Math.round(previewFontSize * 0.82), 9)}px;
-                      filter: drop-shadow(0px {previewShadow}px {previewShadow}px rgba(0, 0, 0, 0.95));
+                      text-shadow: {textShadowCss};
                     "
                   >
                     {sampleLocation}
@@ -559,15 +626,16 @@
 
   .main-layout {
     display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 20px;
     align-items: start;
   }
 
   .form-column {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
+    min-width: 0;
   }
 
   .section-card {
@@ -585,8 +653,8 @@
 
   .options-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
     align-items: center;
   }
 
@@ -601,6 +669,11 @@
     font-weight: 500;
   }
 
+  .align-center-toggle {
+    justify-content: center;
+    padding-top: 18px;
+  }
+
   .sub-options-box {
     background: #0e0e11;
     border: 1px solid var(--border-subtle);
@@ -609,6 +682,12 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+  }
+
+  .overlay-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   /* Date Tokens & Presets */
@@ -698,17 +777,38 @@
     color: #c084fc;
   }
 
+  .token-preview {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .geo-warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-main);
+  }
+
   /* Speed Modes Grid */
   .speed-modes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px;
   }
 
   .speed-mode-card {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     padding: 10px 12px;
     background: #0f0f13;
     border: 1px solid var(--border-subtle);
@@ -724,9 +824,9 @@
   }
 
   .speed-mode-card.active {
-    background: rgba(139, 92, 246, 0.14);
+    background: rgba(139, 92, 246, 0.12);
     border-color: rgba(139, 92, 246, 0.45);
-    box-shadow: 0 0 10px rgba(139, 92, 246, 0.12);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.15);
   }
 
   .mode-head {
@@ -736,9 +836,21 @@
   }
 
   .mode-name {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--text-main);
+  }
+
+  .mode-desc {
+    font-size: 11px;
+    line-height: 1.35;
+    min-height: 28px;
+  }
+
+  .mode-sparkline-wrap {
+    margin-top: 4px;
+    display: flex;
+    justify-content: center;
   }
 
   .active-dot {
@@ -748,20 +860,22 @@
     background: #c084fc;
   }
 
-  .mode-desc {
-    font-size: 11px;
-    line-height: 1.3;
+  .timeline-preview-card {
+    background: #0b0b0f;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
   }
 
-  /* FPS Pills */
+  /* Framerate Pills */
   .fps-pills {
     display: flex;
-    gap: 8px;
+    gap: 6px;
   }
 
   .fps-pill {
-    padding: 6px 14px;
-    background: #0f0f13;
+    padding: 6px 16px;
+    background: #15151c;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
@@ -772,37 +886,31 @@
   }
 
   .fps-pill:hover {
-    background: #181820;
+    background: #1e1e26;
     color: var(--text-main);
   }
 
   .fps-pill.active {
-    background: rgba(56, 189, 248, 0.18);
-    color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(139, 92, 246, 0.2);
+    color: #c084fc;
+    border-color: rgba(139, 92, 246, 0.4);
   }
 
-  .action-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding-top: 10px;
-  }
-
-  /* ── Right Column / Live Mockup ── */
+  /* Preview column */
   .preview-column {
     position: sticky;
-    top: 20px;
+    top: 16px;
+    align-self: start;
   }
 
   .preview-sticky-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    background: #111115;
-    padding: 18px;
-    border-radius: var(--radius-lg);
-    border: 1px solid rgba(139, 92, 246, 0.25);
-    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.08);
+    gap: 12px;
+    background: #111116;
+    padding: 16px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
   }
 
   .preview-header {
@@ -812,11 +920,11 @@
   }
 
   .preview-dot {
-    width: 8px;
-    height: 8px;
-    background: #34d399;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+    background: #a855f7;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.8);
   }
 
   .title-group {
@@ -827,6 +935,8 @@
 
   .mockup-frame {
     width: 100%;
+    max-width: 270px;
+    margin: 0 auto;
     aspect-ratio: 9 / 16;
     background: #000000;
     border-radius: var(--radius-lg);
@@ -845,7 +955,7 @@
   .simulated-photo {
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #090d16 100%);
+    background: radial-gradient(circle at 75% 30%, #475569 0%, #1e293b 40%, #0f172a 75%, #080c14 100%);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -922,7 +1032,6 @@
     line-height: 1.15;
     letter-spacing: -0.01em;
     user-select: none;
-    transition: font-size 0.1s ease, filter 0.1s ease;
   }
 
   .live-location-text {

@@ -5,6 +5,8 @@
   export let value: number = 100;
   export let label: string = 'Font Size';
 
+  let isFocused = false;
+
   const PRESETS = [
     { label: 'S', size: 60 },
     { label: 'M', size: 80 },
@@ -41,9 +43,15 @@
     </div>
 
     <!-- Stepper & Direct Input -->
-    <div class="stepper-wrap">
-      <button type="button" class="btn-step" on:click={decrement} title="Decrease size">
-        <Minus size={13} />
+    <div class="stepper-wrap" class:focused={isFocused}>
+      <button
+        type="button"
+        class="btn-step"
+        on:click={decrement}
+        title="Decrease size"
+        disabled={value <= 30}
+      >
+        <Minus size={11} />
       </button>
 
       <div class="input-unit-wrap">
@@ -55,12 +63,20 @@
           min="30"
           max="200"
           step="5"
+          on:focus={() => (isFocused = true)}
+          on:blur={() => (isFocused = false)}
         />
-        <span class="unit-text">px</span>
+        <span class="unit-badge font-mono">px</span>
       </div>
 
-      <button type="button" class="btn-step" on:click={increment} title="Increase size">
-        <Plus size={13} />
+      <button
+        type="button"
+        class="btn-step"
+        on:click={increment}
+        title="Increase size"
+        disabled={value >= 200}
+      >
+        <Plus size={11} />
       </button>
     </div>
   </div>
@@ -72,99 +88,149 @@
     flex-direction: column;
     gap: 6px;
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .label {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
-    color: var(--text-main);
+    color: var(--text-secondary);
   }
 
   .controls-row {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    height: 32px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .presets-group {
     display: flex;
-    background: #0f0f13;
+    background: linear-gradient(180deg, #101015 0%, #0a0a0e 100%);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 3px;
-    gap: 2px;
+    padding: 2px;
+    gap: 1px;
+    height: 32px;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
   }
 
   .preset-pill {
-    padding: 4px 10px;
-    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    padding: 3px 2px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-sm) - 1px);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    white-space: nowrap;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .preset-pill:hover {
     color: var(--text-main);
-    background: #181820;
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .preset-pill.active {
-    background: rgba(139, 92, 246, 0.25);
+    background: rgba(139, 92, 246, 0.2);
     color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.18);
   }
 
   .stepper-wrap {
     display: flex;
     align-items: center;
-    background: #0f0f13;
+    background: linear-gradient(180deg, #121218 0%, #0c0c10 100%);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     padding: 2px;
+    height: 32px;
+    flex-shrink: 0;
+    width: 98px;
+    box-sizing: border-box;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  .stepper-wrap:hover {
+    border-color: var(--border-medium);
+  }
+
+  .stepper-wrap.focused {
+    border-color: rgba(139, 92, 246, 0.55);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.22);
   }
 
   .btn-step {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: none;
-    color: var(--text-secondary);
+    border: 1px solid transparent;
+    color: var(--text-muted);
     cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
+    border-radius: calc(var(--radius-sm) - 1px);
+    transition: all 100ms ease;
+    flex-shrink: 0;
+    box-sizing: border-box;
   }
 
-  .btn-step:hover {
-    background: #1c1c24;
+  .btn-step:hover:not(:disabled) {
+    background: #1e1e28;
     color: var(--text-main);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-step:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+
+  .btn-step:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
   }
 
   .input-unit-wrap {
     display: flex;
     align-items: center;
-    padding: 0 4px;
+    justify-content: center;
+    padding: 0 1px;
+    gap: 2px;
+    flex: 1;
   }
 
   .num-input {
-    width: 44px;
+    width: 32px;
     background: transparent;
     border: none;
     color: var(--text-main);
     text-align: right;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12.5px;
+    font-weight: 700;
     outline: none;
     appearance: textfield;
     -moz-appearance: textfield;
+    padding: 0;
   }
 
   .num-input::-webkit-inner-spin-button,
@@ -173,9 +239,13 @@
     margin: 0;
   }
 
-  .unit-text {
-    font-size: 11px;
+  .unit-badge {
+    font-size: 9.5px;
+    font-weight: 700;
     color: var(--text-muted);
-    margin-left: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 3px;
+    border-radius: 3px;
+    white-space: nowrap;
   }
 </style>

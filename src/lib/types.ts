@@ -1,4 +1,25 @@
-export type ViewMode = 'home' | 'toolkit-config' | 'recapper-config' | 'processing' | 'complete' | 'settings' | 'about';
+export type ViewMode =
+  | 'home'
+  | 'toolkit-config'
+  | 'recapper-config'
+  | 'processing'
+  | 'complete'
+  | 'activity'
+  | 'settings'
+  | 'about';
+
+export interface ActivityRecord {
+  id: string;
+  type: 'toolkit' | 'recapper';
+  title: string;
+  timestamp: string;
+  outputPath: string;
+  inputPath: string;
+  durationSecs: number;
+  status: 'success' | 'warning' | 'error';
+  itemCount: number;
+  details?: string;
+}
 
 export type OutputFormat = 'Jpeg' | 'WebP' | 'Png';
 export type CombineMode = 'PictureInPicture' | 'SideBySide';
@@ -69,6 +90,18 @@ export interface MonthCount {
   count: number;
 }
 
+export interface MissingFileInfo {
+  path: string;
+  date?: string;
+  cameraType?: string; // 'primary' | 'secondary' | 'bts'
+}
+
+export interface RetakeStats {
+  min: number;
+  max: number;
+  avg: number;
+}
+
 export interface ArchiveInfo {
   isValid: boolean;
   archiveType: 'Zip' | 'Directory';
@@ -80,9 +113,18 @@ export interface ArchiveInfo {
   totalMediaCount: number;
   foundMediaCount: number;
   missingMediaCount: number;
-  missingFilesSample: string[];
+  missingFilesSample: MissingFileInfo[];
   earliestDate?: string;
   latestDate?: string;
+  // Rich media breakdown
+  primaryPhotoCount: number;
+  secondaryPhotoCount: number;
+  primaryVideoCount: number;
+  secondaryVideoCount: number;
+  btsCount: number;
+  withLocationCount: number;
+  withCaptionCount: number;
+  retakeStats?: RetakeStats;
   hasPostsJson: boolean;
   hasPhotosDir: boolean;
   hasUserJson: boolean;

@@ -23,14 +23,16 @@
 
 ---
 
-## 📋 How to Request Your Data from BeReal
-
-1. Open the **BeReal** mobile app on your phone.
-2. Go to **Profile** &rarr; Tap the **Three Dots (...)** in the top-right corner to open **Settings**.
-3. Tap **Privacy** &rarr; Tap **Request My Data** (Article 15 GDPR Data Portability).
-4. Enter your email address and submit.
-5. Within 24–48 hours, BeReal will email you a secure download link for your archive (`.zip`).
-6. Download the archive and either select the unzipped folder or upload the zip directly into **BeReal Studio**.
+## 📋 How to Download Your Archive from BeReal
+ 
+1. Open the **BeReal** mobile app and tap your **Profile icon** (top-right).
+2. Tap **Help** &rarr; Select **Contact Us**.
+3. Select **Ask a Question** &rarr; Tap **Troubleshooting** &rarr; Tap **Other**.
+4. Tap **Contact Us** at the bottom &rarr; Select the **Topic** dropdown.
+5. Select **"I'd like to request a copy of my data"**.
+6. Type a message with at least **10 characters** (e.g., *"Please provide a copy of my account data"*) and submit.
+7. BeReal will deliver a secure download link via email containing your official archive ZIP (including `posts.json` and all media).
+8. Once downloaded, select the ZIP or unzipped folder directly in **BeReal Studio**.
 
 ---
 

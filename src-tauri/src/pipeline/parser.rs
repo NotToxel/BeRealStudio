@@ -8,7 +8,7 @@ use std::{
 };
 use zip::ZipArchive;
 
-use crate::pipeline::types::{ArchiveInfo, BeRealPost, MediaAsset, MonthCount};
+use crate::pipeline::types::{ArchiveInfo, BeRealPost, MediaAsset, MissingFileInfo, MonthCount, RetakeStats};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,29 +22,9 @@ pub fn scan_archive(path: &str) -> Result<ArchiveInfo> {
     let input_path = Path::new(path);
     if !input_path.exists() {
         return Ok(ArchiveInfo {
-            is_valid: false,
             archive_type: if path.ends_with(".zip") { "Zip".into() } else { "Directory".into() },
-            user_name: None,
-            user_fullname: None,
-            entry_count: 0,
-            valid_post_count: 0,
-            corrupted_post_count: 0,
-            total_media_count: 0,
-            found_media_count: 0,
-            missing_media_count: 0,
-            missing_files_sample: Vec::new(),
-            earliest_date: None,
-            latest_date: None,
-            has_posts_json: false,
-            has_photos_dir: false,
-            has_user_json: false,
-            has_videos: false,
-            has_bts: false,
-            monthly_histogram: Vec::new(),
             validation_errors: vec![format!("Path does not exist on disk: {}", path)],
-            warnings: Vec::new(),
-            posts_json_path: String::new(),
-            media_base_path: String::new(),
+            ..Default::default()
         });
     }
 
@@ -64,29 +44,10 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         Ok(f) => f,
         Err(e) => {
             return Ok(ArchiveInfo {
-                is_valid: false,
                 archive_type: "Zip".into(),
-                user_name: None,
-                user_fullname: None,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
-                has_posts_json: false,
-                has_photos_dir: false,
-                has_user_json: false,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors: vec![format!("Could not open ZIP file: {}", e)],
-                warnings: Vec::new(),
-                posts_json_path: String::new(),
                 media_base_path: zip_path.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -95,29 +56,10 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         Ok(a) => a,
         Err(e) => {
             return Ok(ArchiveInfo {
-                is_valid: false,
                 archive_type: "Zip".into(),
-                user_name: None,
-                user_fullname: None,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
-                has_posts_json: false,
-                has_photos_dir: false,
-                has_user_json: false,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors: vec![format!("Invalid or corrupted ZIP archive: {}", e)],
-                warnings: Vec::new(),
-                posts_json_path: String::new(),
                 media_base_path: zip_path.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -169,29 +111,13 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
                 );
             }
             return Ok(ArchiveInfo {
-                is_valid: false,
                 archive_type: "Zip".into(),
-                user_name: None,
-                user_fullname: None,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
-                has_posts_json: false,
                 has_photos_dir,
                 has_user_json: user_entry_name.is_some(),
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors,
                 warnings,
-                posts_json_path: String::new(),
                 media_base_path: zip_path.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -208,29 +134,15 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
 
     if !validation_errors.is_empty() {
         return Ok(ArchiveInfo {
-            is_valid: false,
             archive_type: "Zip".into(),
-            user_name: None,
-            user_fullname: None,
-            entry_count: 0,
-            valid_post_count: 0,
-            corrupted_post_count: 0,
-            total_media_count: 0,
-            found_media_count: 0,
-            missing_media_count: 0,
-            missing_files_sample: Vec::new(),
-            earliest_date: None,
-            latest_date: None,
             has_posts_json: true,
             has_photos_dir,
             has_user_json: user_entry_name.is_some(),
-            has_videos: false,
-            has_bts: false,
-            monthly_histogram: Vec::new(),
             validation_errors,
             warnings,
             posts_json_path: posts_name,
             media_base_path: zip_path.to_string_lossy().to_string(),
+            ..Default::default()
         });
     }
 
@@ -256,29 +168,17 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         Ok(p) => p,
         Err(e) => {
             return Ok(ArchiveInfo {
-                is_valid: false,
                 archive_type: "Zip".into(),
                 user_name: user_name.clone(),
                 user_fullname,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
                 has_posts_json: true,
                 has_photos_dir,
                 has_user_json,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors: vec![format!("'posts.json' is not valid JSON or not an array: {}", e)],
                 warnings,
                 posts_json_path: posts_name,
                 media_base_path: zip_path.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -331,6 +231,17 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
     let mut has_bts = false;
     let mut earliest: Option<DateTime<Utc>> = None;
     let mut latest: Option<DateTime<Utc>> = None;
+    let mut primary_photo_count = 0usize;
+    let mut secondary_photo_count = 0usize;
+    let mut primary_video_count = 0usize;
+    let mut secondary_video_count = 0usize;
+    let mut bts_count = 0usize;
+    let mut with_location_count = 0usize;
+    let mut with_caption_count = 0usize;
+    let mut retake_sum = 0u64;
+    let mut retake_min = u32::MAX;
+    let mut retake_max = 0u32;
+    let mut retake_count = 0usize;
 
     for post in &valid_posts {
         if let Some(dt) = parse_taken_at(&post.taken_at) {
@@ -346,13 +257,33 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
             }
         }
         if let Some(p) = &post.primary {
-            if p.is_video() { has_videos = true; }
+            if p.is_video() { has_videos = true; primary_video_count += 1; }
+            else { primary_photo_count += 1; }
         }
         if let Some(s) = &post.secondary {
-            if s.is_video() { has_videos = true; }
+            if s.is_video() { has_videos = true; secondary_video_count += 1; }
+            else { secondary_photo_count += 1; }
         }
-        if post.bts_media.is_some() { has_bts = true; }
+        if post.bts_media.is_some() { has_bts = true; bts_count += 1; }
+        if post.location.is_some() { with_location_count += 1; }
+        if post.caption.as_ref().map(|c| !c.is_empty()).unwrap_or(false) { with_caption_count += 1; }
+        if let Some(r) = post.retake_counter {
+            retake_sum += r as u64;
+            retake_min = retake_min.min(r);
+            retake_max = retake_max.max(r);
+            retake_count += 1;
+        }
     }
+
+    let retake_stats = if retake_count > 0 {
+        Some(RetakeStats {
+            min: retake_min,
+            max: retake_max,
+            avg: retake_sum as f32 / retake_count as f32,
+        })
+    } else {
+        None
+    };
 
     let is_valid = validation_errors.is_empty() && !valid_posts.is_empty();
 
@@ -370,6 +301,14 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         missing_files_sample: missing_sample,
         earliest_date: earliest.map(|d| d.format("%Y-%m-%d").to_string()),
         latest_date: latest.map(|d| d.format("%Y-%m-%d").to_string()),
+        primary_photo_count,
+        secondary_photo_count,
+        primary_video_count,
+        secondary_video_count,
+        bts_count,
+        with_location_count,
+        with_caption_count,
+        retake_stats,
         has_posts_json: true,
         has_photos_dir,
         has_user_json,
@@ -398,29 +337,11 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
             ));
             let has_photos = base_dir.join("Photos").exists() || base_dir.join("photos").exists();
             return Ok(ArchiveInfo {
-                is_valid: false,
-                archive_type: "Directory".into(),
-                user_name: None,
-                user_fullname: None,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
-                has_posts_json: false,
                 has_photos_dir: has_photos,
-                has_user_json: false,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors,
                 warnings,
-                posts_json_path: String::new(),
                 media_base_path: base_dir.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -459,29 +380,16 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
         Err(e) => {
             validation_errors.push(format!("Failed to read {}: {}", posts_json_path.display(), e));
             return Ok(ArchiveInfo {
-                is_valid: false,
-                archive_type: "Directory".into(),
                 user_name,
                 user_fullname,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
                 has_posts_json: true,
                 has_photos_dir,
                 has_user_json,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors,
                 warnings,
                 posts_json_path: posts_json_path.to_string_lossy().to_string(),
                 media_base_path: media_base.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -492,29 +400,16 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
         Err(e) => {
             validation_errors.push(format!("'posts.json' is not valid JSON: {}", e));
             return Ok(ArchiveInfo {
-                is_valid: false,
-                archive_type: "Directory".into(),
                 user_name,
                 user_fullname,
-                entry_count: 0,
-                valid_post_count: 0,
-                corrupted_post_count: 0,
-                total_media_count: 0,
-                found_media_count: 0,
-                missing_media_count: 0,
-                missing_files_sample: Vec::new(),
-                earliest_date: None,
-                latest_date: None,
                 has_posts_json: true,
                 has_photos_dir,
                 has_user_json,
-                has_videos: false,
-                has_bts: false,
-                monthly_histogram: Vec::new(),
                 validation_errors,
                 warnings,
                 posts_json_path: posts_json_path.to_string_lossy().to_string(),
                 media_base_path: media_base.to_string_lossy().to_string(),
+                ..Default::default()
             });
         }
     };
@@ -567,6 +462,17 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
     let mut has_bts = false;
     let mut earliest: Option<DateTime<Utc>> = None;
     let mut latest: Option<DateTime<Utc>> = None;
+    let mut primary_photo_count = 0usize;
+    let mut secondary_photo_count = 0usize;
+    let mut primary_video_count = 0usize;
+    let mut secondary_video_count = 0usize;
+    let mut bts_count = 0usize;
+    let mut with_location_count = 0usize;
+    let mut with_caption_count = 0usize;
+    let mut retake_sum = 0u64;
+    let mut retake_min = u32::MAX;
+    let mut retake_max = 0u32;
+    let mut retake_count = 0usize;
 
     for post in &valid_posts {
         if let Some(dt) = parse_taken_at(&post.taken_at) {
@@ -582,13 +488,33 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
             }
         }
         if let Some(p) = &post.primary {
-            if p.is_video() { has_videos = true; }
+            if p.is_video() { has_videos = true; primary_video_count += 1; }
+            else { primary_photo_count += 1; }
         }
         if let Some(s) = &post.secondary {
-            if s.is_video() { has_videos = true; }
+            if s.is_video() { has_videos = true; secondary_video_count += 1; }
+            else { secondary_photo_count += 1; }
         }
-        if post.bts_media.is_some() { has_bts = true; }
+        if post.bts_media.is_some() { has_bts = true; bts_count += 1; }
+        if post.location.is_some() { with_location_count += 1; }
+        if post.caption.as_ref().map(|c| !c.is_empty()).unwrap_or(false) { with_caption_count += 1; }
+        if let Some(r) = post.retake_counter {
+            retake_sum += r as u64;
+            retake_min = retake_min.min(r);
+            retake_max = retake_max.max(r);
+            retake_count += 1;
+        }
     }
+
+    let retake_stats = if retake_count > 0 {
+        Some(RetakeStats {
+            min: retake_min,
+            max: retake_max,
+            avg: retake_sum as f32 / retake_count as f32,
+        })
+    } else {
+        None
+    };
 
     let is_valid = validation_errors.is_empty() && !valid_posts.is_empty();
 
@@ -606,6 +532,14 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
         missing_files_sample: missing_sample,
         earliest_date: earliest.map(|d| d.format("%Y-%m-%d").to_string()),
         latest_date: latest.map(|d| d.format("%Y-%m-%d").to_string()),
+        primary_photo_count,
+        secondary_photo_count,
+        primary_video_count,
+        secondary_video_count,
+        bts_count,
+        with_location_count,
+        with_caption_count,
+        retake_stats,
         has_posts_json: true,
         has_photos_dir,
         has_user_json,
@@ -623,21 +557,23 @@ fn check_zip_media_presence(
     posts: &[BeRealPost],
     zip_filenames: &HashSet<String>,
     zip_entries_by_filename: &HashMap<String, String>,
-) -> (usize, usize, usize, Vec<String>) {
+) -> (usize, usize, usize, Vec<MissingFileInfo>) {
     let mut total = 0usize;
     let mut found = 0usize;
     let mut missing = 0usize;
-    let mut missing_sample = Vec::new();
+    let mut missing_sample: Vec<MissingFileInfo> = Vec::new();
 
     for post in posts {
-        let assets = [
-            &post.primary,
-            &post.primary_placeholder,
-            &post.secondary,
-            &post.secondary_placeholder,
-            &post.bts_media,
+        let post_date = parse_taken_at(&post.taken_at)
+            .map(|d| d.format("%Y-%m-%d").to_string());
+        let assets: [(&Option<MediaAsset>, &str); 5] = [
+            (&post.primary,              "primary"),
+            (&post.primary_placeholder,  "primary"),
+            (&post.secondary,            "secondary"),
+            (&post.secondary_placeholder,"secondary"),
+            (&post.bts_media,            "bts"),
         ];
-        for asset_opt in assets {
+        for (asset_opt, cam_type) in assets {
             if let Some(asset) = asset_opt {
                 total += 1;
                 let raw = asset.path.trim_start_matches('/').replace('\\', "/").to_lowercase();
@@ -654,7 +590,11 @@ fn check_zip_media_presence(
                 } else {
                     missing += 1;
                     if missing_sample.len() < 10 {
-                        missing_sample.push(asset.path.clone());
+                        missing_sample.push(MissingFileInfo {
+                            path: asset.path.clone(),
+                            date: post_date.clone(),
+                            camera_type: Some(cam_type.to_string()),
+                        });
                     }
                 }
             }
@@ -667,21 +607,23 @@ fn check_zip_media_presence(
 fn check_disk_media_presence(
     posts: &[BeRealPost],
     media_base: &Path,
-) -> (usize, usize, usize, Vec<String>) {
+) -> (usize, usize, usize, Vec<MissingFileInfo>) {
     let mut total = 0usize;
     let mut found = 0usize;
     let mut missing = 0usize;
-    let mut missing_sample = Vec::new();
+    let mut missing_sample: Vec<MissingFileInfo> = Vec::new();
 
     for post in posts {
-        let assets = [
-            &post.primary,
-            &post.primary_placeholder,
-            &post.secondary,
-            &post.secondary_placeholder,
-            &post.bts_media,
+        let post_date = parse_taken_at(&post.taken_at)
+            .map(|d| d.format("%Y-%m-%d").to_string());
+        let assets: [(&Option<MediaAsset>, &str); 5] = [
+            (&post.primary,              "primary"),
+            (&post.primary_placeholder,  "primary"),
+            (&post.secondary,            "secondary"),
+            (&post.secondary_placeholder,"secondary"),
+            (&post.bts_media,            "bts"),
         ];
-        for asset_opt in assets {
+        for (asset_opt, cam_type) in assets {
             if let Some(asset) = asset_opt {
                 total += 1;
                 if resolve_media_path(asset, media_base).is_some() {
@@ -689,7 +631,11 @@ fn check_disk_media_presence(
                 } else {
                     missing += 1;
                     if missing_sample.len() < 10 {
-                        missing_sample.push(asset.path.clone());
+                        missing_sample.push(MissingFileInfo {
+                            path: asset.path.clone(),
+                            date: post_date.clone(),
+                            camera_type: Some(cam_type.to_string()),
+                        });
                     }
                 }
             }

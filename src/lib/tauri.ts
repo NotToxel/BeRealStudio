@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
+export { openPath };
 import type {
   ArchiveInfo,
   ToolkitConfig,
@@ -106,6 +107,19 @@ export async function pickFile(
     directory: false,
     multiple: false,
     title,
+    filters: [{ name: 'Allowed Files', extensions }],
+  });
+  return typeof selected === 'string' ? selected : null;
+}
+
+export async function saveFilePicker(
+  title: string,
+  defaultPath?: string,
+  extensions: string[] = ['json']
+): Promise<string | null> {
+  const selected = await save({
+    title,
+    defaultPath,
     filters: [{ name: 'Allowed Files', extensions }],
   });
   return typeof selected === 'string' ? selected : null;

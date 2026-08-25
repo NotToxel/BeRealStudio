@@ -218,6 +218,24 @@ pub enum RuleCondition {
 
 // ─── Archive Scan Results ────────────────────────────────────────────────────
 
+/// Rich metadata for a single missing media file, shown in the diagnostic UI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissingFileInfo {
+    pub path: String,
+    pub date: Option<String>,       // "YYYY-MM-DD"
+    pub camera_type: Option<String>, // "primary" | "secondary" | "bts"
+}
+
+/// Retake counter statistics across all memories.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetakeStats {
+    pub min: u32,
+    pub max: u32,
+    pub avg: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveInfo {
@@ -231,9 +249,18 @@ pub struct ArchiveInfo {
     pub total_media_count: usize,
     pub found_media_count: usize,
     pub missing_media_count: usize,
-    pub missing_files_sample: Vec<String>,
+    pub missing_files_sample: Vec<MissingFileInfo>,
     pub earliest_date: Option<String>,
     pub latest_date: Option<String>,
+    // Rich media type breakdown
+    pub primary_photo_count: usize,
+    pub secondary_photo_count: usize,
+    pub primary_video_count: usize,
+    pub secondary_video_count: usize,
+    pub bts_count: usize,
+    pub with_location_count: usize,
+    pub with_caption_count: usize,
+    pub retake_stats: Option<RetakeStats>,
     pub has_posts_json: bool,
     pub has_photos_dir: bool,
     pub has_user_json: bool,
@@ -250,6 +277,44 @@ pub struct ArchiveInfo {
 pub struct MonthCount {
     pub month: String, // "YYYY-MM"
     pub count: u32,
+}
+
+impl Default for ArchiveInfo {
+    fn default() -> Self {
+        Self {
+            is_valid: false,
+            archive_type: "Directory".into(),
+            user_name: None,
+            user_fullname: None,
+            entry_count: 0,
+            valid_post_count: 0,
+            corrupted_post_count: 0,
+            total_media_count: 0,
+            found_media_count: 0,
+            missing_media_count: 0,
+            missing_files_sample: Vec::new(),
+            earliest_date: None,
+            latest_date: None,
+            primary_photo_count: 0,
+            secondary_photo_count: 0,
+            primary_video_count: 0,
+            secondary_video_count: 0,
+            bts_count: 0,
+            with_location_count: 0,
+            with_caption_count: 0,
+            retake_stats: None,
+            has_posts_json: false,
+            has_photos_dir: false,
+            has_user_json: false,
+            has_videos: false,
+            has_bts: false,
+            monthly_histogram: Vec::new(),
+            validation_errors: Vec::new(),
+            warnings: Vec::new(),
+            posts_json_path: String::new(),
+            media_base_path: String::new(),
+        }
+    }
 }
 
 // ─── Progress Events ─────────────────────────────────────────────────────────

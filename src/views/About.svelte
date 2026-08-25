@@ -14,8 +14,8 @@
     <div class="logo-circle">
       <span class="dot"></span>
     </div>
-    <h1 class="title-lg">BeReal Studio</h1>
-    <span class="version-tag">Version 0.1.0 &bull; Open Source Desktop Suite</span>
+    <h1 class="title-lg font-bold">BeReal Studio</h1>
+    <span class="version-tag">Version 1.0.0 &bull; Open Source Desktop Suite</span>
     <p class="subtitle text-secondary">
       The all-in-one, privacy-first desktop suite to restore, process, composite, and recap your personal BeReal GDPR archives.
     </p>
@@ -77,11 +77,13 @@
       </div>
 
       <ol class="steps-list text-secondary">
-        <li>Open the <strong>BeReal</strong> mobile application on iOS or Android.</li>
-        <li>Tap your profile icon &rarr; Tap the <strong>three dots (...)</strong> in the upper right.</li>
-        <li>Select <strong>Settings</strong> &rarr; <strong>Privacy</strong> &rarr; <strong>Request My Data</strong> (Article 15 GDPR).</li>
-        <li>Enter your email address. BeReal will deliver a secure download link for your raw ZIP archive within 24–48 hours.</li>
-        <li>Download and select the extracted folder in BeReal Studio.</li>
+        <li>Open the <strong>BeReal</strong> mobile app and tap your <strong>Profile icon</strong> in the top-right corner.</li>
+        <li>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</li>
+        <li>Select <strong>Ask a Question</strong> &rarr; Tap <strong>Troubleshooting</strong> &rarr; Select <strong>Other</strong>.</li>
+        <li>Tap <strong>Contact Us</strong> at the bottom of the article &rarr; Tap the <strong>Topic</strong> dropdown.</li>
+        <li>Select the topic: <strong>"I'd like to request a copy of my data"</strong>.</li>
+        <li>Type a short message with at least <strong>10 characters</strong> (e.g., <em>"Please provide a full copy of my account data"</em>) and submit your request.</li>
+        <li>BeReal support will email you a secure download link containing your raw archive ZIP with <code>posts.json</code> and all full-resolution memories.</li>
       </ol>
     </div>
 
@@ -104,7 +106,12 @@
           class="credit-card-link"
         >
           <div class="credit-card-head">
-            <strong class="text-purple-300">BeReel (BeReal-Recapper)</strong>
+            <div class="credit-brand-title">
+              <svg class="github-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              <strong class="text-purple-300">BeReel (BeReal-Recapper)</strong>
+            </div>
             <ExternalLink size={13} class="text-secondary" />
           </div>
           <span class="text-secondary text-desc">
@@ -120,7 +127,12 @@
           class="credit-card-link"
         >
           <div class="credit-card-head">
-            <strong class="text-amber-300">BeReal-GDPR-Photo-Toolkit</strong>
+            <div class="credit-brand-title">
+              <svg class="github-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              <strong class="text-amber-300">BeReal-GDPR-Photo-Toolkit</strong>
+            </div>
             <ExternalLink size={13} class="text-secondary" />
           </div>
           <span class="text-secondary text-desc">
@@ -271,6 +283,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .credit-brand-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .github-icon {
+    color: var(--text-secondary);
+    flex-shrink: 0;
   }
 
   .credit-card-head strong {

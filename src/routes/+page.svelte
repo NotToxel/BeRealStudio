@@ -8,6 +8,7 @@
   import Processing from '../views/Processing.svelte';
   import Complete from '../views/Complete.svelte';
   import Settings from '../views/Settings.svelte';
+  import Activity from '../views/Activity.svelte';
   import About from '../views/About.svelte';
 
   onMount(async () => {
@@ -50,6 +51,8 @@
   <Processing />
 {:else if $currentView === 'complete'}
   <Complete />
+{:else if $currentView === 'activity'}
+  <Activity />
 {:else if $currentView === 'settings'}
   <Settings />
 {:else if $currentView === 'about'}
