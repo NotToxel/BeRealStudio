@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ExplorerMemory } from '$lib/types';
+  import { openExportModal } from '$lib/memoriesStore';
   import { exportSingleMemory, revealInFolder, isTauri } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
   import MoreHorizontal from 'lucide-svelte/icons/ellipsis';
@@ -8,9 +9,11 @@
   import Camera from 'lucide-svelte/icons/camera';
   import User from 'lucide-svelte/icons/circle-user';
   import Film from 'lucide-svelte/icons/film';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import Copy from 'lucide-svelte/icons/copy';
   import Check from 'lucide-svelte/icons/check';
   import Layers from 'lucide-svelte/icons/layers';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
   export let memory: ExplorerMemory;
 
@@ -27,6 +30,11 @@
     isOpen = false;
   }
 
+  function handleOpenExportDialog() {
+    closeMenu();
+    openExportModal(memory);
+  }
+
   async function handleOpenExplorer() {
     closeMenu();
     if (memory.primaryPath) {
@@ -34,16 +42,22 @@
     }
   }
 
-  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only') {
+  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
     closeMenu();
     if (!memory.primaryPath) return;
 
     try {
       isExporting = true;
-      const defaultFilename = `${memory.takenAt.slice(0, 10)}_${exportType}.jpg`;
+      const isVideo = exportType === 'bts_only';
+      const ext = isVideo ? 'mp4' : 'jpg';
+      const defaultFilename = `${memory.takenAt.slice(0, 10)}_${exportType}.${ext}`;
+      const filters = isVideo
+        ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
+        : [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }];
+
       const savePath = await save({
         defaultPath: defaultFilename,
-        filters: [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }],
+        filters,
       });
 
       if (!savePath) {
@@ -55,6 +69,7 @@
         memoryIndex: memory.index,
         primaryPath: memory.primaryPath,
         secondaryPath: memory.secondaryPath,
+        btsPath: memory.btsPath,
         outputPath: savePath,
         exportType,
         format: 'Jpeg',
@@ -102,9 +117,9 @@
   </button>
 
   {#if isOpen}
-    <div class="menu-popover">
+    <div class="menu-popover" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
       <div class="menu-section">
-        <span class="menu-header">Open & Export</span>
+        <span class="menu-header">Open &amp; Export</span>
 
         {#if memory.primaryPath}
           <button type="button" class="menu-item" on:click={handleOpenExplorer}>
@@ -112,6 +127,11 @@
             <span>Reveal in File Explorer</span>
           </button>
         {/if}
+
+        <button type="button" class="menu-item" on:click={handleOpenExportDialog}>
+          <SlidersHorizontal size={14} class="text-sky-400" />
+          <span>Export Options &amp; Settings...</span>
+        </button>
 
         <button type="button" class="menu-item" on:click={() => handleExport('combined_pip')}>
           <Layers size={14} class="text-amber-400" />
@@ -134,6 +154,18 @@
           <Camera size={14} class="text-emerald-400" />
           <span>Save Main Camera</span>
         </button>
+
+        {#if memory.btsPath}
+          <button type="button" class="menu-item" on:click={() => handleExport('bts_only')}>
+            <Film size={14} class="text-amber-400" />
+            <span>Save BTS Video (.mp4)</span>
+          </button>
+
+          <button type="button" class="menu-item" on:click={() => handleExport('motion_photo')}>
+            <Sparkles size={14} class="text-emerald-400" />
+            <span>Save Motion Photo (Live)</span>
+          </button>
+        {/if}
       </div>
 
       <div class="menu-divider"></div>

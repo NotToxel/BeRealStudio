@@ -5,7 +5,11 @@
     closeFeed,
     filteredMemories,
     explorerData,
+    openExportModal,
+    exportPreferences,
   } from '$lib/memoriesStore';
+  import { exportSingleMemory } from '$lib/tauri';
+  import { save } from '@tauri-apps/plugin-dialog';
   import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import MemoryActionMenu from './MemoryActionMenu.svelte';
@@ -13,10 +17,52 @@
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Clock from 'lucide-svelte/icons/clock';
   import Calendar from 'lucide-svelte/icons/calendar';
+  import Download from 'lucide-svelte/icons/download';
 
   let feedScrollContainer: HTMLElement | null = null;
   let activeVisibleMemory: ExplorerMemory | null = null;
   let hasScrolledInitial = false;
+
+  async function handleQuickDownload(mem: ExplorerMemory) {
+    if (!mem.primaryPath) return;
+    const prefs = $exportPreferences;
+    if (!prefs.isDefaultSet) {
+      openExportModal(mem);
+      return;
+    }
+
+    try {
+      const isVideo = prefs.exportType === 'bts_only';
+      const ext = isVideo ? 'mp4' : prefs.format.toLowerCase() === 'png' ? 'png' : prefs.format.toLowerCase() === 'webp' ? 'webp' : 'jpg';
+      const defaultFilename = `${mem.takenAt.slice(0, 10)}_${prefs.exportType}.${ext}`;
+
+      const savePath = await save({
+        defaultPath: defaultFilename,
+        filters: isVideo ? [{ name: 'MP4 Video', extensions: ['mp4'] }] : [{ name: 'Image', extensions: [ext] }],
+      });
+
+      if (!savePath) return;
+
+      await exportSingleMemory({
+        memoryIndex: mem.index,
+        primaryPath: mem.primaryPath,
+        secondaryPath: mem.secondaryPath,
+        btsPath: mem.btsPath,
+        outputPath: savePath,
+        exportType: prefs.exportType,
+        format: prefs.format,
+        quality: prefs.quality || 92,
+        embedExif: prefs.embedExif,
+        takenAt: mem.takenAt,
+        latitude: prefs.embedGps && mem.location ? mem.location.latitude : undefined,
+        longitude: prefs.embedGps && mem.location ? mem.location.longitude : undefined,
+        caption: mem.caption,
+      });
+    } catch (e) {
+      console.error('Quick download failed:', e);
+      openExportModal(mem);
+    }
+  }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -146,6 +192,15 @@
               </div>
 
               <div class="post-header-actions">
+                <button
+                  type="button"
+                  class="quick-download-btn"
+                  on:click={() => handleQuickDownload(memory)}
+                  title="Export / Download this memory"
+                  aria-label="Download memory"
+                >
+                  <Download size={14} />
+                </button>
                 <MemoryActionMenu {memory} />
               </div>
             </div>
@@ -398,6 +453,31 @@
 
   .post-header-actions {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .quick-download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: #181824;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .quick-download-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
   }
 
   .dual-frame-wrapper {

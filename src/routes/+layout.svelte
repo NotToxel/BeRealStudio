@@ -5,6 +5,7 @@
   import NavBar from '$components/NavBar.svelte';
   import ErrorModal from '$components/ErrorModal.svelte';
   import MemoryContextMenu from '$components/memories/MemoryContextMenu.svelte';
+  import ExportMemoryModal from '$components/memories/ExportMemoryModal.svelte';
 </script>
 
 <svelte:window on:contextmenu={(e) => e.preventDefault()} />
@@ -19,6 +20,7 @@
 
 <ErrorModal />
 <MemoryContextMenu />
+<ExportMemoryModal />
 
 <style>
   :global(body) {

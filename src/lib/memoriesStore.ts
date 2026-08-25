@@ -281,3 +281,64 @@ export function openContextMenu(e: MouseEvent, memory: ExplorerMemory) {
 export function closeContextMenu() {
   contextMenuState.update((s) => ({ ...s, isOpen: false }));
 }
+
+// ─── Export Preferences & Modal State ─────────────────────────────────────────
+export interface ExportPreferences {
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo';
+  format: 'Jpeg' | 'WebP' | 'Png';
+  quality: number;
+  embedExif: boolean;
+  embedGps: boolean;
+  isDefaultSet: boolean;
+}
+
+const defaultExportPreferences: ExportPreferences = {
+  exportType: 'combined_pip',
+  format: 'Jpeg',
+  quality: 92,
+  embedExif: true,
+  embedGps: true,
+  isDefaultSet: false,
+};
+
+function loadSavedExportPreferences(): ExportPreferences {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_export_preferences');
+      if (saved) return { ...defaultExportPreferences, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...defaultExportPreferences };
+}
+
+export const exportPreferences = writable<ExportPreferences>(loadSavedExportPreferences());
+
+if (typeof window !== 'undefined') {
+  exportPreferences.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_export_preferences', JSON.stringify(val));
+    } catch {}
+  });
+}
+
+export const exportModalState = writable<{
+  isOpen: boolean;
+  memory: ExplorerMemory | null;
+}>({
+  isOpen: false,
+  memory: null,
+});
+
+export function openExportModal(memory: ExplorerMemory) {
+  exportModalState.set({
+    isOpen: true,
+    memory,
+  });
+}
+
+export function closeExportModal() {
+  exportModalState.set({
+    isOpen: false,
+    memory: null,
+  });
+}

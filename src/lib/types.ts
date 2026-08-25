@@ -328,8 +328,9 @@ export interface ExportSinglePostOptions {
   memoryIndex: number;
   primaryPath: string;
   secondaryPath?: string;
+  btsPath?: string;
   outputPath: string;
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only';
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;

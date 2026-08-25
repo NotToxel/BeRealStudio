@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { contextMenuState, closeContextMenu, openFeedAt } from '$lib/memoriesStore';
+  import { contextMenuState, closeContextMenu, openFeedAt, openExportModal } from '$lib/memoriesStore';
   import { exportSingleMemory, revealInFolder, isTauri } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
@@ -7,10 +7,12 @@
   import Camera from 'lucide-svelte/icons/camera';
   import User from 'lucide-svelte/icons/circle-user';
   import Film from 'lucide-svelte/icons/film';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import Copy from 'lucide-svelte/icons/copy';
   import Check from 'lucide-svelte/icons/check';
   import Layers from 'lucide-svelte/icons/layers';
   import Eye from 'lucide-svelte/icons/eye';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
   let copiedText = '';
   let isExporting = false;
@@ -32,16 +34,29 @@
     }
   }
 
-  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only') {
+  function handleOpenExportDialog() {
+    closeContextMenu();
+    if (memory) {
+      openExportModal(memory);
+    }
+  }
+
+  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
     closeContextMenu();
     if (!memory || !memory.primaryPath) return;
 
     try {
       isExporting = true;
-      const defaultFilename = `${memory.takenAt.slice(0, 10)}_${exportType}.jpg`;
+      const isVideo = exportType === 'bts_only';
+      const ext = isVideo ? 'mp4' : 'jpg';
+      const defaultFilename = `${memory.takenAt.slice(0, 10)}_${exportType}.${ext}`;
+      const filters = isVideo
+        ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
+        : [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }];
+
       const savePath = await save({
         defaultPath: defaultFilename,
-        filters: [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }],
+        filters,
       });
 
       if (!savePath) {
@@ -53,11 +68,16 @@
         memoryIndex: memory.index,
         primaryPath: memory.primaryPath,
         secondaryPath: memory.secondaryPath,
+        btsPath: memory.btsPath,
         outputPath: savePath,
         exportType,
         format: 'Jpeg',
         quality: 92,
         embedExif: true,
+        takenAt: memory.takenAt,
+        latitude: memory.location ? memory.location.latitude : undefined,
+        longitude: memory.location ? memory.location.longitude : undefined,
+        caption: memory.caption,
       });
     } catch (err) {
       console.error('Failed to export memory from context menu:', err);
@@ -112,10 +132,16 @@
       <span>Reveal in Explorer</span>
     </button>
 
+    <!-- Custom Export Dialog -->
+    <button type="button" class="menu-item" on:click={handleOpenExportDialog}>
+      <SlidersHorizontal size={13} class="menu-item-icon text-sky-400" />
+      <span>Export Options...</span>
+    </button>
+
     <div class="menu-divider"></div>
 
     <!-- Export Group -->
-    <div class="menu-section-label">EXPORT PHOTO</div>
+    <div class="menu-section-label">QUICK EXPORT</div>
 
     <button
       type="button"
@@ -156,6 +182,28 @@
       >
         <User size={13} class="menu-item-icon text-violet-400" />
         <span>Save Selfie Camera Only</span>
+      </button>
+    {/if}
+
+    {#if memory.btsPath}
+      <button
+        type="button"
+        class="menu-item"
+        disabled={isExporting}
+        on:click={() => handleExport('bts_only')}
+      >
+        <Film size={13} class="menu-item-icon text-amber-400" />
+        <span>Save BTS Video (.mp4)</span>
+      </button>
+
+      <button
+        type="button"
+        class="menu-item"
+        disabled={isExporting}
+        on:click={() => handleExport('motion_photo')}
+      >
+        <Sparkles size={13} class="menu-item-icon text-emerald-400" />
+        <span>Save Motion Photo (Live)</span>
       </button>
     {/if}
 

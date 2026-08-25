@@ -14,7 +14,7 @@ use zip::ZipArchive;
 
 use crate::{
     pipeline::{
-        exif_writer, image_ops,
+        exif_writer, image_ops, motion_photo,
         parser::{self, parse_taken_at},
         types::{BeRealPost, Location, LocationRule, OutputFormat, RuleCondition},
     },
@@ -71,8 +71,9 @@ pub struct ExportSinglePostOptions {
     pub memory_index: usize,
     pub primary_path: String,
     pub secondary_path: Option<String>,
+    pub bts_path: Option<String>,
     pub output_path: String,
-    pub export_type: String, // "combined_pip", "combined_sidebyside", "primary_only", "secondary_only"
+    pub export_type: String, // "combined_pip", "combined_sidebyside", "primary_only", "secondary_only", "bts_only", "motion_photo"
     pub format: String,      // "Jpeg", "WebP", "Png"
     pub quality: u8,
     pub embed_exif: bool,
@@ -538,6 +539,43 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
                     if opts.embed_exif && matches!(fmt, OutputFormat::Jpeg) {
                         let _ = exif_writer::write_metadata(out_dest, &dt, location.as_ref(), opts.caption.as_deref());
                     }
+                }
+            }
+        }
+        "bts_only" => {
+            if let Some(bts_str) = &opts.bts_path {
+                let bts_path = Path::new(bts_str);
+                if bts_path.exists() {
+                    fs::copy(bts_path, out_dest)?;
+                } else {
+                    anyhow::bail!("BTS video file not found on disk: {}", bts_str);
+                }
+            } else {
+                anyhow::bail!("No BTS video available for this memory.");
+            }
+        }
+        "motion_photo" => {
+            if let Some(sec_str) = &opts.secondary_path {
+                let sec_path = Path::new(sec_str);
+                if sec_path.exists() {
+                    let combined = image_ops::combine_pip(prim_path, sec_path)?;
+                    let rgb = combined.to_rgb8();
+                    image_ops::save_rgb_image(&rgb, out_dest, &OutputFormat::Jpeg, opts.quality)?;
+                } else {
+                    image_ops::convert_image(prim_path, out_dest, &OutputFormat::Jpeg, opts.quality)?;
+                }
+            } else {
+                image_ops::convert_image(prim_path, out_dest, &OutputFormat::Jpeg, opts.quality)?;
+            }
+
+            if opts.embed_exif {
+                let _ = exif_writer::write_metadata(out_dest, &dt, location.as_ref(), opts.caption.as_deref());
+            }
+
+            if let Some(bts_str) = &opts.bts_path {
+                let bts_path = Path::new(bts_str);
+                if bts_path.exists() {
+                    let _ = motion_photo::create_motion_photo(out_dest, bts_path);
                 }
             }
         }
