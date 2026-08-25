@@ -21,6 +21,8 @@
     recordActivity,
     getPreferredRecapInputFolder,
     getSensibleRecapOutputPath,
+    currentArchive,
+    archiveMetadata,
   } from '$lib/stores';
   import {
     startRecapper,
@@ -55,6 +57,7 @@
   import User from 'lucide-svelte/icons/circle-user';
   import Mountain from 'lucide-svelte/icons/mountain';
   import FilePicker from '$components/FilePicker.svelte';
+  import DateRangePicker from '$components/DateRangePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import FontPicker from '$components/FontPicker.svelte';
   import FontSizePicker from '$components/FontSizePicker.svelte';
@@ -326,6 +329,28 @@
 
   $: isConfigValid = Boolean($recapperConfig.inputFolder && $recapperConfig.musicPath && $recapperConfig.outputPath);
 
+  function formatDisplayDate(dStr?: string): string {
+    if (!dStr) return '';
+    try {
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return dStr;
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return dStr;
+    }
+  }
+
+  $: dateRangeLabel = (() => {
+    if ($recapperConfig.dateRangeStart && $recapperConfig.dateRangeEnd) {
+      return `${formatDisplayDate($recapperConfig.dateRangeStart)} – ${formatDisplayDate($recapperConfig.dateRangeEnd)}`;
+    } else if ($recapperConfig.dateRangeStart) {
+      return `From ${formatDisplayDate($recapperConfig.dateRangeStart)}`;
+    } else if ($recapperConfig.dateRangeEnd) {
+      return `Until ${formatDisplayDate($recapperConfig.dateRangeEnd)}`;
+    }
+    return 'Full Timeline';
+  })();
+
   async function handleStart() {
     missingInputFolder = !$recapperConfig.inputFolder;
     missingMusicPath = !$recapperConfig.musicPath;
@@ -356,6 +381,7 @@
       title: `Recap Video (${$recapperConfig.fps} FPS)`,
       inputPath: $recapperConfig.inputFolder,
       outputPath: finalOutputPath,
+      dateRange: dateRangeLabel,
     });
 
     // Also update legacy single-job stores
@@ -393,7 +419,8 @@
           status: 'success',
           itemCount: res.filesConverted || res.entriesProcessed,
           memoriesCount: res.filesConverted || res.entriesProcessed,
-          details: `Generated in ${res.durationSecs.toFixed(1)}s`,
+          dateRange: dateRangeLabel,
+          details: `${dateRangeLabel} • Generated in ${res.durationSecs.toFixed(1)}s`,
         });
       })
       .catch((e: any) => {
@@ -526,11 +553,23 @@
         />
       </div>
 
-      <!-- 2. Typography & Overlays -->
+      <!-- 2. Date Range & Timeline Filter -->
+      <DateRangePicker
+        title="2. Date Range & Timeline Filter"
+        accentColor="purple"
+        histogram={$currentArchive?.monthlyHistogram || $archiveMetadata?.monthlyHistogram || []}
+        minDate={$currentArchive?.earliestDate?.slice(0, 10) || $archiveMetadata?.earliestDate?.slice(0, 10) || ''}
+        maxDate={$currentArchive?.latestDate?.slice(0, 10) || $archiveMetadata?.latestDate?.slice(0, 10) || ''}
+        totalCount={$currentArchive?.entryCount || $archiveMetadata?.entryCount || 0}
+        bind:startDate={$recapperConfig.dateRangeStart}
+        bind:endDate={$recapperConfig.dateRangeEnd}
+      />
+
+      <!-- 3. Typography & Overlays -->
       <div class="card section-card">
         <div class="section-title-row">
           <Type size={18} class="text-purple-400" />
-          <h2 class="title-sm">2. Typography &amp; Visual Overlays</h2>
+          <h2 class="title-sm">3. Typography &amp; Visual Overlays</h2>
         </div>
 
         <FontPicker
@@ -886,11 +925,11 @@
         </div>
       </div>
 
-      <!-- 3. Pacing & Timing Settings -->
+      <!-- 4. Pacing & Timing Settings -->
       <div class="card section-card">
         <div class="section-title-row">
           <Activity size={18} class="text-sky-400" />
-          <h2 class="title-sm">3. Speed Transitions &amp; Pacing</h2>
+          <h2 class="title-sm">4. Speed Transitions &amp; Pacing</h2>
         </div>
 
         <!-- Speed Mode Cards Grid with Inline Sparklines -->

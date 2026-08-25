@@ -224,6 +224,7 @@ pub enum RuleCondition {
 pub struct MissingFileInfo {
     pub path: String,
     pub date: Option<String>,       // "YYYY-MM-DD"
+    pub timestamp: Option<String>,  // "YYYY-MM-DD HH:MM:SS UTC"
     pub camera_type: Option<String>, // "primary" | "secondary" | "bts"
 }
 
@@ -243,6 +244,7 @@ pub struct ArchiveInfo {
     pub archive_type: String, // "Zip" | "Directory"
     pub user_name: Option<String>,
     pub user_fullname: Option<String>,
+    pub profile_picture_data_url: Option<String>,
     pub entry_count: usize,
     pub valid_post_count: usize,
     pub corrupted_post_count: usize,
@@ -286,6 +288,7 @@ impl Default for ArchiveInfo {
             archive_type: "Directory".into(),
             user_name: None,
             user_fullname: None,
+            profile_picture_data_url: None,
             entry_count: 0,
             valid_post_count: 0,
             corrupted_post_count: 0,

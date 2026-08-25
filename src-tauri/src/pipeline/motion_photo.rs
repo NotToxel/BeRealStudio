@@ -23,7 +23,7 @@ pub fn create_motion_photo(image_path: &Path, video_path: &Path) -> Result<()> {
     let image_size = image_bytes.len();
     let video_footer = &footer;
     let image_padding = get_image_padding(&video_bytes);
-    let video_size = video_footer.len() - image_padding;
+    let video_size = video_footer.len().saturating_sub(image_padding);
 
     // Inject XMP into the JPEG
     let xmp_content = build_motion_photo_xmp(image_size, video_size, image_padding);
@@ -144,6 +144,11 @@ fn inject_xmp_into_jpeg(jpeg_bytes: &[u8], xmp: &str) -> Result<Vec<u8>> {
         d.extend_from_slice(xmp_payload_bytes);
         d
     };
+
+    if new_segment_data.len() + 2 > 65535 {
+        anyhow::bail!("XMP metadata payload is too large for JPEG APP1 segment (exceeds 64KB)");
+    }
+
     // APP1 length includes the 2-byte length field itself
     let segment_len = (new_segment_data.len() + 2) as u16;
     let mut new_app1: Vec<u8> = Vec::new();
@@ -170,9 +175,15 @@ fn inject_xmp_into_jpeg(jpeg_bytes: &[u8], xmp: &str) -> Result<Vec<u8>> {
         }
         let marker = jpeg_bytes[i + 1];
         let seg_len = u16::from_be_bytes([jpeg_bytes[i + 2], jpeg_bytes[i + 3]]) as usize;
-        let seg_end = i + 2 + seg_len;
+        if seg_len < 2 {
+            break;
+        }
+        let seg_end = (i + 2).saturating_add(seg_len);
+        if seg_end > jpeg_bytes.len() {
+            break;
+        }
 
-        if marker == 0xE1 && seg_end <= jpeg_bytes.len() {
+        if marker == 0xE1 {
             let payload = &jpeg_bytes[i + 4..seg_end];
             if payload.starts_with(xmp_header) {
                 // Replace existing XMP APP1

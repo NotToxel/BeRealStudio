@@ -14,6 +14,76 @@ use crate::pipeline::types::{ArchiveInfo, BeRealPost, MediaAsset, MissingFileInf
 struct UserExportMeta {
     username: Option<String>,
     fullname: Option<String>,
+    profile_picture: Option<serde_json::Value>,
+    avatar: Option<serde_json::Value>,
+    photo_url: Option<serde_json::Value>,
+}
+
+fn extract_pic_val(v: &serde_json::Value) -> (Option<String>, Option<String>) {
+    let mut direct_url = None;
+    let mut target_path = None;
+
+    if let Some(s) = v.as_str() {
+        if s.starts_with("http://") || s.starts_with("https://") || s.starts_with("data:image") {
+            direct_url = Some(s.to_string());
+        } else if !s.trim().is_empty() {
+            target_path = Some(s.to_string());
+        }
+    } else if let Some(obj) = v.as_object() {
+        if let Some(u) = obj.get("url").and_then(|val| val.as_str()) {
+            if u.starts_with("http://") || u.starts_with("https://") || u.starts_with("data:image") {
+                direct_url = Some(u.to_string());
+            } else if !u.trim().is_empty() {
+                target_path = Some(u.to_string());
+            }
+        }
+        if target_path.is_none() {
+            if let Some(p) = obj.get("path").and_then(|val| val.as_str()) {
+                if !p.trim().is_empty() {
+                    target_path = Some(p.to_string());
+                }
+            } else if let Some(p) = obj.get("mediaPath").and_then(|val| val.as_str()) {
+                if !p.trim().is_empty() {
+                    target_path = Some(p.to_string());
+                }
+            }
+        }
+    }
+
+    (direct_url, target_path)
+}
+
+fn resolve_profile_picture(user: &UserExportMeta) -> (Option<String>, Option<String>) {
+    if let Some(ref pv) = user.profile_picture {
+        let res = extract_pic_val(pv);
+        if res.0.is_some() || res.1.is_some() {
+            return res;
+        }
+    }
+    if let Some(ref av) = user.avatar {
+        let res = extract_pic_val(av);
+        if res.0.is_some() || res.1.is_some() {
+            return res;
+        }
+    }
+    if let Some(ref pu) = user.photo_url {
+        let res = extract_pic_val(pu);
+        if res.0.is_some() || res.1.is_some() {
+            return res;
+        }
+    }
+    (None, None)
+}
+
+fn bytes_to_data_url(bytes: &[u8], ext: &str) -> String {
+    use base64::Engine;
+    let mime = match ext.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => "image/jpeg",
+    };
+    format!("data:{};base64,{}", mime, base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 /// Scan an input path (ZIP archive or unzipped directory) and return detailed BeReal archive metadata & validation.
@@ -125,12 +195,78 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
     let has_user_json = user_entry_name.is_some();
     let mut user_name = None;
     let mut user_fullname = None;
+    let mut profile_picture_data_url = None;
+    let mut target_profile_path: Option<String> = None;
+
     if let Some(ref user_name_entry) = user_entry_name {
         if let Ok(entry) = archive.by_name(user_name_entry) {
             let reader = std::io::BufReader::new(entry);
             if let Ok(user) = serde_json::from_reader::<_, UserExportMeta>(reader) {
+                let (direct, target) = resolve_profile_picture(&user);
                 user_name = user.username;
                 user_fullname = user.fullname;
+                profile_picture_data_url = direct;
+                target_profile_path = target;
+            }
+        }
+    }
+
+    if profile_picture_data_url.is_none() {
+        let mut found_pic_entry = None;
+        let clean_tp = target_profile_path.as_deref().map(|s| s.trim_start_matches('/').trim_start_matches("./"));
+        let target_filename = clean_tp.and_then(|s| Path::new(s).file_name().and_then(|f| f.to_str()));
+
+        // 1. Try matching target path and filename
+        if let Some(filename) = target_filename {
+            for i in 0..archive.len() {
+                if let Ok(entry) = archive.by_index(i) {
+                    let entry_name = entry.name();
+                    if entry_name.ends_with(filename)
+                        || entry_name.eq_ignore_ascii_case(filename)
+                        || (clean_tp.is_some() && entry_name.ends_with(clean_tp.unwrap()))
+                    {
+                        found_pic_entry = Some(entry_name.to_string());
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 2. Search for any file in profile/ or Photos/profile/ or matching profile/avatar
+        if found_pic_entry.is_none() {
+            for i in 0..archive.len() {
+                if let Ok(entry) = archive.by_index(i) {
+                    let name_lower = entry.name().to_lowercase();
+                    let is_image = name_lower.ends_with(".webp")
+                        || name_lower.ends_with(".jpg")
+                        || name_lower.ends_with(".jpeg")
+                        || name_lower.ends_with(".png");
+
+                    if is_image && !entry.name().ends_with('/') {
+                        if name_lower.contains("/profile/")
+                            || name_lower.starts_with("profile/")
+                            || name_lower.contains("profile_picture")
+                            || name_lower.contains("profile-picture")
+                            || name_lower.contains("avatar")
+                        {
+                            found_pic_entry = Some(entry.name().to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(entry_name) = found_pic_entry {
+            if let Ok(mut entry) = archive.by_name(&entry_name) {
+                if entry.size() > 0 && entry.size() < 4 * 1024 * 1024 {
+                    use std::io::Read;
+                    let mut pic_bytes = Vec::new();
+                    if entry.read_to_end(&mut pic_bytes).is_ok() {
+                        let ext = Path::new(&entry_name).extension().and_then(|e| e.to_str()).unwrap_or("webp");
+                        profile_picture_data_url = Some(bytes_to_data_url(&pic_bytes, ext));
+                    }
+                }
             }
         }
     }
@@ -282,6 +418,7 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         archive_type: "Zip".into(),
         user_name,
         user_fullname,
+        profile_picture_data_url,
         entry_count: valid_posts.len(),
         valid_post_count: valid_posts.len(),
         corrupted_post_count: corrupted_posts,
@@ -345,6 +482,9 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
     // Check user.json
     let mut user_name = None;
     let mut user_fullname = None;
+    let mut profile_picture_data_url = None;
+    let mut target_profile_path: Option<String> = None;
+
     let user_json_candidates = [
         media_base.join("user.json"),
         base_dir.join("user.json"),
@@ -356,9 +496,98 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
             has_user_json = true;
             if let Ok(data) = std::fs::read_to_string(u_path) {
                 if let Ok(user) = serde_json::from_str::<UserExportMeta>(&data) {
+                    let (direct, target) = resolve_profile_picture(&user);
                     user_name = user.username;
                     user_fullname = user.fullname;
+                    profile_picture_data_url = direct;
+                    target_profile_path = target;
                     break;
+                }
+            }
+        }
+    }
+
+    if profile_picture_data_url.is_none() {
+        let mut candidate_paths = Vec::new();
+        let clean_tp = target_profile_path.as_deref().map(|s| s.trim_start_matches('/').trim_start_matches("./"));
+        let target_filename = clean_tp.and_then(|s| Path::new(s).file_name().and_then(|f| f.to_str()));
+
+        // Check exact target paths
+        if let Some(tp) = clean_tp {
+            candidate_paths.push(media_base.join(tp));
+            candidate_paths.push(base_dir.join(tp));
+        }
+
+        // Check target filename inside profile folders
+        if let Some(filename) = target_filename {
+            for base in &[&media_base, base_dir] {
+                candidate_paths.push(base.join("profile").join(filename));
+                candidate_paths.push(base.join("Photos").join("profile").join(filename));
+                candidate_paths.push(base.join("photos").join("profile").join(filename));
+                candidate_paths.push(base.join("Profile").join(filename));
+                candidate_paths.push(base.join("Photos").join("Profile").join(filename));
+                candidate_paths.push(base.join(filename));
+            }
+        }
+
+        // Common profile picture folder/file locations in BeReal GDPR
+        for base in &[&media_base, base_dir] {
+            candidate_paths.push(base.join("Photos").join("profile_picture.webp"));
+            candidate_paths.push(base.join("photos").join("profile_picture.webp"));
+            candidate_paths.push(base.join("profile").join("profile_picture.webp"));
+            candidate_paths.push(base.join("profile_picture.webp"));
+            candidate_paths.push(base.join("profile_picture.jpg"));
+            candidate_paths.push(base.join("profile-picture.webp"));
+            candidate_paths.push(base.join("profile-picture.jpg"));
+            candidate_paths.push(base.join("profilePicture.webp"));
+            candidate_paths.push(base.join("profilePicture.jpg"));
+            candidate_paths.push(base.join("avatar.webp"));
+            candidate_paths.push(base.join("avatar.jpg"));
+        }
+
+        for cp in &candidate_paths {
+            if cp.is_file() {
+                if let Ok(bytes) = std::fs::read(cp) {
+                    if !bytes.is_empty() && bytes.len() < 4 * 1024 * 1024 {
+                        let ext = cp.extension().and_then(|e| e.to_str()).unwrap_or("webp");
+                        profile_picture_data_url = Some(bytes_to_data_url(&bytes, ext));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If still none, scan `profile` subfolders for any image file
+        if profile_picture_data_url.is_none() {
+            let search_dirs = [
+                media_base.join("Photos").join("profile"),
+                media_base.join("photos").join("profile"),
+                media_base.join("profile"),
+                base_dir.join("Photos").join("profile"),
+                base_dir.join("photos").join("profile"),
+                base_dir.join("profile"),
+            ];
+            for sdir in &search_dirs {
+                if sdir.is_dir() {
+                    if let Ok(entries) = std::fs::read_dir(sdir) {
+                        for entry in entries.flatten() {
+                            let p = entry.path();
+                            if p.is_file() {
+                                let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                if matches!(ext.as_str(), "webp" | "jpg" | "jpeg" | "png") {
+                                    if let Ok(bytes) = std::fs::read(&p) {
+                                        if !bytes.is_empty() && bytes.len() < 4 * 1024 * 1024 {
+                                            profile_picture_data_url = Some(bytes_to_data_url(&bytes, &ext));
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if profile_picture_data_url.is_some() {
+                        break;
+                    }
                 }
             }
         }
@@ -513,6 +742,7 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
         archive_type: "Directory".into(),
         user_name,
         user_fullname,
+        profile_picture_data_url,
         entry_count: valid_posts.len(),
         valid_post_count: valid_posts.len(),
         corrupted_post_count: corrupted_posts,
@@ -554,8 +784,11 @@ fn check_zip_media_presence(
     let mut missing_sample: Vec<MissingFileInfo> = Vec::new();
 
     for post in posts {
-        let post_date = parse_taken_at(&post.taken_at)
+        let parsed_dt = parse_taken_at(&post.taken_at);
+        let post_date = parsed_dt
             .map(|d| d.format("%Y-%m-%d").to_string());
+        let post_timestamp = parsed_dt
+            .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string());
         let assets: [(&Option<MediaAsset>, &str); 5] = [
             (&post.primary,              "primary"),
             (&post.primary_placeholder,  "primary"),
@@ -583,6 +816,7 @@ fn check_zip_media_presence(
                         missing_sample.push(MissingFileInfo {
                             path: asset.path.clone(),
                             date: post_date.clone(),
+                            timestamp: post_timestamp.clone(),
                             camera_type: Some(cam_type.to_string()),
                         });
                     }
@@ -604,8 +838,11 @@ fn check_disk_media_presence(
     let mut missing_sample: Vec<MissingFileInfo> = Vec::new();
 
     for post in posts {
-        let post_date = parse_taken_at(&post.taken_at)
+        let parsed_dt = parse_taken_at(&post.taken_at);
+        let post_date = parsed_dt
             .map(|d| d.format("%Y-%m-%d").to_string());
+        let post_timestamp = parsed_dt
+            .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string());
         let assets: [(&Option<MediaAsset>, &str); 5] = [
             (&post.primary,              "primary"),
             (&post.primary_placeholder,  "primary"),
@@ -624,6 +861,7 @@ fn check_disk_media_presence(
                         missing_sample.push(MissingFileInfo {
                             path: asset.path.clone(),
                             date: post_date.clone(),
+                            timestamp: post_timestamp.clone(),
                             camera_type: Some(cam_type.to_string()),
                         });
                     }

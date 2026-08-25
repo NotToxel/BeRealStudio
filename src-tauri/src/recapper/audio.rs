@@ -39,18 +39,27 @@ pub fn analyze_audio(path: &Path, buckets: usize) -> Result<AudioAnalysis> {
 
     let mut format = probed.format;
     let track = format.tracks().first().context("No audio tracks found")?.clone();
-    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
-    let channels = track.codec_params.channels.map(|c| c.count() as u32).unwrap_or(2);
+    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100).max(1);
+    let channels = track.codec_params.channels.map(|c| c.count() as u32).unwrap_or(2).max(1);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .context("Could not create audio decoder")?;
 
     let bucket_count = buckets.max(30).min(500);
-    let mut raw_samples: Vec<f32> = Vec::new();
+    // Bounded sample buffer: never consume more than 20,000 floats (~80 KB RAM) even for multi-hour audio files
+    const MAX_STORED_SAMPLES: usize = 20_000;
+    let mut raw_samples: Vec<f32> = Vec::with_capacity(MAX_STORED_SAMPLES);
     let mut total_frames = 0u64;
+    let mut packet_count = 0u64;
+    const MAX_PACKETS: u64 = 2_000_000; // Guard against malicious infinite streams
 
     loop {
+        packet_count += 1;
+        if packet_count > MAX_PACKETS {
+            break;
+        }
+
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(e))
@@ -69,29 +78,39 @@ pub fn analyze_audio(path: &Path, buckets: usize) -> Result<AudioAnalysis> {
             Ok(buf_ref) => {
                 total_frames += buf_ref.frames() as u64;
 
-                // Extract and downsample channel 0 samples for waveform
-                match buf_ref {
-                    AudioBufferRef::F32(buf) => {
-                        for &s in buf.chan(0).iter().step_by(16) {
-                            raw_samples.push(s.abs());
+                // Extract channel 0 samples for waveform if buffer capacity remains
+                if raw_samples.len() < MAX_STORED_SAMPLES {
+                    match buf_ref {
+                        AudioBufferRef::F32(buf) => {
+                            for &s in buf.chan(0).iter().step_by(32) {
+                                if raw_samples.len() < MAX_STORED_SAMPLES {
+                                    raw_samples.push(s.abs());
+                                }
+                            }
                         }
-                    }
-                    AudioBufferRef::S16(buf) => {
-                        for &s in buf.chan(0).iter().step_by(16) {
-                            raw_samples.push((s as f32 / 32768.0).abs());
+                        AudioBufferRef::S16(buf) => {
+                            for &s in buf.chan(0).iter().step_by(32) {
+                                if raw_samples.len() < MAX_STORED_SAMPLES {
+                                    raw_samples.push((s as f32 / 32768.0).abs());
+                                }
+                            }
                         }
-                    }
-                    AudioBufferRef::S32(buf) => {
-                        for &s in buf.chan(0).iter().step_by(16) {
-                            raw_samples.push((s as f32 / 2147483648.0).abs());
+                        AudioBufferRef::S32(buf) => {
+                            for &s in buf.chan(0).iter().step_by(32) {
+                                if raw_samples.len() < MAX_STORED_SAMPLES {
+                                    raw_samples.push((s as f32 / 2147483648.0).abs());
+                                }
+                            }
                         }
-                    }
-                    AudioBufferRef::U8(buf) => {
-                        for &s in buf.chan(0).iter().step_by(16) {
-                            raw_samples.push(((s as f32 - 128.0) / 128.0).abs());
+                        AudioBufferRef::U8(buf) => {
+                            for &s in buf.chan(0).iter().step_by(32) {
+                                if raw_samples.len() < MAX_STORED_SAMPLES {
+                                    raw_samples.push(((s as f32 - 128.0) / 128.0).abs());
+                                }
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
@@ -99,7 +118,10 @@ pub fn analyze_audio(path: &Path, buckets: usize) -> Result<AudioAnalysis> {
         }
     }
 
-    let duration = total_frames as f64 / sample_rate as f64;
+    let duration = (total_frames as f64 / sample_rate as f64).max(0.0);
+    if !duration.is_finite() {
+        anyhow::bail!("Audio file reported non-finite or invalid duration");
+    }
 
     // Resample raw samples into fixed number of normalized peak buckets
     let mut waveform = vec![0.05f32; bucket_count];

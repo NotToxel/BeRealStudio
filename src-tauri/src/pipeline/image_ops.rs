@@ -71,9 +71,16 @@ pub fn combine_pip(primary_path: &Path, secondary_path: &Path) -> Result<Dynamic
     let (pw, ph) = primary.dimensions();
     let (sw, sh) = secondary.dimensions();
 
+    if pw == 0 || ph == 0 {
+        anyhow::bail!("Primary image has invalid zero dimensions: {}x{}", pw, ph);
+    }
+    if sw == 0 || sh == 0 {
+        anyhow::bail!("Secondary image has invalid zero dimensions: {}x{}", sw, sh);
+    }
+
     // Scale secondary down to 1/3.333
-    let new_sw = (sw as f32 * PIP_SCALE) as u32;
-    let new_sh = (sh as f32 * PIP_SCALE) as u32;
+    let new_sw = ((sw as f32 * PIP_SCALE) as u32).max(1);
+    let new_sh = ((sh as f32 * PIP_SCALE) as u32).max(1);
     let secondary_resized = secondary
         .resize_exact(new_sw, new_sh, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
@@ -128,15 +135,22 @@ pub fn combine_side_by_side(primary_path: &Path, secondary_path: &Path) -> Resul
     let target_h = ph;
     let (sw, sh) = secondary.dimensions();
 
+    if pw == 0 || ph == 0 {
+        anyhow::bail!("Primary image has invalid zero dimensions: {}x{}", pw, ph);
+    }
+    if sw == 0 || sh == 0 {
+        anyhow::bail!("Secondary image has invalid zero dimensions: {}x{}", sw, sh);
+    }
+
     // Scale secondary to same height as primary
-    let new_sw = (sw * target_h / sh).max(1);
+    let new_sw = (sw.saturating_mul(target_h) / sh.max(1)).max(1);
     let secondary_resized = secondary
         .resize_exact(new_sw, target_h, image::imageops::FilterType::Lanczos3)
         .to_rgb8();
     let primary_rgb = primary.to_rgb8();
 
     // Create wide canvas
-    let total_w = pw + new_sw;
+    let total_w = pw.saturating_add(new_sw);
     let mut canvas = image::RgbImage::new(total_w, target_h);
     image::imageops::overlay(&mut canvas, &primary_rgb, 0, 0);
     image::imageops::overlay(&mut canvas, &secondary_resized, pw as i64, 0);

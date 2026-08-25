@@ -52,7 +52,7 @@ where
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .context("Failed to launch FFmpeg for streaming encoding")?;
 
@@ -66,9 +66,16 @@ where
         let raw_bytes = img.as_raw();
 
         for _ in 0..n_frames {
-            writer
-                .write_all(raw_bytes)
-                .context("Failed to stream frame bytes to FFmpeg stdin")?;
+            if let Err(e) = writer.write_all(raw_bytes) {
+                // If FFmpeg exited early, drop writer and wait for output to extract actual FFmpeg error log
+                drop(writer);
+                if let Ok(out) = child.wait_with_output() {
+                    let err_tail = String::from_utf8_lossy(&out.stderr);
+                    let last_lines = err_tail.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+                    anyhow::bail!("FFmpeg aborted early: {}\n{}", e, last_lines);
+                }
+                return Err(e).context("Failed to stream frame bytes to FFmpeg stdin");
+            }
             frames_written += 1;
 
             if total_expected_frames > 0 {
@@ -78,12 +85,14 @@ where
         }
     }
 
-    writer.flush().context("Failed to flush frame stream to FFmpeg")?;
+    let _ = writer.flush();
     drop(writer);
 
-    let status = child.wait().context("FFmpeg encoding process failed")?;
-    if !status.success() {
-        anyhow::bail!("FFmpeg streaming encoding failed with exit code: {}", status);
+    let output = child.wait_with_output().context("FFmpeg encoding process failed")?;
+    if !output.status.success() {
+        let err_tail = String::from_utf8_lossy(&output.stderr);
+        let last_lines = err_tail.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        anyhow::bail!("FFmpeg encoding failed ({}):\n{}", output.status, last_lines);
     }
 
     Ok(())

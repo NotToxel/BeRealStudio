@@ -221,10 +221,24 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-│
-└── package.json                            # App manifest & dependencies (v1.5.0)
+├── package.json                            # App manifest & dependencies (v1.5.0)
 └── README.md                               # User documentation & GDPR guide
 ```
+
+---
+
+## 🗺️ Future Roadmap & Upcoming Features
+
+- [ ] **🍏 Apple Photos Live Photos Compatibility**:
+  - Export paired still image (`.jpg`/`.heic`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier` metadata) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
+- [ ] **📅 Native BeReal-Style Memories & Calendar Viewer**:
+  - **Monthly Memories Calendar Matrix**: Visual calendar grid with day thumbnails, late badges, retake counters, and fast multi-year navigation.
+  - **Interactive Lightbox & Day Feed**: Flip front/back camera perspectives by clicking the selfie PIP with smooth animations, and hover-to-play BTS live video loops.
+  - **Social Context Layer**: Render friends' RealMojis reaction avatars, comments sheet with timestamps, and embedded Spotify/location cards.
+- [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
+  - Optional setting to burn original BeReal captions in authentic semi-transparent rounded pill styling directly onto composited images or recap slides.
+- [ ] **🎬 Recap Video Library & Gallery Viewer**:
+  - In-app gallery indexing all rendered recap MP4s with playback preview, waveform scrubber, and quick actions ("Open in Player", "Show in Explorer").
 
 ---
 

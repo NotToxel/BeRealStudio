@@ -95,6 +95,7 @@ export interface MonthCount {
 export interface MissingFileInfo {
   path: string;
   date?: string;
+  timestamp?: string;
   cameraType?: string; // 'primary' | 'secondary' | 'bts'
 }
 
@@ -109,6 +110,7 @@ export interface ArchiveInfo {
   archiveType: 'Zip' | 'Directory';
   userName?: string;
   userFullname?: string;
+  profilePictureDataUrl?: string;
   entryCount: number;
   validPostCount: number;
   corruptedPostCount: number;

@@ -17,6 +17,21 @@
     // Register native dual-layer disk persistence for activity history
     registerNativeActivitySync(saveActivityHistory, clearNativeActivityHistory);
 
+    // Hydrate native settings from disk if available
+    try {
+      const savedSettings = await loadSettings();
+      if (savedSettings) {
+        if (savedSettings.toolkit) {
+          toolkitConfig.update((current) => ({ ...current, ...savedSettings.toolkit }));
+        }
+        if (savedSettings.recapper) {
+          recapperConfig.update((current) => ({ ...current, ...savedSettings.recapper }));
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load native settings:', e);
+    }
+
     // Hydrate native activity history from disk if available
     try {
       const diskHistory = await loadActivityHistory();

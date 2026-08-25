@@ -14,17 +14,25 @@ pub fn calculate_durations(
     end_padding: f64,
     speed_mode: &SpeedMode,
 ) -> Vec<f64> {
-    if count == 0 {
+    if count == 0 || !total_duration.is_finite() || total_duration <= 0.0 {
         return Vec::new();
     }
     if count == 1 {
         return vec![total_duration];
     }
 
-    let mut active = total_duration - start_padding - end_padding;
-    if active <= 0.0 {
-        active = total_duration;
-    }
+    // Sanitize paddings: cannot exceed 80% of total_duration combined to prevent desync
+    let max_combined_padding = total_duration * 0.8;
+    let raw_start = start_padding.max(0.0);
+    let raw_end = end_padding.max(0.0);
+    let (clean_start_pad, clean_end_pad) = if raw_start + raw_end > max_combined_padding {
+        let ratio = max_combined_padding / (raw_start + raw_end).max(0.001);
+        (raw_start * ratio, raw_end * ratio)
+    } else {
+        (raw_start, raw_end)
+    };
+
+    let active = (total_duration - clean_start_pad - clean_end_pad).max(0.001);
 
     let mut durations: Vec<f64> = match speed_mode {
         SpeedMode::Ramp => {
@@ -35,7 +43,7 @@ pub fn calculate_durations(
                     1.0 + 2.0 * x * x
                 })
                 .collect();
-            let weight_sum: f64 = weights.iter().sum();
+            let weight_sum: f64 = weights.iter().sum::<f64>().max(0.0001);
             weights.iter().map(|w| w / weight_sum * active).collect()
         }
         SpeedMode::Even => vec![active / count as f64; count],
@@ -47,7 +55,7 @@ pub fn calculate_durations(
                     1.0 + 2.5 * (1.0 - t) * (1.0 - t)
                 })
                 .collect();
-            let weight_sum: f64 = weights.iter().sum();
+            let weight_sum: f64 = weights.iter().sum::<f64>().max(0.0001);
             weights.iter().map(|w| w / weight_sum * active).collect()
         }
         SpeedMode::Decelerate => {
@@ -58,7 +66,7 @@ pub fn calculate_durations(
                     1.0 + 2.5 * t * t
                 })
                 .collect();
-            let weight_sum: f64 = weights.iter().sum();
+            let weight_sum: f64 = weights.iter().sum::<f64>().max(0.0001);
             weights.iter().map(|w| w / weight_sum * active).collect()
         }
         SpeedMode::Wave => {
@@ -69,17 +77,17 @@ pub fn calculate_durations(
                     1.0 + (std::f64::consts::PI * 3.0 * t).sin().abs()
                 })
                 .collect();
-            let weight_sum: f64 = weights.iter().sum();
+            let weight_sum: f64 = weights.iter().sum::<f64>().max(0.0001);
             weights.iter().map(|w| w / weight_sum * active).collect()
         }
     };
 
     // Apply padding to first and last
     if let Some(first) = durations.first_mut() {
-        *first += start_padding;
+        *first += clean_start_pad;
     }
     if let Some(last) = durations.last_mut() {
-        *last += end_padding;
+        *last += clean_end_pad;
     }
 
     durations

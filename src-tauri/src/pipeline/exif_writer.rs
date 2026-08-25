@@ -80,7 +80,9 @@ fn build_exif_bytes(
     }
 
     if let Some(loc) = location {
-        writer.add_gps(loc.latitude, loc.longitude);
+        if loc.latitude.is_finite() && loc.longitude.is_finite() {
+            writer.add_gps(loc.latitude.clamp(-90.0, 90.0), loc.longitude.clamp(-180.0, 180.0));
+        }
     }
 
     let mut payload = b"Exif\0\0".to_vec();
@@ -95,12 +97,13 @@ fn build_iptc_bytes(caption: Option<&str>, source: &str, program: &str) -> Vec<u
 
     // Each IPTC record: 0x1C + dataset_num + record_num + length (2 bytes BE) + data
     let mut write_record = |dataset: u8, record: u8, data: &[u8]| {
+        let safe_data = if data.len() > 65530 { &data[..65530] } else { data };
         iptc_records.push(0x1C);
         iptc_records.push(dataset);
         iptc_records.push(record);
-        let len = data.len() as u16;
+        let len = safe_data.len() as u16;
         iptc_records.extend_from_slice(&len.to_be_bytes());
-        iptc_records.extend_from_slice(data);
+        iptc_records.extend_from_slice(safe_data);
     };
 
     if let Some(cap) = caption {

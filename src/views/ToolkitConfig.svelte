@@ -46,6 +46,7 @@
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import RefreshCw from 'lucide-svelte/icons/refresh-cw';
   import MapPin from 'lucide-svelte/icons/map-pin';
+  import Clock from 'lucide-svelte/icons/clock';
   import MessageSquare from 'lucide-svelte/icons/message-square';
   import Clapperboard from 'lucide-svelte/icons/clapperboard';
   import Film from 'lucide-svelte/icons/film';
@@ -118,6 +119,43 @@
     return 'All Dates';
   })();
 
+  const AVATAR_COLORS = [
+    '#0088cc', // Cyan / Cerulean (Alex Enthoven / Hope Hui)
+    '#4338ca', // Indigo / Deep Purple (Hannah Lay)
+    '#dc2626', // Crimson Red (Zoe)
+    '#881337', // Plum / Berry / Maroon (Chinese / non-Latin)
+    '#059669', // Emerald Green
+    '#d97706', // Warm Amber
+    '#0891b2', // Deep Cyan
+    '#7c3aed', // Bright Violet
+  ];
+
+  function getAvatarColor(name?: string): string {
+    if (!name || name.trim().length === 0) return AVATAR_COLORS[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
+    }
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+
+  function getInitials(fullname?: string, username?: string): string {
+    const raw = (fullname && fullname.trim()) ? fullname.trim() : (username && username.trim()) ? username.trim() : '';
+    if (!raw) return '?';
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const first = Array.from(parts[0])[0];
+      const last = Array.from(parts[parts.length - 1])[0];
+      return (first + last).toUpperCase();
+    }
+    const chars = Array.from(raw);
+    if (chars.length === 1) return chars[0].toUpperCase();
+    if (chars.length > 1 && (!fullname || !fullname.trim())) {
+      return (chars[0] + chars[1]).toUpperCase();
+    }
+    return chars[0].toUpperCase();
+  }
+
   function getSensibleOutputPath(inputPath: string): string {
     const clean = inputPath.replace(/\\/g, '/');
     const lastSlash = clean.lastIndexOf('/');
@@ -131,8 +169,14 @@
       : `${inputPath}_processed`;
   }
 
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
   async function handleArchiveChange(path: string) {
-    if (!path) return;
+    if (!path || path.trim().length === 0) {
+      archiveMetadata.set(null);
+      $lastScannedArchivePath = '';
+      return;
+    }
     // Skip re-scan if this path was already successfully scanned
     if (path === $lastScannedArchivePath && $archiveMetadata && $archiveMetadata.isValid) {
       return;
@@ -144,7 +188,7 @@
       const meta = await scanArchive(path);
       archiveMetadata.set(meta);
 
-      if (!$toolkitConfig.outputPath) {
+      if (meta.isValid && !$toolkitConfig.outputPath) {
         $toolkitConfig.outputPath = getSensibleOutputPath(path);
       }
     } catch (e: any) {
@@ -159,8 +203,16 @@
     }
   }
 
-  $: if ($toolkitConfig.inputPath && ($toolkitConfig.inputPath !== $lastScannedArchivePath || !$archiveMetadata)) {
-    handleArchiveChange($toolkitConfig.inputPath);
+  $: if ($toolkitConfig.inputPath !== $lastScannedArchivePath) {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    if (!$toolkitConfig.inputPath || $toolkitConfig.inputPath.trim().length === 0) {
+      archiveMetadata.set(null);
+      $lastScannedArchivePath = '';
+    } else {
+      debounceTimer = setTimeout(() => {
+        handleArchiveChange($toolkitConfig.inputPath);
+      }, 450);
+    }
   }
 
   let missingInputPath = false;
@@ -334,7 +386,20 @@
                 </div>
                 {#if $archiveMetadata.userName}
                   <div class="user-pill">
-                    <User size={13} class="text-sky-400" />
+                    {#if $archiveMetadata.profilePictureDataUrl}
+                      <img
+                        src={$archiveMetadata.profilePictureDataUrl}
+                        alt="@{$archiveMetadata.userName}"
+                        class="user-avatar-img"
+                      />
+                    {:else}
+                      <div
+                        class="user-avatar-initials"
+                        style="background-color: {getAvatarColor($archiveMetadata.userFullname || $archiveMetadata.userName)};"
+                      >
+                        {getInitials($archiveMetadata.userFullname, $archiveMetadata.userName)}
+                      </div>
+                    {/if}
                     <span class="font-medium">@{$archiveMetadata.userName}</span>
                     {#if $archiveMetadata.userFullname}
                       <span class="text-muted text-xs">({$archiveMetadata.userFullname})</span>
@@ -425,16 +490,21 @@
                   </button>
                   {#if showMissingDetails && $archiveMetadata.missingFilesSample && $archiveMetadata.missingFilesSample.length > 0}
                     <div class="missing-files-list">
-                      <div class="missing-files-title">Sample missing files &amp; associated metadata:</div>
+                      <div class="missing-files-title">Sample missing files &amp; associated timestamps:</div>
                       {#each $archiveMetadata.missingFilesSample as sample}
                         <div class="missing-file-item font-mono">
-                          {#if sample.date}
+                          {#if sample.timestamp}
+                            <span class="mf-time" title="Capture Timestamp">
+                              <Clock size={11} />
+                              <span>{sample.timestamp}</span>
+                            </span>
+                          {:else if sample.date}
                             <span class="mf-date">[{sample.date}]</span>
                           {/if}
                           {#if sample.cameraType}
                             <span class="mf-cam">[{sample.cameraType}]</span>
                           {/if}
-                          <span class="mf-path">{sample.path}</span>
+                          <span class="mf-path" title={sample.path}>{sample.path}</span>
                         </div>
                       {/each}
                     </div>
@@ -515,6 +585,8 @@
       <!-- 2. Date Range Filtering -->
       {#if $archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.monthlyHistogram.length > 0}
         <DateRangePicker
+          title="2. Date Range & Timeline Filter"
+          accentColor="yellow"
           histogram={$archiveMetadata.monthlyHistogram}
           minDate={$archiveMetadata.earliestDate}
           maxDate={$archiveMetadata.latestDate}
@@ -1234,12 +1306,39 @@
   .user-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 7px;
+    font-size: 12.5px;
     background: #181820;
-    padding: 3px 10px;
+    padding: 3px 12px 3px 4px;
     border-radius: var(--radius-full);
     border: 1px solid var(--border-subtle);
+  }
+
+  .user-avatar-img {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: inline-block;
+    border: none;
+    flex-shrink: 0;
+  }
+
+  .user-avatar-initials {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.2px;
+    flex-shrink: 0;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 
   .warning-callout {
@@ -1310,8 +1409,47 @@
   }
 
   .missing-file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
     color: #fca5a5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mf-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 5px;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fbbf24;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .mf-date {
+    color: #f59e0b;
+    flex-shrink: 0;
+  }
+
+  .mf-cam {
+    color: #c084fc;
+    background: rgba(168, 85, 247, 0.15);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .mf-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .error-callout-body {
