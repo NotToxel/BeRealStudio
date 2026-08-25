@@ -172,15 +172,7 @@ mod tests {
     fn make_post(taken_at: &str) -> BeRealPost {
         BeRealPost {
             taken_at: taken_at.to_string(),
-            primary: None,
-            primary_placeholder: None,
-            secondary: None,
-            secondary_placeholder: None,
-            bts_media: None,
-            location: None,
-            caption: None,
-            retake_counter: None,
-            visibility: None,
+            ..Default::default()
         }
     }
 

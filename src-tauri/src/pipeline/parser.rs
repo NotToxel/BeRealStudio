@@ -1150,27 +1150,11 @@ mod tests {
         let posts = vec![
             BeRealPost {
                 taken_at: "2024-03-15T12:00:00.000Z".to_string(),
-                primary: None,
-                primary_placeholder: None,
-                secondary: None,
-                secondary_placeholder: None,
-                bts_media: None,
-                location: None,
-                caption: None,
-                retake_counter: None,
-                visibility: None,
+                ..Default::default()
             },
             BeRealPost {
                 taken_at: "2024-01-10T08:00:00.000Z".to_string(),
-                primary: None,
-                primary_placeholder: None,
-                secondary: None,
-                secondary_placeholder: None,
-                bts_media: None,
-                location: None,
-                caption: None,
-                retake_counter: None,
-                visibility: None,
+                ..Default::default()
             },
         ];
         let hist = compute_monthly_histogram(&posts);

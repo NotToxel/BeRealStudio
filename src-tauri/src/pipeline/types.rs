@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 // ─── BeReal JSON Data Structures ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BeRealPost {
     pub primary: Option<MediaAsset>,
@@ -21,7 +21,7 @@ pub struct BeRealPost {
     pub notification_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaAsset {
     pub path: String,
@@ -40,7 +40,7 @@ impl MediaAsset {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Location {
     pub latitude: f64,
     pub longitude: f64,
