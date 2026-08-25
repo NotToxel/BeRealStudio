@@ -75,6 +75,15 @@ async function main() {
       errors++;
     }
 
+    // Windows NSIS check
+    const nsisLangs = tauriConf.bundle?.windows?.nsis?.languages;
+    if (nsisLangs && nsisLangs.includes('en-US')) {
+      fail('NSIS languages cannot be "en-US"; must be "English"');
+      errors++;
+    } else {
+      success('Windows NSIS packaging configuration verified');
+    }
+
     // Icon files check
     const icons = tauriConf.bundle?.icon || [];
     let missingIcons = 0;

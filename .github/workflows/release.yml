@@ -168,7 +168,7 @@ jobs:
       - name: Build Tauri Desktop Application (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          bun run tauri build --bundles nsis,msi --verbose *>&1 | Tee-Object -FilePath tauri-build.log
+          bun run tauri build --bundles nsis --verbose *>&1 | Tee-Object -FilePath tauri-build.log
           if ($LASTEXITCODE -ne 0) {
             Write-Host "=== BUILD LOG TAIL ==="
             Get-Content tauri-build.log -Tail 120
@@ -224,78 +224,19 @@ jobs:
           ls -la "$GITHUB_WORKSPACE/release-artifacts/"
 
       - name: Upload Release Binaries
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            const tagName = '${{ needs.create-release.outputs.tag_name }}' || 'v2.0.0';
-            const resolvedTag = (tagName && tagName !== 'true') ? tagName : 'v2.0.0';
-
-            const artifactDir = path.join(process.env.GITHUB_WORKSPACE, 'release-artifacts');
-            if (!fs.existsSync(artifactDir)) {
-              console.log('Artifact directory does not exist.');
-              return;
-            }
-
-            const files = fs.readdirSync(artifactDir)
-              .map(f => path.join(artifactDir, f))
-              .filter(f => fs.statSync(f).isFile());
-
-            console.log(`Found ${files.length} release artifacts to upload:`);
-            files.forEach(f => console.log(' - ' + path.basename(f) + ' (' + (fs.statSync(f).size / 1024 / 1024).toFixed(2) + ' MB)'));
-
-            if (files.length === 0) {
-              console.log('No files found to upload.');
-              return;
-            }
-
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: resolvedTag
-            });
-
-            for (const filePath of files) {
-              const fileName = path.basename(filePath);
-              const fileData = fs.readFileSync(filePath);
-
-              try {
-                const freshRelease = await github.rest.repos.getReleaseByTag({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  tag: resolvedTag
-                });
-
-                const existing = freshRelease.data.assets.find(a => a.name === fileName);
-                if (existing) {
-                  console.log(`Removing old asset ${fileName} (${existing.id})...`);
-                  try {
-                    await github.rest.repos.deleteReleaseAsset({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      asset_id: existing.id
-                    });
-                  } catch (e) {
-                    console.log(`Note on delete: ${e.message}`);
-                  }
-                }
-
-                console.log(`Uploading ${fileName} (${(fileData.length / 1024 / 1024).toFixed(2)} MB)...`);
-                await github.rest.repos.uploadReleaseAsset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  release_id: release.data.id,
-                  name: fileName,
-                  data: fileData,
-                  headers: {
-                    'content-type': 'application/octet-stream',
-                    'content-length': fileData.length
-                  }
-                });
-                console.log(`Successfully uploaded: ${fileName}`);
-              } catch (err) {
-                console.warn(`Warning uploading ${fileName}: ${err.message}`);
-              }
-            }
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.create-release.outputs.tag_name }}"
+          [ -z "$TAG" ] || [ "$TAG" = "true" ] && TAG="v2.0.0"
+          echo "Uploading release artifacts for tag $TAG..."
+          if [ -d "$GITHUB_WORKSPACE/release-artifacts" ]; then
+            cd "$GITHUB_WORKSPACE/release-artifacts"
+            for f in *; do
+              if [ -f "$f" ]; then
+                echo "Uploading $f..."
+                gh release upload "$TAG" "$f" --clobber --repo "$GITHUB_REPOSITORY"
+              fi
+            done
+          fi
