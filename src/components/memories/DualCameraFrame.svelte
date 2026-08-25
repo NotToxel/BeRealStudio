@@ -210,7 +210,6 @@
         src={safeBtsSrc}
         class="media-layer base-video"
         autoplay
-        loop
         muted
         playsinline
         on:ended={handleVideoEnded}
@@ -249,15 +248,15 @@
       </div>
     {/if}
 
-    <!-- Top-right badge (e.g. retakes (2) or BTS) -->
+    <!-- Top-right badge (e.g. BTS indicator) -->
     {#if badgeText}
       <div class="corner-badge">
         <span>{badgeText}</span>
       </div>
     {/if}
 
-    <!-- Small Inset PIP (Selfie / Secondary camera) -->
-    {#if smallPipImage}
+    <!-- Small Inset PIP (Selfie / Secondary camera) - Hidden during BTS playback -->
+    {#if smallPipImage && !isPlayingBts}
       <div
         class="pip-frame-wrapper corner-{pipCorner}"
         class:is-custom-pos={hasMovedCustom}
