@@ -23,6 +23,7 @@ export interface ActivityRecord {
   details?: string;
 }
 
+export type MediaFilter = 'All' | 'PhotosOnly' | 'VideosOnly';
 export type OutputFormat = 'Jpeg' | 'WebP' | 'Png';
 export type CombineMode = 'PictureInPicture' | 'SideBySide';
 export type SpeedMode = 'Ramp' | 'Even' | 'Accelerate' | 'Decelerate' | 'Wave';
@@ -51,12 +52,14 @@ export interface ToolkitConfig {
   outputPath: string;
   dateRangeStart?: string;
   dateRangeEnd?: string;
+  mediaFilter?: MediaFilter;
   convertFormat: OutputFormat;
   quality: number;
   createCombined: boolean;
   combineMode: CombineMode;
   createReversed: boolean;
   createMotionPhotos: boolean;
+  createLivePhotos?: boolean;
   embedExif: boolean;
   keepOriginalFilename: boolean;
   cleanupIntermediates: boolean;
@@ -137,6 +140,8 @@ export interface ArchiveInfo {
   hasVideos: boolean;
   hasBts: boolean;
   monthlyHistogram: MonthCount[];
+  photoMonthlyHistogram: MonthCount[];
+  videoMonthlyHistogram: MonthCount[];
   validationErrors: string[];
   warnings: string[];
   postsJsonPath: string;
@@ -231,6 +236,7 @@ export interface ProcessingResult {
   combinedCreated: number;
   reversedCreated: number;
   motionPhotosCreated: number;
+  livePhotosCreated?: number;
   filesSkipped: number;
   errors: string[];
   durationSecs: number;

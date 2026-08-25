@@ -61,12 +61,16 @@ pub struct ToolkitConfig {
     pub output_path: String,
     pub date_range_start: Option<String>, // ISO 8601 date, e.g. "2024-01-01"
     pub date_range_end: Option<String>,   // ISO 8601 date, e.g. "2024-12-31"
+    #[serde(default)]
+    pub media_filter: MediaFilter,
     pub convert_format: OutputFormat,
     pub quality: u8, // 50–100
     pub create_combined: bool,
     pub combine_mode: CombineMode,
     pub create_reversed: bool,
     pub create_motion_photos: bool,
+    #[serde(default)]
+    pub create_live_photos: bool,
     pub embed_exif: bool,
     pub keep_original_filename: bool,
     pub cleanup_intermediates: bool,
@@ -79,12 +83,14 @@ impl Default for ToolkitConfig {
             output_path: String::new(),
             date_range_start: None,
             date_range_end: None,
+            media_filter: MediaFilter::All,
             convert_format: OutputFormat::Jpeg,
             quality: 90,
             create_combined: true,
             combine_mode: CombineMode::PictureInPicture,
             create_reversed: false,
             create_motion_photos: false,
+            create_live_photos: false,
             embed_exif: true,
             keep_original_filename: false,
             cleanup_intermediates: true,
@@ -159,6 +165,14 @@ impl Default for RecapperConfig {
 }
 
 // ─── Enumerations ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum MediaFilter {
+    #[default]
+    All,
+    PhotosOnly,
+    VideosOnly,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum OutputFormat {
@@ -348,6 +362,8 @@ pub struct ArchiveInfo {
     pub has_videos: bool,
     pub has_bts: bool,
     pub monthly_histogram: Vec<MonthCount>,
+    pub photo_monthly_histogram: Vec<MonthCount>,
+    pub video_monthly_histogram: Vec<MonthCount>,
     pub validation_errors: Vec<String>,
     pub warnings: Vec<String>,
     pub posts_json_path: String,
@@ -391,6 +407,8 @@ impl Default for ArchiveInfo {
             has_videos: false,
             has_bts: false,
             monthly_histogram: Vec::new(),
+            photo_monthly_histogram: Vec::new(),
+            video_monthly_histogram: Vec::new(),
             validation_errors: Vec::new(),
             warnings: Vec::new(),
             posts_json_path: String::new(),
@@ -494,6 +512,8 @@ pub struct ProcessingResult {
     pub combined_created: usize,
     pub reversed_created: usize,
     pub motion_photos_created: usize,
+    #[serde(default)]
+    pub live_photos_created: usize,
     pub files_skipped: usize,
     pub errors: Vec<String>,
     pub duration_secs: f64,

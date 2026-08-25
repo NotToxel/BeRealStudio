@@ -319,6 +319,7 @@ fn make_result(entries: usize, output_path: &str, duration: f64) -> ProcessingRe
         combined_created: 0,
         reversed_created: 0,
         motion_photos_created: 0,
+        live_photos_created: 0,
         files_skipped: 0,
         errors: vec![],
         duration_secs: duration,

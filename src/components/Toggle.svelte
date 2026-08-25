@@ -5,10 +5,11 @@
   export let label: string;
   export let description: string = '';
   export let tooltip: string = '';
+  export let badge: string = '';
   export let icon: any = null;
   export let checked: boolean = false;
   export let disabled: boolean = false;
-  export let accentColor: 'yellow' | 'violet' | 'emerald' | 'cyan' = 'yellow';
+  export let accentColor: 'yellow' | 'violet' | 'emerald' | 'cyan' | 'rose' = 'yellow';
   export let onChange: ((val: boolean) => void) | undefined = undefined;
 
   let showTooltip = false;
@@ -36,6 +37,9 @@
     <div class="text-group">
       <div class="label-row">
         <span class="label-text">{label}</span>
+        {#if badge}
+          <span class="badge-mini badge-mini-{accentColor}">{badge}</span>
+        {/if}
         {#if tooltip}
           <div class="info-popover-wrapper">
             <button
@@ -144,6 +148,40 @@
     color: #c084fc;
     border-color: rgba(192, 132, 252, 0.25);
     background: rgba(192, 132, 252, 0.08);
+  }
+
+  .toggle-icon-wrap.accent-rose {
+    color: #fb7185;
+    border-color: rgba(251, 113, 133, 0.25);
+    background: rgba(251, 113, 133, 0.08);
+  }
+
+  .badge-mini {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1.5px 5.5px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .badge-mini-rose {
+    background: rgba(244, 63, 94, 0.18);
+    color: #fda4af;
+    border: 1px solid rgba(244, 63, 94, 0.35);
+  }
+
+  .badge-mini-yellow {
+    background: rgba(234, 179, 8, 0.18);
+    color: #fef08a;
+    border: 1px solid rgba(234, 179, 8, 0.35);
+  }
+
+  .badge-mini-cyan {
+    background: rgba(6, 182, 212, 0.18);
+    color: #a5f3fc;
+    border: 1px solid rgba(6, 182, 212, 0.35);
   }
 
   .text-group {
@@ -322,5 +360,15 @@
     transform: translateX(20px);
     background: #38bdf8;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  }
+
+  .switch-btn.checked.accent-rose {
+    background: rgba(244, 63, 94, 0.25);
+    border-color: rgba(244, 63, 94, 0.6);
+  }
+  .switch-btn.checked.accent-rose .thumb {
+    transform: translateX(20px);
+    background: #fb7185;
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.8);
   }
 </style>

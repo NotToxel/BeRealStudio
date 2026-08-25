@@ -88,6 +88,13 @@ export function loadDemoArchive() {
     hasVideos: true,
     hasBts: true,
     monthlyHistogram: months,
+    photoMonthlyHistogram: months.map((m) => ({ month: m.month, count: Math.max(1, m.count - 2) })),
+    videoMonthlyHistogram: [
+      { month: '2023-06', count: 4 },
+      { month: '2023-10', count: 3 },
+      { month: '2024-03', count: 4 },
+      { month: '2024-08', count: 3 },
+    ],
     validationErrors: [],
     warnings: [],
     postsJsonPath: 'C:\\Development\\BeRealStudio\\archive\\bereal-gdpr-photo-toolkit\\posts.json',

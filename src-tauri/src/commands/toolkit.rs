@@ -16,9 +16,11 @@ use crate::{
         date_filter,
         exif_writer,
         image_ops,
+        live_photo,
         motion_photo,
         parser,
         types::*,
+        video_ops,
     },
     state::{AppState, ProgressEmitter},
 };
@@ -118,8 +120,9 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
         }
     };
 
+    let filtered_posts = date_filter::filter_by_media_type(all_posts, &config.media_filter);
     let posts = date_filter::filter_by_date_range(
-        all_posts,
+        filtered_posts,
         config.date_range_start.as_deref(),
         config.date_range_end.as_deref(),
     );
@@ -127,6 +130,7 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
     let dir_singles = out_base.join("singles");
     let dir_combined = out_base.join("combined");
     let dir_reversed = out_base.join("combined_reversed");
+    let dir_live_photos = out_base.join("live_photos");
 
     let mut conflicting_files_count = 0;
     let ext = config.convert_format.extension();
@@ -173,6 +177,15 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
         if config.create_reversed {
             if dir_reversed.join(format!("{}_combined_reversed.{}", time_str, ext)).exists()
                 || dir_reversed.join(format!("{}_combined_reversed.mp4", time_str)).exists()
+            {
+                conflicting_files_count += 1;
+            }
+        }
+
+        // 4. Live Photos
+        if config.create_live_photos {
+            if dir_live_photos.join(format!("{}_combined.jpg", time_str)).exists()
+                || dir_live_photos.join(format!("{}_combined.mov", time_str)).exists()
             {
                 conflicting_files_count += 1;
             }
@@ -308,16 +321,19 @@ fn run_toolkit(
     });
     emitter.info("Parsing posts.json...");
 
-    let all_posts = match parser::parse_posts(&posts_json) {
-        Ok(p) => p,
-        Err(e) => {
-            if is_temp_dir {
-                let _ = std::fs::remove_dir_all(&working_dir);
+    let all_posts = date_filter::filter_by_media_type(
+        match parser::parse_posts(&posts_json) {
+            Ok(p) => p,
+            Err(e) => {
+                if is_temp_dir {
+                    let _ = std::fs::remove_dir_all(&working_dir);
+                }
+                return Err(e);
             }
-            return Err(e);
-        }
-    };
-    emitter.info(format!("Found {} BeReal entries.", all_posts.len()));
+        },
+        &config.media_filter,
+    );
+    emitter.info(format!("Found {} BeReal entries after media filtering.", all_posts.len()));
 
     // ── Stage 2: Date filter ──────────────────────────────────────────────────
     let posts = date_filter::filter_by_date_range(
@@ -330,7 +346,7 @@ fn run_toolkit(
     }
 
     if posts.is_empty() {
-        emitter.warn("No entries matched the selected date range.");
+        emitter.warn("No entries matched the selected filters.");
         if is_temp_dir {
             let _ = std::fs::remove_dir_all(&working_dir);
         }
@@ -340,6 +356,7 @@ fn run_toolkit(
             combined_created: 0,
             reversed_created: 0,
             motion_photos_created: 0,
+            live_photos_created: 0,
             files_skipped: 0,
             errors: vec![],
             duration_secs: start.elapsed().as_secs_f64(),
@@ -352,6 +369,7 @@ fn run_toolkit(
     let dir_singles = out_base.join("singles");
     let dir_combined = out_base.join("combined");
     let dir_reversed = out_base.join("combined_reversed");
+    let dir_live_photos = out_base.join("live_photos");
     std::fs::create_dir_all(&dir_singles)
         .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_singles.display(), e))?;
     if config.create_combined {
@@ -361,6 +379,10 @@ fn run_toolkit(
     if config.create_reversed {
         std::fs::create_dir_all(&dir_reversed)
             .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_reversed.display(), e))?;
+    }
+    if config.create_live_photos {
+        std::fs::create_dir_all(&dir_live_photos)
+            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_live_photos.display(), e))?;
     }
     emitter.info(format!("Output: {}", out_base.display()));
 
@@ -372,6 +394,7 @@ fn run_toolkit(
     let combined_created = Arc::new(AtomicUsize::new(0));
     let reversed_created = Arc::new(AtomicUsize::new(0));
     let motion_photos_created = Arc::new(AtomicUsize::new(0));
+    let live_photos_created = Arc::new(AtomicUsize::new(0));
     let files_skipped = Arc::new(AtomicUsize::new(0));
     // Collect pairs for combination phase
     let pairs: Arc<std::sync::Mutex<Vec<(PathBuf, PathBuf, DateTime<chrono::Utc>, Option<Location>, Option<String>, Option<PathBuf>)>>> =
@@ -538,15 +561,35 @@ fn run_toolkit(
                 let ext = config.convert_format.extension();
                 let dest = dir_combined.join(format!("{}_combined.{}", timestamp, ext));
                 match combine_and_save(prim_path, sec_path, &dest, &config, dt, location.as_ref(), caption.as_deref()) {
-                    Ok(_) => {
+                    Ok(actual_dest) => {
                         combined_created.fetch_add(1, Ordering::Relaxed);
-                        // Motion photo
+                        // Samsung/Google Motion photo
                         if config.create_motion_photos {
                             if let Some(bts) = bts_path {
-                                if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) {
-                                    match motion_photo::create_motion_photo(&dest, bts) {
+                                if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) && actual_dest.extension().map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg")).unwrap_or(false) {
+                                    match motion_photo::create_motion_photo(&actual_dest, bts) {
                                         Ok(_) => { motion_photos_created.fetch_add(1, Ordering::Relaxed); }
-                                        Err(e) => emitter.warn(format!("Motion photo failed for {}: {}", dest.display(), e)),
+                                        Err(e) => emitter.warn(format!("Motion photo failed for {}: {}", actual_dest.display(), e)),
+                                    }
+                                }
+                            }
+                        }
+
+                        // Apple Live Photos pair (.jpg + .mov)
+                        if config.create_live_photos {
+                            if let Some(bts) = bts_path {
+                                if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) && actual_dest.extension().map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg")).unwrap_or(false) {
+                                    match live_photo::create_apple_live_photo_pair(
+                                        &actual_dest,
+                                        bts,
+                                        &dir_live_photos,
+                                        &format!("{}_combined", timestamp),
+                                        dt,
+                                        location.as_ref(),
+                                        caption.as_deref(),
+                                    ) {
+                                        Ok(_) => { live_photos_created.fetch_add(1, Ordering::Relaxed); }
+                                        Err(e) => emitter.warn(format!("Apple Live Photo pair failed for {}: {}", actual_dest.display(), e)),
                                     }
                                 }
                             }
@@ -563,12 +606,31 @@ fn run_toolkit(
             if config.create_reversed {
                 let ext = config.convert_format.extension();
                 let dest = dir_reversed.join(format!("{}_combined_reversed.{}", timestamp, ext));
-                if let Err(e) = combine_and_save(sec_path, prim_path, &dest, &config, dt, location.as_ref(), caption.as_deref()) {
-                    if let Ok(mut errs) = errors.lock() {
-                        errs.push(format!("Reversed combined error: {}", e));
+                match combine_and_save(sec_path, prim_path, &dest, &config, dt, location.as_ref(), caption.as_deref()) {
+                    Ok(actual_dest) => {
+                        reversed_created.fetch_add(1, Ordering::Relaxed);
+                        // Apple Live Photos for reversed composite
+                        if config.create_live_photos {
+                            if let Some(bts) = bts_path {
+                                if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) && actual_dest.extension().map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg")).unwrap_or(false) {
+                                    let _ = live_photo::create_apple_live_photo_pair(
+                                        &actual_dest,
+                                        bts,
+                                        &dir_live_photos,
+                                        &format!("{}_combined_reversed", timestamp),
+                                        dt,
+                                        location.as_ref(),
+                                        caption.as_deref(),
+                                    );
+                                }
+                            }
+                        }
                     }
-                } else {
-                    reversed_created.fetch_add(1, Ordering::Relaxed);
+                    Err(e) => {
+                        if let Ok(mut errs) = errors.lock() {
+                            errs.push(format!("Reversed combined error: {}", e));
+                        }
+                    }
                 }
             }
 
@@ -605,6 +667,7 @@ fn run_toolkit(
         combined_created.load(Ordering::Relaxed),
         reversed_created.load(Ordering::Relaxed),
         motion_photos_created.load(Ordering::Relaxed),
+        live_photos_created.load(Ordering::Relaxed),
         files_skipped.load(Ordering::Relaxed),
         errors.lock().unwrap().clone(),
         start.elapsed().as_secs_f64(),
@@ -612,9 +675,10 @@ fn run_toolkit(
     );
 
     emitter.info(format!(
-        "Complete! Processed: {}, Combined: {}, Skipped: {}, Errors: {} ({:.1}s)",
+        "Complete! Processed: {}, Combined: {}, Live Photos: {}, Skipped: {}, Errors: {} ({:.1}s)",
         result.entries_processed,
         result.combined_created,
+        result.live_photos_created,
         result.files_skipped,
         result.errors.len(),
         result.duration_secs,
@@ -639,7 +703,19 @@ fn combine_and_save(
     dt: &DateTime<chrono::Utc>,
     location: Option<&Location>,
     caption: Option<&str>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<PathBuf> {
+    let p_is_video = primary.extension().map(|e| e.eq_ignore_ascii_case("mp4") || e.eq_ignore_ascii_case("mov")).unwrap_or(false);
+    let s_is_video = secondary.extension().map(|e| e.eq_ignore_ascii_case("mp4") || e.eq_ignore_ascii_case("mov")).unwrap_or(false);
+
+    if p_is_video || s_is_video {
+        let video_dest = dest.with_extension("mp4");
+        video_ops::combine_videos_pip(primary, secondary, &video_dest, |_| {})?;
+        let ft = filetime::FileTime::from_unix_time(dt.timestamp(), 0);
+        let _ = filetime::set_file_times(&video_dest, ft, ft);
+        let _ = video_ops::set_video_metadata(&video_dest, dt);
+        return Ok(video_dest);
+    }
+
     let combined = match config.combine_mode {
         CombineMode::PictureInPicture => image_ops::combine_pip(primary, secondary)?,
         CombineMode::SideBySide => image_ops::combine_side_by_side(primary, secondary)?,
@@ -653,7 +729,7 @@ fn combine_and_save(
     if config.embed_exif && matches!(config.convert_format, OutputFormat::Jpeg) {
         let _ = exif_writer::write_metadata(dest, dt, location, caption);
     }
-    Ok(())
+    Ok(dest.to_path_buf())
 }
 
 fn make_result(
@@ -662,6 +738,7 @@ fn make_result(
     combined: usize,
     reversed: usize,
     motion: usize,
+    live: usize,
     skipped: usize,
     errors: Vec<String>,
     duration: f64,
@@ -673,6 +750,7 @@ fn make_result(
         combined_created: combined,
         reversed_created: reversed,
         motion_photos_created: motion,
+        live_photos_created: live,
         files_skipped: skipped,
         errors,
         duration_secs: duration,

@@ -4,8 +4,34 @@ use std::path::{Path, PathBuf};
 
 use crate::pipeline::{
     parser::parse_taken_at,
-    types::BeRealPost,
+    types::{BeRealPost, MediaFilter},
 };
+
+/// Filter a list of posts according to the chosen media filter (All, PhotosOnly, VideosOnly).
+pub fn filter_by_media_type(
+    posts: Vec<BeRealPost>,
+    filter: &MediaFilter,
+) -> Vec<BeRealPost> {
+    match filter {
+        MediaFilter::All => posts,
+        MediaFilter::PhotosOnly => posts
+            .into_iter()
+            .filter(|post| {
+                let p_video = post.primary.as_ref().map(|a| a.is_video()).unwrap_or(false);
+                let s_video = post.secondary.as_ref().map(|a| a.is_video()).unwrap_or(false);
+                !p_video && !s_video
+            })
+            .collect(),
+        MediaFilter::VideosOnly => posts
+            .into_iter()
+            .filter(|post| {
+                let p_video = post.primary.as_ref().map(|a| a.is_video()).unwrap_or(false);
+                let s_video = post.secondary.as_ref().map(|a| a.is_video()).unwrap_or(false);
+                p_video || s_video
+            })
+            .collect(),
+    }
+}
 
 /// Filter a list of posts to those whose takenAt falls within [start, end] (inclusive).
 /// None on either bound means unbounded in that direction.

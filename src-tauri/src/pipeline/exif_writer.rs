@@ -141,6 +141,7 @@ pub fn write_metadata_exiftool(
     location: Option<&Location>,
     caption: Option<&str>,
     is_video: bool,
+    apple_asset_id: Option<&str>,
 ) -> Result<()> {
     let date_str = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
     let date_sub_str = datetime.format("%Y:%m:%d %H:%M:%S%.3f").to_string();
@@ -164,6 +165,16 @@ pub fn write_metadata_exiftool(
             .arg(format!("-QuickTime:ModifyDate={}", date_str))
             .arg(format!("-TrackCreateDate={}", date_str))
             .arg(format!("-MediaCreateDate={}", date_str));
+    }
+
+    if let Some(asset_id) = apple_asset_id {
+        if is_video {
+            cmd.arg(format!("-ContentIdentifier={}", asset_id))
+                .arg(format!("-Keys:ContentIdentifier={}", asset_id));
+        } else {
+            cmd.arg(format!("-ContentIdentifier={}", asset_id))
+                .arg(format!("-MakerApple:ContentIdentifier={}", asset_id));
+        }
     }
 
     if let Some(loc) = location {
@@ -212,12 +223,22 @@ pub fn write_metadata_exiftool(
 }
 
 /// Write combined EXIF and IPTC metadata to a file in-place and synchronize filesystem timestamps.
-/// Prioritizes ExifTool for 100% metadata fidelity, falling back to native byte-level segment injection.
 pub fn write_metadata(
     path: &Path,
     datetime: &DateTime<Utc>,
     location: Option<&Location>,
     caption: Option<&str>,
+) -> Result<()> {
+    write_metadata_with_apple_id(path, datetime, location, caption, None)
+}
+
+/// Write combined EXIF (with optional Apple MakerNote asset identifier) and IPTC metadata in-place.
+pub fn write_metadata_with_apple_id(
+    path: &Path,
+    datetime: &DateTime<Utc>,
+    location: Option<&Location>,
+    caption: Option<&str>,
+    apple_asset_id: Option<&str>,
 ) -> Result<()> {
     let is_video = path
         .extension()
@@ -225,7 +246,7 @@ pub fn write_metadata(
         .unwrap_or(false);
 
     if let Some(exiftool) = detect_exiftool() {
-        return write_metadata_exiftool(&exiftool, path, datetime, location, caption, is_video);
+        return write_metadata_exiftool(&exiftool, path, datetime, location, caption, is_video, apple_asset_id);
     }
 
     if is_video {
@@ -239,8 +260,8 @@ pub fn write_metadata(
     let mut jpeg = Jpeg::from_bytes(data.into())
         .with_context(|| "Not a valid JPEG file")?;
 
-    // 1. Build and set EXIF APP1
-    let exif_bytes = build_exif_bytes(datetime, location, caption);
+    // 1. Build and set EXIF APP1 (with Apple MakerNote if asset ID provided)
+    let exif_bytes = build_exif_bytes_with_apple_id(datetime, location, caption, apple_asset_id);
     jpeg.set_exif(Some(exif_bytes.into()));
 
     // 2. Build and inject IPTC APP13
@@ -263,7 +284,7 @@ pub fn write_metadata(
         .with_context(|| format!("Cannot write {}", path.display()))?;
     jpeg.encoder().write_to(out)?;
 
-    // 4. Synchronize filesystem creation & modification timestamps with the photo capture time
+    // 4. Synchronize filesystem creation & modification timestamps
     let ft = filetime::FileTime::from_unix_time(datetime.timestamp(), 0);
     let _ = filetime::set_file_times(path, ft, ft);
 
@@ -411,6 +432,31 @@ impl ExifWriter {
         data.extend_from_slice(b"ASCII\0\0\0");
         data.extend_from_slice(text.as_bytes());
         self.exif_entries.push(TiffEntry { tag: 0x9286, typ: 7, data });
+    }
+
+    fn add_apple_maker_note(&mut self, asset_id: &str) {
+        // Apple MakerNote IFD embedding AssetIdentifier Tag 17 (0x0011)
+        let mut maker_note = Vec::new();
+        let num_entries = 1u16;
+        maker_note.extend_from_slice(&num_entries.to_le_bytes());
+
+        let tag = 0x0011u16; // 17: ContentIdentifier
+        let typ = 2u16;      // ASCII
+        let count = (asset_id.len() + 1) as u32;
+        let val_or_offset = 18u32; // 2 (count) + 12 (entry) + 4 (next IFD) = 18
+        maker_note.extend_from_slice(&tag.to_le_bytes());
+        maker_note.extend_from_slice(&typ.to_le_bytes());
+        maker_note.extend_from_slice(&count.to_le_bytes());
+        maker_note.extend_from_slice(&val_or_offset.to_le_bytes());
+        maker_note.extend_from_slice(&0u32.to_le_bytes()); // Next IFD = 0
+        maker_note.extend_from_slice(asset_id.as_bytes());
+        maker_note.push(0); // null-terminated
+
+        self.exif_entries.push(TiffEntry {
+            tag: 0x927C, // MakerNote tag in EXIF IFD
+            typ: 7,      // UNDEFINED
+            data: maker_note,
+        });
     }
 
     fn add_gps(&mut self, lat: f64, lon: f64) {
@@ -563,6 +609,15 @@ fn build_exif_bytes(
     location: Option<&Location>,
     description: Option<&str>,
 ) -> Vec<u8> {
+    build_exif_bytes_with_apple_id(datetime, location, description, None)
+}
+
+fn build_exif_bytes_with_apple_id(
+    datetime: &DateTime<Utc>,
+    location: Option<&Location>,
+    description: Option<&str>,
+    apple_asset_id: Option<&str>,
+) -> Vec<u8> {
     let mut writer = ExifWriter::new();
     let date_str = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
 
@@ -583,6 +638,13 @@ fn build_exif_bytes(
     if let Some(loc) = location {
         if loc.latitude.is_finite() && loc.longitude.is_finite() {
             writer.add_gps(loc.latitude.clamp(-90.0, 90.0), loc.longitude.clamp(-180.0, 180.0));
+        }
+    }
+
+    // Apple MakerNote Asset Identifier
+    if let Some(asset_id) = apple_asset_id {
+        if !asset_id.is_empty() {
+            writer.add_apple_maker_note(asset_id);
         }
     }
 
@@ -609,5 +671,16 @@ mod tests {
         let bytes = build_exif_bytes(&dt, Some(&loc), Some("Sunset in Paris"));
         assert!(bytes.starts_with(b"Exif\0\0"));
         assert!(bytes.len() > 100);
+    }
+
+    #[test]
+    fn test_build_exif_with_apple_maker_note() {
+        let dt = Utc.with_ymd_and_hms(2024, 3, 15, 12, 0, 0).unwrap();
+        let uuid_str = "C09DCB26-D321-4254-9F68-2E2E7FA16155";
+        let bytes = build_exif_bytes_with_apple_id(&dt, None, None, Some(uuid_str));
+        assert!(bytes.starts_with(b"Exif\0\0"));
+        // Check that the UUID bytes exist inside the generated EXIF payload
+        let found = bytes.windows(uuid_str.len()).any(|w| w == uuid_str.as_bytes());
+        assert!(found, "UUID should be embedded in Apple MakerNote IFD");
     }
 }

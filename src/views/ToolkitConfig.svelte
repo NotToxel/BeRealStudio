@@ -55,6 +55,7 @@
   import MessageSquare from 'lucide-svelte/icons/message-square';
   import Clapperboard from 'lucide-svelte/icons/clapperboard';
   import Film from 'lucide-svelte/icons/film';
+  import Smartphone from 'lucide-svelte/icons/smartphone';
   import Toggle from '$components/Toggle.svelte';
   import Slider from '$components/Slider.svelte';
   import Stepper from '$components/Stepper.svelte';
@@ -68,6 +69,36 @@
   let previewTab: 'standard' | 'reversed' | 'sidebyside' = 'standard';
 
   $: isCompositing = $toolkitConfig.createCombined || $toolkitConfig.createReversed;
+
+  // ─── Filtered histogram / bounds for DateRangePicker ──────────────────────
+  $: activeHistogram = (() => {
+    if (!$archiveMetadata) return [];
+    const filter = $toolkitConfig.mediaFilter ?? 'All';
+    if (filter === 'PhotosOnly') return $archiveMetadata.photoMonthlyHistogram ?? $archiveMetadata.monthlyHistogram;
+    if (filter === 'VideosOnly') return $archiveMetadata.videoMonthlyHistogram ?? [];
+    return $archiveMetadata.monthlyHistogram;
+  })();
+
+  $: activeTotalCount = (() => {
+    if (!$archiveMetadata) return 0;
+    const filter = $toolkitConfig.mediaFilter ?? 'All';
+    if (filter === 'PhotosOnly') return $archiveMetadata.primaryPhotoCount + $archiveMetadata.secondaryPhotoCount;
+    if (filter === 'VideosOnly') return $archiveMetadata.primaryVideoCount + $archiveMetadata.secondaryVideoCount;
+    return $archiveMetadata.entryCount;
+  })();
+
+  $: activeMinDate = (() => {
+    if (!$archiveMetadata || activeHistogram.length === 0) return $archiveMetadata?.earliestDate ?? '';
+    // First month in the filtered histogram
+    return activeHistogram[0].month + '-01';
+  })();
+
+  $: activeMaxDate = (() => {
+    if (!$archiveMetadata || activeHistogram.length === 0) return $archiveMetadata?.latestDate ?? '';
+    // Last month in the filtered histogram
+    const last = activeHistogram[activeHistogram.length - 1];
+    return last.month + '-31';
+  })();
 
   $: compositePerspective = (() => {
     if ($toolkitConfig.createCombined && $toolkitConfig.createReversed) return 'both';
@@ -609,17 +640,52 @@
         {/if}
       </div>
 
-      <!-- 2. Date Range Filtering -->
+      <!-- 2. Date Range & Media Filtering -->
       {#if $archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.monthlyHistogram.length > 0}
+        <div class="media-filter-row">
+          <span class="media-filter-label">Media Type:</span>
+          <div class="media-filter-pills">
+            <button
+              type="button"
+              class="media-filter-pill"
+              class:active={!$toolkitConfig.mediaFilter || $toolkitConfig.mediaFilter === 'All'}
+              on:click={() => ($toolkitConfig.mediaFilter = 'All')}
+            >
+              <Sparkles size={11} />
+              <span>All ({$archiveMetadata.entryCount})</span>
+            </button>
+            <button
+              type="button"
+              class="media-filter-pill"
+              class:active={$toolkitConfig.mediaFilter === 'PhotosOnly'}
+              on:click={() => ($toolkitConfig.mediaFilter = 'PhotosOnly')}
+            >
+              <Camera size={11} />
+              <span>Photos Only ({$archiveMetadata.primaryPhotoCount})</span>
+            </button>
+            {#if $archiveMetadata.primaryVideoCount > 0 || $archiveMetadata.secondaryVideoCount > 0}
+              <button
+                type="button"
+                class="media-filter-pill"
+                class:active={$toolkitConfig.mediaFilter === 'VideosOnly'}
+                on:click={() => ($toolkitConfig.mediaFilter = 'VideosOnly')}
+              >
+                <Film size={11} />
+                <span>Videos Only ({$archiveMetadata.primaryVideoCount + $archiveMetadata.secondaryVideoCount})</span>
+              </button>
+            {/if}
+          </div>
+        </div>
+
         <DateRangePicker
-          title="2. Date Range & Timeline Filter"
+          title="2. Date Range &amp; Timeline Filter"
           accentColor="yellow"
-          histogram={$archiveMetadata.monthlyHistogram}
-          minDate={$archiveMetadata.earliestDate}
-          maxDate={$archiveMetadata.latestDate}
+          histogram={activeHistogram}
+          minDate={activeMinDate}
+          maxDate={activeMaxDate}
           bind:startDate={$toolkitConfig.dateRangeStart}
           bind:endDate={$toolkitConfig.dateRangeEnd}
-          totalCount={$archiveMetadata.entryCount}
+          totalCount={activeTotalCount}
           bind:selectedCount={selectedMemoriesCount}
         />
       {/if}
@@ -696,12 +762,23 @@
         />
 
         <Toggle
-          label="Live &amp; Motion Photos"
+          label="Live &amp; Motion Photos (Samsung / Google)"
           description="Embeds BTS micro-video clips into interactive moving photos"
-          tooltip="Muxes BTS video clips into photos compatible with Samsung Gallery (SEFH) and Google Photos (GCamera XMP)."
+          tooltip="Muxes BTS video clips into composite photos compatible with Samsung Gallery (SEFH) and Google Photos (GCamera XMP)."
           icon={Film}
           bind:checked={$toolkitConfig.createMotionPhotos}
           accentColor="cyan"
+        />
+
+        <Toggle
+          label="Apple Live Photos"
+          badge="BETA"
+          description="Exports paired .jpg + .mov files for native Apple Photos &amp; iCloud recognition"
+          tooltip="Embeds matching Apple Content Identifier UUIDs into the composite JPEG (MakerNote tag 17) and BTS MOV (QuickTime metadata) in the live_photos/ subfolder. Requires JPEG format."
+          icon={Smartphone}
+          disabled={$toolkitConfig.convertFormat !== 'Jpeg'}
+          bind:checked={$toolkitConfig.createLivePhotos}
+          accentColor="rose"
         />
       </div>
 
@@ -2264,11 +2341,58 @@
     overflow-y: auto;
   }
 
-  .modal-actions-row {
+  .media-filter-row {
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    margin-bottom: -4px;
+  }
+
+  .media-filter-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .media-filter-pills {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .media-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3.5px 9px;
+    background: #14141d;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .media-filter-pill:hover {
+    color: #ffffff;
+    border-color: var(--border-medium);
+    background: #1b1b26;
+  }
+
+  .media-filter-pill.active {
+    background: rgba(255, 230, 0, 0.12);
+    border-color: rgba(255, 230, 0, 0.5);
+    color: #ffe600;
+    font-weight: 600;
   }
 
   @media (max-width: 900px) {

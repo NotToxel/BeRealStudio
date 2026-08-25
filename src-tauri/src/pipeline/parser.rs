@@ -353,6 +353,8 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
     }
 
     let histogram = compute_monthly_histogram(&valid_posts);
+    let photo_histogram = compute_monthly_histogram_photos(&valid_posts);
+    let video_histogram = compute_monthly_histogram_videos(&valid_posts);
     let mut has_videos = false;
     let mut has_bts = false;
     let mut earliest: Option<DateTime<Utc>> = None;
@@ -442,6 +444,8 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         has_videos,
         has_bts,
         monthly_histogram: histogram,
+        photo_monthly_histogram: photo_histogram,
+        video_monthly_histogram: video_histogram,
         validation_errors,
         warnings,
         posts_json_path: posts_name,
@@ -482,7 +486,7 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
                 let mut months: Vec<String> = histogram_map.keys().cloned().collect();
                 months.sort();
 
-                let monthly_histogram = months
+                let monthly_histogram: Vec<MonthCount> = months
                     .into_iter()
                     .map(|month| {
                         let count = histogram_map.get(&month).copied().unwrap_or(0) as u32;
@@ -521,7 +525,9 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
                     has_user_json: false,
                     has_videos: false,
                     has_bts: false,
-                    monthly_histogram,
+                    monthly_histogram: monthly_histogram.clone(),
+                    photo_monthly_histogram: monthly_histogram,
+                    video_monthly_histogram: Vec::new(),
                     validation_errors: Vec::new(),
                     warnings: Vec::new(),
                     posts_json_path: String::new(),
@@ -751,6 +757,8 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
     }
 
     let histogram = compute_monthly_histogram(&valid_posts);
+    let photo_histogram = compute_monthly_histogram_photos(&valid_posts);
+    let video_histogram = compute_monthly_histogram_videos(&valid_posts);
     let mut has_videos = false;
     let mut has_bts = false;
     let mut earliest: Option<DateTime<Utc>> = None;
@@ -840,6 +848,8 @@ fn scan_directory_archive(base_dir: &Path) -> Result<ArchiveInfo> {
         has_videos,
         has_bts,
         monthly_histogram: histogram,
+        photo_monthly_histogram: photo_histogram,
+        video_monthly_histogram: video_histogram,
         validation_errors,
         warnings,
         posts_json_path: posts_json_path.to_string_lossy().to_string(),
@@ -1019,6 +1029,46 @@ pub fn compute_monthly_histogram(posts: &[BeRealPost]) -> Vec<MonthCount> {
         if let Some(dt) = parse_taken_at(&post.taken_at) {
             let key = dt.format("%Y-%m").to_string();
             *counts.entry(key).or_insert(0) += 1;
+        }
+    }
+    let mut months: Vec<MonthCount> = counts
+        .into_iter()
+        .map(|(month, count)| MonthCount { month, count })
+        .collect();
+    months.sort_by(|a, b| a.month.cmp(&b.month));
+    months
+}
+
+/// Compute a per-month histogram counting only posts where the primary is a photo (not a video).
+pub fn compute_monthly_histogram_photos(posts: &[BeRealPost]) -> Vec<MonthCount> {
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for post in posts {
+        let is_video = post.primary.as_ref().map(|p| p.is_video()).unwrap_or(false);
+        if !is_video {
+            if let Some(dt) = parse_taken_at(&post.taken_at) {
+                let key = dt.format("%Y-%m").to_string();
+                *counts.entry(key).or_insert(0) += 1;
+            }
+        }
+    }
+    let mut months: Vec<MonthCount> = counts
+        .into_iter()
+        .map(|(month, count)| MonthCount { month, count })
+        .collect();
+    months.sort_by(|a, b| a.month.cmp(&b.month));
+    months
+}
+
+/// Compute a per-month histogram counting only posts where the primary is a video.
+pub fn compute_monthly_histogram_videos(posts: &[BeRealPost]) -> Vec<MonthCount> {
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for post in posts {
+        let is_video = post.primary.as_ref().map(|p| p.is_video()).unwrap_or(false);
+        if is_video {
+            if let Some(dt) = parse_taken_at(&post.taken_at) {
+                let key = dt.format("%Y-%m").to_string();
+                *counts.entry(key).or_insert(0) += 1;
+            }
         }
     }
     let mut months: Vec<MonthCount> = counts
