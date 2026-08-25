@@ -17,9 +17,10 @@ const SCREENSHOT_DIR = path.resolve(ROOT_DIR, 'docs', 'screenshots');
 
 const VIEWS = [
   { name: '01_home_dashboard.png', view: 'home', label: 'Home Dashboard' },
-  { name: '02_photo_toolkit_config.png', view: 'toolkit-config', label: 'Photo Processing Suite' },
-  { name: '03_recap_video_config.png', view: 'recapper-config', label: 'Recap Video Generator' },
-  { name: '04_activity_history.png', view: 'activity', label: 'Active Tasks & Generation History' },
+  { name: '02_memories_explorer.png', view: 'memories', label: 'Native Memories Explorer' },
+  { name: '03_photo_toolkit_config.png', view: 'toolkit-config', label: 'Photo Processing Suite' },
+  { name: '04_recap_video_config.png', view: 'recapper-config', label: 'Recap Video Generator' },
+  { name: '05_activity_history.png', view: 'activity', label: 'Active Tasks & Generation History' },
 ];
 
 function findBrowserBinary() {

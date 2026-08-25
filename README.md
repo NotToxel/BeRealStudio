@@ -2,14 +2,30 @@
 
 <div align="center">
   <h3>Unified, Local-First Desktop Suite for BeReal GDPR Data Exports</h3>
-  <p>Restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
+  <p>Explore your memories in an authentic mobile feed & calendar, restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
   <p>
-    <a href="https://github.com/NotToxel/BeRealStudio"><img src="https://img.shields.io/badge/GitHub-NotToxel%2FBeRealStudio-yellow?style=flat&logo=github" alt="GitHub Repo" /></a>
-    <img src="https://img.shields.io/badge/Version-1.6.0-blue?style=flat" alt="Version" />
-    <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
+    <a href="https://github.com/NotToxel/BeRealStudio/releases/latest"><img src="https://img.shields.io/github/v/release/NotToxel/BeRealStudio?label=Latest%20Release&logo=github&color=blue" alt="Latest Release" /></a>
+    <a href="https://github.com/NotToxel/BeRealStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/NotToxel/BeRealStudio/release.yml?branch=master&label=Release%20Build&logo=github" alt="Release Build Status" /></a>
+    <a href="https://github.com/NotToxel/BeRealStudio/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" /></a>
     <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat" alt="Cross Platform" />
   </p>
 </div>
+
+---
+
+## 📥 Downloads & Installation
+
+Download the official standalone release for your platform from the [Latest Release Page](https://github.com/NotToxel/BeRealStudio/releases/latest):
+
+| Platform | Format | Direct Download Link |
+| :--- | :--- | :--- |
+| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64-setup.exe) |
+| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64_en-US.msi) |
+| **macOS** (Universal) | `.dmg` (Apple Silicon & Intel) | [⬇️ **Download for macOS (.dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_universal.dmg) |
+| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.AppImage) |
+| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.deb) |
+
+> 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
 ---
 
@@ -17,13 +33,17 @@
 
 <div align="center">
 
-| 🏠 Home Dashboard & Archive Scanner | 📸 Photo Processing & Dual Perspective |
+| 🏠 Home Dashboard & Archive Scanner | 📱 Native Memories & Calendar Explorer |
 |:---:|:---:|
-| ![Home Dashboard](docs/screenshots/01_home_dashboard.png) | ![Photo Processing](docs/screenshots/02_photo_toolkit_config.png) |
+| ![Home Dashboard](docs/screenshots/01_home_dashboard.png) | ![Memories Explorer](docs/screenshots/02_memories_explorer.png) |
 
-| 🎬 Recap Video Generator & Audio Waveforms | ⚡ Active Operations & History Queue |
+| 📸 Photo Processing Suite & Dual Perspectives | 🎬 Recap Video Generator & Audio Waveforms |
 |:---:|:---:|
-| ![Recap Video Generator](docs/screenshots/03_recap_video_config.png) | ![Activity History](docs/screenshots/04_activity_history.png) |
+| ![Photo Processing](docs/screenshots/03_photo_toolkit_config.png) | ![Recap Video Generator](docs/screenshots/04_recap_video_config.png) |
+
+| ⚡ Active Operations & Generation History Queue |
+|:---:|
+| ![Activity History](docs/screenshots/05_activity_history.png) |
 
 </div>
 
@@ -31,20 +51,38 @@
 
 ## ✨ Key Features
 
-### 📸 Photo Processing Suite
-- **Metadata Restoration & EXIF Synchronization:** Losslessly embeds original capture dates, times, GPS coordinates, and caption descriptions into EXIF/IPTC photo headers.
-- **Authentic Dual-Camera Compositing:** Recreates BeReal's signature in-app aesthetic with rounded corners and crisp borders, supporting Picture-in-Picture and Side-by-Side layouts.
-- **Dual-Angle Perspective Export:** Choose between **Standard** (primary background), **Reversed** (selfie background), or export **Both Angles** concurrently.
-- **Samsung & Google Motion Photos:** Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos.
-- **Visual Timeline & Date Range Filter:** Interactive monthly activity density curve and calendar picker to easily filter memories by year, month, or custom dates.
-- **Fast Batch Processing:** Multi-threaded pipeline processes hundreds of archive photos in seconds.
+### 📱 1. Native Memories & Calendar Explorer
+- **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
+- **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** and an interactive **Monthly Calendar Matrix**.
+- **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
+- **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
+- **Interactive Dual-Camera Frame**:
+  - **Click-to-Swap**: Flip front and back cameras instantly.
+  - **Movable PIP**: Drag and reposition the selfie PIP anywhere or snap to the 4 corners.
+  - **Inline BTS Player**: Stream Behind-the-Scenes live video micro-clips with a single click.
+- **Smart Search & Hierarchical Filtering**: Filter posts by text query, GPS location, BTS clips, captions, retakes, year, month, city, and country.
+- **Single-Memory Instant Export Dialog**: Export individual memories as Combined PIP, Side-by-Side, Front/Back only, MP4 video clip, or Motion Photo with customizable defaults.
+- **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
 
-### 🎬 Recap Video Generator
-- **Music-Synchronized Recap Slideshows:** Automatically paces memories to your chosen soundtrack (MP3, WAV, M4A, AAC, FLAC) with real-time waveform visualization.
-- **Dynamic Timing Curves:** Customize video pacing with quadratic ramp, even timing, accelerate, decelerate, or wave timing curves.
-- **Smart Location & Date Stamps:** Automatically formats reverse-geocoded location stamps and custom date text on each memory slide.
-- **Live Video Preview:** Interactive player to preview your recap sequence before rendering.
-- **Background Multi-Job Queue:** Render videos and process photo batches simultaneously in the background without UI interruption.
+---
+
+### 📸 2. Photo Processing Suite
+- **Metadata Restoration & EXIF Synchronization**: Losslessly embeds original capture dates, times, GPS coordinates, and caption descriptions into EXIF/IPTC photo headers.
+- **Dual-Camera Compositing**: Recreates BeReal's signature aesthetic with rounded corners and clean borders in Picture-in-Picture and Side-by-Side layouts.
+- **Dual-Angle Perspective Export**: Choose between **Standard** (primary background), **Reversed** (selfie background), or export **Both Angles** concurrently.
+- **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos.
+- **Visual Timeline & Date Range Filter**: Interactive monthly activity density curve and calendar picker to easily filter memories by year, month, or custom dates.
+- **Fast Batch Processing**: Multi-threaded Rayon pipeline processes hundreds of archive photos in seconds.
+
+---
+
+### 🎬 3. Recap Video Generator
+- **Music-Synchronized Recap Slideshows**: Automatically paces memories to your chosen soundtrack (MP3, WAV, M4A, AAC, FLAC) with real-time waveform visualization.
+- **Dynamic Timing Curves**: Customize video pacing with quadratic ramp, even timing, accelerate, decelerate, or wave timing curves.
+- **Smart Location & Date Stamps**: Formats reverse-geocoded location stamps and custom date typography on each memory slide.
+- **Offline Spatial Reverse Geocoder**: Built-in in-memory GeoNames spatial index for instant, offline city/country resolution with zero network pauses.
+- **Live Video Preview**: Interactive player to preview your recap sequence before rendering.
+- **Background Multi-Job Queue**: Render videos and process photo batches simultaneously in the background without UI interruption.
 
 ---
 
@@ -61,7 +99,7 @@
 
 ---
 
-## 🛠️ Prerequisites
+## 🛠️ Prerequisites (For Building from Source)
 
 1. **Rust Toolchain:**
    - Install via [rustup.rs](https://rustup.rs) (Rust 1.78+ recommended).
@@ -113,16 +151,16 @@ npm run tauri build
 ```
 
 ### Build Artifact Locations:
-- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_1.3.1_x64_en-US.msi`
-- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_1.3.1_x64.dmg`
-- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_1.3.1_amd64.deb` or `appimage`
+- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_2.0.0_x64_en-US.msi` or `.exe`
+- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.0.0_universal.dmg`
+- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.0.0_amd64.deb` or `appimage`
 
 ---
 
 ## 🧪 Testing & Verification
 
 ```bash
-# Run Svelte & TypeScript type checks
+# Run Svelte & TypeScript diagnostics
 bun run check
 # or: npm run check
 
@@ -143,10 +181,12 @@ BeRealStudio/
 │   │   ├── types.ts                        # TypeScript data models & IPC interfaces
 │   │   ├── tauri.ts                        # Typed Tauri IPC bridge & event subscribers
 │   │   ├── stores.ts                       # Reactive stores & parallel multi-job queue
+│   │   ├── memoriesStore.ts                # Native Memories & Calendar state & caching
 │   │   ├── devMode.ts                      # Demo data generator & developer mode
 │   │   └── fonts.ts                        # Curated built-in font definitions
 │   ├── components/                         # Reusable UI Components
 │   │   ├── NavBar.svelte                   # Global top navigation with Activity badge
+│   │   ├── TitleBar.svelte                 # Custom frameless title bar & window controls
 │   │   ├── Toggle.svelte                   # Animated on/off switch
 │   │   ├── Slider.svelte                   # Value range slider with value pill
 │   │   ├── Stepper.svelte                  # Numeric stepper input
@@ -156,15 +196,25 @@ BeRealStudio/
 │   │   ├── Modal.svelte                    # Accessible modal dialog
 │   │   ├── LogConsole.svelte               # Color-coded live terminal console
 │   │   ├── ErrorModal.svelte               # Categorized error overlay
-│   │   └── RuleEditor.svelte               # Reverse geocoding rules editor
+│   │   ├── RuleEditor.svelte               # Reverse geocoding rules editor
+│   │   └── memories/                       # Memories & Explorer Component Suite
+│   │       ├── MemoriesGrid.svelte         # Responsive memory card grid
+│   │       ├── CalendarGrid.svelte         # Interactive monthly calendar matrix
+│   │       ├── DualCameraFrame.svelte      # Dual-camera frame with click-to-swap & movable PIP
+│   │       ├── MemoryFeedModal.svelte      # Fullscreen continuous vertical scroll feed
+│   │       ├── MemoryFilterBar.svelte      # Multi-dimensional search & drawer filters
+│   │       ├── MemoryActionMenu.svelte     # Memory 3-dot dropdown menu
+│   │       ├── MemoryContextMenu.svelte    # Right-click context menu
+│   │       └── ExportMemoryModal.svelte    # Single-memory export dialog
 │   ├── views/                              # Application Primary Views
 │   │   ├── Home.svelte                     # Main dashboard with hero & feature cards
+│   │   ├── MemoriesView.svelte             # Native Memories & Calendar Explorer View
 │   │   ├── ToolkitConfig.svelte            # Photo processing configuration view
 │   │   ├── RecapperConfig.svelte           # Recap video configuration view with live preview
 │   │   ├── Activity.svelte                 # Parallel active operations & generation history
 │   │   ├── Processing.svelte               # Real-time progress & live streaming log view
 │   │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
-│   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & offline GeoDB
+│   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & header settings
 │   │   └── About.svelte                    # Privacy manifesto, authoring & open source credits
 │   └── routes/+page.svelte                 # SPA root page router
 │
@@ -200,7 +250,7 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-├── package.json                            # App manifest & dependencies (v1.6.0)
+├── package.json                            # App manifest & dependencies (v2.0.0)
 └── README.md                               # User documentation & GDPR guide
 ```
 
@@ -208,12 +258,12 @@ BeRealStudio/
 
 ## 🗺️ Future Roadmap & Upcoming Features
 
+- [x] **📅 Native BeReal-Style Memories & Calendar Viewer** *(Completed in v2.0.0)*:
+  - Monthly Memories Calendar Matrix with day thumbnails, late badges, and retake counters.
+  - Interactive Feed & Lightbox with front/back camera click-to-swap and movable PIP.
+  - Multi-dimensional search, hierarchical location drawers, and single-memory exports.
 - [ ] **🍏 Apple Photos Live Photos Compatibility**:
   - Export paired still image (`.jpg`/`.heic`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier` metadata) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
-- [ ] **📅 Native BeReal-Style Memories & Calendar Viewer**:
-  - **Monthly Memories Calendar Matrix**: Visual calendar grid with day thumbnails, late badges, retake counters, and fast multi-year navigation.
-  - **Interactive Lightbox & Day Feed**: Flip front/back camera perspectives by clicking the selfie PIP with smooth animations, and hover-to-play BTS live video loops.
-  - **Social Context Layer**: Render friends' RealMojis reaction avatars, comments sheet with timestamps, and embedded Spotify/location cards.
 - [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
   - Optional setting to burn original BeReal captions in authentic semi-transparent rounded pill styling directly onto composited images or recap slides.
 - [ ] **🎬 Recap Video Library & Gallery Viewer**:
