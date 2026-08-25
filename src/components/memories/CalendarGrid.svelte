@@ -328,11 +328,11 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 22px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    padding: 10px 24px;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1.5px solid rgba(56, 189, 248, 0.4);
     border-radius: var(--radius-full);
-    color: #ffffff;
+    color: #38bdf8;
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
@@ -341,10 +341,11 @@
   }
 
   .explore-memories-outline-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #ffffff;
+    background: #38bdf8;
+    color: #09090b;
+    border-color: #38bdf8;
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);
   }
 
   @media (max-width: 600px) {

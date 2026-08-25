@@ -64,7 +64,7 @@
       </div>
 
       <div class="card-footer">
-        <span class="btn btn-accent-yellow btn-sm">
+        <span class="card-action-btn action-yellow">
           Process Photos <ArrowRight size={14} />
         </span>
       </div>
@@ -86,7 +86,7 @@
       </div>
 
       <div class="card-footer">
-        <span class="btn btn-accent-cyan btn-sm">
+        <span class="card-action-btn action-cyan">
           Explore Memories <ArrowRight size={14} />
         </span>
       </div>
@@ -108,7 +108,7 @@
       </div>
 
       <div class="card-footer">
-        <span class="btn btn-accent-violet btn-sm">
+        <span class="card-action-btn action-violet">
           Create Recap <ArrowRight size={14} />
         </span>
       </div>
@@ -234,6 +234,60 @@
 
   .card-footer {
     padding-top: 8px;
+  }
+
+  .card-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .action-yellow {
+    background: rgba(255, 230, 0, 0.1);
+    border: 1px solid rgba(255, 230, 0, 0.3);
+    color: #ffe600;
+  }
+
+  .feature-card:hover .action-yellow {
+    background: #ffe600;
+    color: #09090b;
+    border-color: #ffe600;
+    box-shadow: 0 4px 14px rgba(255, 230, 0, 0.35);
+    transform: translateX(2px);
+  }
+
+  .action-cyan {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #38bdf8;
+  }
+
+  .feature-card:hover .action-cyan {
+    background: #38bdf8;
+    color: #09090b;
+    border-color: #38bdf8;
+    box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+    transform: translateX(2px);
+  }
+
+  .action-violet {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #c084fc;
+  }
+
+  .feature-card:hover .action-violet {
+    background: #a855f7;
+    color: #ffffff;
+    border-color: #a855f7;
+    box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+    transform: translateX(2px);
   }
 
   @media (max-width: 768px) {
