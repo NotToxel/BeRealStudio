@@ -2,6 +2,7 @@ export type ViewMode =
   | 'home'
   | 'toolkit-config'
   | 'recapper-config'
+  | 'memories'
   | 'processing'
   | 'complete'
   | 'activity'
@@ -277,3 +278,76 @@ export interface HardwareAccelerationInfo {
   cpuCores: number;
   parallelThreads: number;
 }
+
+// ─── Memories Explorer Types ──────────────────────────────────────────────────
+
+export interface ExplorerMemory {
+  id: string;
+  index: number;
+  takenAt: string;
+  dateFormatted: string;
+  dayNumber: string;
+  monthKey: string; // "YYYY-MM"
+  year: number;
+  month: number;
+  day: number;
+  timeFormatted: string;
+  isLate: boolean;
+  lateDuration?: string;
+  retakeCounter: number;
+  caption?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  locationName?: string;
+  city?: string;
+  country?: string;
+  primaryPath?: string;
+  secondaryPath?: string;
+  btsPath?: string;
+  isVideo: boolean;
+  width?: number;
+  height?: number;
+}
+
+export interface ExplorerData {
+  memories: ExplorerMemory[];
+  totalCount: number;
+  uniqueYears: number[];
+  uniqueMonths: string[];
+  uniqueCities: string[];
+  uniqueCountries: string[];
+  userName?: string;
+  userFullname?: string;
+  profilePictureDataUrl?: string;
+  mediaBasePath: string;
+}
+
+export interface ExportSinglePostOptions {
+  memoryIndex: number;
+  primaryPath: string;
+  secondaryPath?: string;
+  outputPath: string;
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only';
+  format: 'Jpeg' | 'WebP' | 'Png';
+  quality: number;
+  embedExif: boolean;
+  takenAt?: string;
+  latitude?: number;
+  longitude?: number;
+  caption?: string;
+}
+
+export interface ExplorerFilterState {
+  searchQuery: string;
+  selectedYear: number | 'all';
+  selectedMonth: string | 'all'; // "YYYY-MM" or "all"
+  selectedCity: string | 'all';
+  selectedCountry: string | 'all';
+  hasLocationOnly: boolean;
+  hasBtsOnly: boolean;
+  hasCaptionOnly: boolean;
+  retakesOnly: boolean;
+}
+

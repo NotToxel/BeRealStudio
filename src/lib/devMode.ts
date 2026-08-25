@@ -10,7 +10,8 @@ import {
   defaultToolkitConfig,
   defaultRecapperConfig,
 } from './stores';
-import type { ArchiveInfo, MonthCount, ActiveJob, ActivityRecord } from './types';
+import { explorerData, calendarCurrentMonth } from './memoriesStore';
+import type { ArchiveInfo, MonthCount, ActiveJob, ActivityRecord, ExplorerMemory } from './types';
 
 export const isDev = import.meta.env.DEV;
 
@@ -229,11 +230,151 @@ export function loadDemoActiveJobs() {
   activeJobs.set(mockJobs);
 }
 
+export function loadDemoExplorer() {
+  const demoMemories: ExplorerMemory[] = [
+    {
+      id: 'demo-1',
+      index: 0,
+      takenAt: '2024-08-25T16:05:00.000Z',
+      dateFormatted: '25 August 2024',
+      dayNumber: '25',
+      monthKey: '2024-08',
+      year: 2024,
+      month: 8,
+      day: 25,
+      timeFormatted: '16:05',
+      isLate: false,
+      lateDuration: undefined,
+      retakeCounter: 4,
+      caption: 'Coding BeReal Studio frontend & Rust backend!',
+      location: { latitude: 51.5074, longitude: -0.1278 },
+      locationName: 'London, United Kingdom',
+      city: 'London',
+      country: 'United Kingdom',
+      primaryPath: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&auto=format&fit=crop&q=80',
+      secondaryPath: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+      btsPath: undefined,
+      isVideo: false,
+    },
+    {
+      id: 'demo-2',
+      index: 1,
+      takenAt: '2024-08-24T18:30:00.000Z',
+      dateFormatted: '24 August 2024',
+      dayNumber: '24',
+      monthKey: '2024-08',
+      year: 2024,
+      month: 8,
+      day: 24,
+      timeFormatted: '18:30',
+      isLate: false,
+      lateDuration: undefined,
+      retakeCounter: 0,
+      caption: 'Evening walk along the river Thames',
+      location: { latitude: 51.5055, longitude: -0.0754 },
+      locationName: 'Tower Bridge, United Kingdom',
+      city: 'London',
+      country: 'United Kingdom',
+      primaryPath: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&auto=format&fit=crop&q=80',
+      secondaryPath: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+      btsPath: undefined,
+      isVideo: false,
+    },
+    {
+      id: 'demo-3',
+      index: 2,
+      takenAt: '2024-08-23T13:15:00.000Z',
+      dateFormatted: '23 August 2024',
+      dayNumber: '23',
+      monthKey: '2024-08',
+      year: 2024,
+      month: 8,
+      day: 23,
+      timeFormatted: '13:15',
+      isLate: true,
+      lateDuration: '2h Late',
+      retakeCounter: 2,
+      caption: 'Lunch with the dev team',
+      location: { latitude: 51.5137, longitude: -0.1303 },
+      locationName: 'Soho, United Kingdom',
+      city: 'London',
+      country: 'United Kingdom',
+      primaryPath: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&auto=format&fit=crop&q=80',
+      secondaryPath: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+      btsPath: undefined,
+      isVideo: false,
+    },
+    {
+      id: 'demo-4',
+      index: 3,
+      takenAt: '2024-08-22T19:45:00.000Z',
+      dateFormatted: '22 August 2024',
+      dayNumber: '22',
+      monthKey: '2024-08',
+      year: 2024,
+      month: 8,
+      day: 22,
+      timeFormatted: '19:45',
+      isLate: false,
+      lateDuration: undefined,
+      retakeCounter: 1,
+      caption: 'Sunset in the park',
+      location: { latitude: 51.5073, longitude: -0.1657 },
+      locationName: 'Hyde Park, United Kingdom',
+      city: 'London',
+      country: 'United Kingdom',
+      primaryPath: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?w=600&auto=format&fit=crop&q=80',
+      secondaryPath: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+      btsPath: undefined,
+      isVideo: false,
+    },
+    {
+      id: 'demo-5',
+      index: 4,
+      takenAt: '2024-08-18T12:31:00.000Z',
+      dateFormatted: '18 August 2024',
+      dayNumber: '18',
+      monthKey: '2024-08',
+      year: 2024,
+      month: 8,
+      day: 18,
+      timeFormatted: '12:31',
+      isLate: false,
+      lateDuration: undefined,
+      retakeCounter: 0,
+      caption: 'Margate seaside cliffs!',
+      location: { latitude: 51.3896, longitude: 1.3868 },
+      locationName: 'Margate, United Kingdom',
+      city: 'Margate',
+      country: 'United Kingdom',
+      primaryPath: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80',
+      secondaryPath: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+      btsPath: undefined,
+      isVideo: false,
+    },
+  ];
+
+  explorerData.set({
+    memories: demoMemories,
+    totalCount: demoMemories.length,
+    uniqueYears: [2024],
+    uniqueMonths: ['2024-08'],
+    uniqueCities: ['London', 'Margate'],
+    uniqueCountries: ['United Kingdom'],
+    userName: 'toxel',
+    userFullname: 'Caleb Lim',
+    profilePictureDataUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%2338bdf8'/><stop offset='100%' stop-color='%23a855f7'/></linearGradient></defs><circle cx='50' cy='50' r='50' fill='url(%23g)'/><text x='50' y='62' font-family='sans-serif' font-size='42' font-weight='bold' fill='white' text-anchor='middle'>T</text></svg>",
+    mediaBasePath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR\\Photos',
+  });
+  calendarCurrentMonth.set('2024-08');
+}
+
 export function loadAllDemoData() {
   if (typeof window !== 'undefined') {
     sessionStorage.setItem('bereal_studio_demo_active', '1');
   }
   loadDemoArchive();
+  loadDemoExplorer();
   loadDemoRecapper();
   loadDemoHistory();
   loadDemoActiveJobs();
@@ -255,6 +396,7 @@ export function clearAllDemoData() {
 
   currentArchive.set(null);
   lastScannedArchivePath.set('');
+  explorerData.set(null);
   toolkitConfig.set({ ...defaultToolkitConfig });
   recapperConfig.set({ ...defaultRecapperConfig });
   activeJobs.update((jobs) => jobs.filter((j) => !j.id.startsWith('demo_')));

@@ -19,6 +19,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::archive::scan_archive,
             commands::archive::extract_zip,
+            commands::explorer::load_explorer_memories,
+            commands::explorer::read_media_file_data_url,
+            commands::explorer::export_single_memory,
             commands::toolkit::start_toolkit,
             commands::toolkit::cancel_toolkit,
             commands::toolkit::check_toolkit_conflicts,

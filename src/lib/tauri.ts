@@ -1,8 +1,8 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { openPath, openUrl } from '@tauri-apps/plugin-opener';
-export { openPath, openUrl };
+export { openPath, openUrl, convertFileSrc };
 import type {
   ArchiveInfo,
   ToolkitConfig,
@@ -18,6 +18,8 @@ import type {
   ActivityRecord,
   DestinationStatus,
   HardwareAccelerationInfo,
+  ExplorerData,
+  ExportSinglePostOptions,
 } from './types';
 
 export function isTauri(): boolean {
@@ -38,6 +40,19 @@ export async function scanArchive(path: string): Promise<ArchiveInfo> {
 
 export async function extractZip(zipPath: string, destDir: string): Promise<string> {
   return await safeInvoke<string>('extract_zip', { zipPath, destDir });
+}
+
+// Memories Explorer
+export async function loadExplorerMemories(archivePath: string): Promise<ExplorerData> {
+  return await safeInvoke<ExplorerData>('load_explorer_memories', { archivePath });
+}
+
+export async function readMediaFileDataUrl(filePath: string): Promise<string> {
+  return await safeInvoke<string>('read_media_file_data_url', { filePath });
+}
+
+export async function exportSingleMemory(opts: ExportSinglePostOptions): Promise<string> {
+  return await safeInvoke<string>('export_single_memory', { opts });
 }
 
 // Processing

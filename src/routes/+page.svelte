@@ -7,6 +7,7 @@
   import Home from '../views/Home.svelte';
   import ToolkitConfig from '../views/ToolkitConfig.svelte';
   import RecapperConfig from '../views/RecapperConfig.svelte';
+  import MemoriesView from '../views/MemoriesView.svelte';
   import Processing from '../views/Processing.svelte';
   import Complete from '../views/Complete.svelte';
   import Settings from '../views/Settings.svelte';
@@ -89,7 +90,7 @@
         loadAllDemoData();
       }
       const requestedView = urlParams.get('view') as any;
-      if (requestedView && ['home', 'toolkit-config', 'recapper-config', 'activity', 'settings', 'about', 'processing', 'complete'].includes(requestedView)) {
+      if (requestedView && ['home', 'toolkit-config', 'recapper-config', 'memories', 'activity', 'settings', 'about', 'processing', 'complete'].includes(requestedView)) {
         currentView.set(requestedView);
       }
     }
@@ -114,6 +115,8 @@
       <ToolkitConfig />
     {:else if $currentView === 'recapper-config'}
       <RecapperConfig />
+    {:else if $currentView === 'memories'}
+      <MemoriesView />
     {:else if $currentView === 'processing'}
       <Processing />
     {:else if $currentView === 'complete'}

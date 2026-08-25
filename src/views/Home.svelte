@@ -9,11 +9,16 @@
   } from '$lib/stores';
   import Camera from 'lucide-svelte/icons/camera';
   import Film from 'lucide-svelte/icons/film';
+  import Calendar from 'lucide-svelte/icons/calendar';
   import ArrowRight from 'lucide-svelte/icons/arrow-right';
 
   function openToolkit() {
     activeFeature.set('toolkit');
     currentView.set('toolkit-config');
+  }
+
+  function openMemories() {
+    currentView.set('memories');
   }
 
   function openRecapper() {
@@ -37,11 +42,11 @@
     </h1>
 
     <p class="hero-subtitle text-secondary">
-      Restore authentic timestamps, composite dual-camera memories, mux motion photos, and render music-synchronized recap videos.
+      Explore your authentic memories timeline &amp; calendar, composite dual-camera photos, and render music-synchronized recap videos.
     </p>
   </div>
 
-  <!-- Dual Main Action Cards -->
+  <!-- 3 Main Action Cards Grid -->
   <div class="cards-grid">
     <!-- Card 1: Photo Processing -->
     <button type="button" class="feature-card card-toolkit card-clickable text-left" on:click={openToolkit}>
@@ -65,7 +70,29 @@
       </div>
     </button>
 
-    <!-- Card 2: Recap Video -->
+    <!-- Card 2: Memories Explorer -->
+    <button type="button" class="feature-card card-memories card-clickable text-left" on:click={openMemories}>
+      <div class="card-top-row">
+        <div class="card-icon icon-sky">
+          <Calendar size={24} />
+        </div>
+      </div>
+
+      <div class="card-body">
+        <h2 class="title-md font-bold text-white">Memories &amp; Calendar</h2>
+        <p class="card-desc text-secondary">
+          Browse your authentic mobile BeReal feed, calendar view, search captions, and swap dual-camera perspectives.
+        </p>
+      </div>
+
+      <div class="card-footer">
+        <span class="btn btn-accent-cyan btn-sm">
+          Explore Memories <ArrowRight size={14} />
+        </span>
+      </div>
+    </button>
+
+    <!-- Card 3: Recap Video -->
     <button type="button" class="feature-card card-recapper card-clickable text-left" on:click={openRecapper}>
       <div class="card-top-row">
         <div class="card-icon icon-violet">
@@ -120,8 +147,8 @@
 
   .cards-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 22px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
   }
 
   .feature-card {
@@ -142,6 +169,13 @@
   .card-toolkit:hover {
     border-color: rgba(255, 230, 0, 0.4);
     box-shadow: 0 8px 30px rgba(255, 230, 0, 0.08);
+    transform: translateY(-2px);
+    background: #15151c;
+  }
+
+  .card-memories:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+    box-shadow: 0 8px 30px rgba(56, 189, 248, 0.12);
     transform: translateY(-2px);
     background: #15151c;
   }
@@ -172,6 +206,12 @@
     background: rgba(255, 230, 0, 0.12);
     color: #ffe600;
     border: 1px solid rgba(255, 230, 0, 0.25);
+  }
+
+  .icon-sky {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.25);
   }
 
   .icon-violet {

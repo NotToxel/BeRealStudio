@@ -7,6 +7,7 @@
   import Home from 'lucide-svelte/icons/house';
   import Images from 'lucide-svelte/icons/images';
   import Film from 'lucide-svelte/icons/film';
+  import Calendar from 'lucide-svelte/icons/calendar';
   import History from 'lucide-svelte/icons/history';
   import Settings from 'lucide-svelte/icons/settings';
   import Info from 'lucide-svelte/icons/info';
@@ -66,6 +67,16 @@
         >
           <Images size={15} />
           <span>Photos Suite</span>
+        </button>
+
+        <button
+          type="button"
+          class="core-nav-btn memories-btn"
+          class:active={$currentView === 'memories'}
+          on:click={() => navigate('memories')}
+        >
+          <Calendar size={15} />
+          <span>Memories</span>
         </button>
 
         <button
@@ -306,6 +317,13 @@
     color: #ffe600;
     border-color: rgba(255, 230, 0, 0.35);
     box-shadow: 0 0 14px rgba(255, 230, 0, 0.2);
+  }
+
+  .core-nav-btn.memories-btn.active {
+    background: rgba(56, 189, 248, 0.18);
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);
   }
 
   .core-nav-btn.recap-btn.active {
