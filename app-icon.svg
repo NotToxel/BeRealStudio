@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#181920" />
+      <stop offset="100%" stop-color="#0c0d10" />
+    </linearGradient>
+
+    <!-- Primary Frame Fill -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1f212a" />
+      <stop offset="100%" stop-color="#13141a" />
+    </linearGradient>
+
+    <!-- PIP Fill -->
+    <linearGradient id="pipGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#262935" />
+      <stop offset="100%" stop-color="#16171e" />
+    </linearGradient>
+
+    <!-- Amber Glow / Gradient for PIP Accent -->
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffbe3b" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Outer Squircle Shadow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+
+    <filter id="pipShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Squircle Background -->
+  <rect x="32" y="32" width="960" height="960" rx="214" ry="214" fill="url(#bgGrad)" stroke="#2b2d38" stroke-width="6" />
+
+  <!-- Primary BeReal Portrait Frame (3:4 Ratio) -->
+  <rect 
+    x="252" 
+    y="165" 
+    width="520" 
+    height="693" 
+    rx="48" 
+    ry="48" 
+    fill="url(#cardGrad)" 
+    stroke="#ffffff" 
+    stroke-width="16" 
+    filter="url(#cardShadow)" 
+  />
+
+  <!-- Secondary Top-Left PIP Frame (1/3.33 scale with rounded corners) -->
+  <rect 
+    x="280" 
+    y="193" 
+    width="156" 
+    height="208" 
+    rx="28" 
+    ry="28" 
+    fill="url(#pipGrad)" 
+    stroke="url(#amberGrad)" 
+    stroke-width="12" 
+    filter="url(#pipShadow)" 
+  />
+
+  <!-- Subtle PIP Camera Lens Indicator -->
+  <circle cx="358" cy="297" r="22" fill="#2d303e" stroke="url(#amberGrad)" stroke-width="4" />
+  <circle cx="358" cy="297" r="10" fill="#ffbe3b" />
+
+  <!-- Studio Playhead / Play Triangle Glyph in Center of Primary Frame -->
+  <polygon 
+    points="472,446 472,578 586,512" 
+    fill="#ffffff" 
+    stroke="#ffffff" 
+    stroke-width="20" 
+    stroke-linejoin="round" 
+  />
+</svg>

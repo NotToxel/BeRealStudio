@@ -1,0 +1,45 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node.js & SvelteKit
+node_modules/
+/build/
+/.svelte-kit/
+/package/
+.env
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Rust & Tauri Builds
+src-tauri/target/
+src-tauri/gen/schemas/
+target/
+target-test/
+Cargo.lock
+
+# Media, Outputs & Temporary Files
+*.mp4
+*.m4v
+*.mov
+*.avi
+*.wav
+*.mp3
+*.flac
+*.aac
+*.ogg
+*.zip
+*.tar.gz
+*.log
+debug_log*.txt
+__processed/
+__combined/
+singles/
+combined/
+combined_reversed/
+
+# Archive directory
+/archive/
