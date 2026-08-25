@@ -34,7 +34,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "appimage", "dmg", "app", "nsis", "msi"],
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
@@ -44,7 +44,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "category": "Graphics",
+    "category": "Graphics and Design",
     "shortDescription": "BeReal GDPR Archive Explorer & Recap Studio",
     "longDescription": "Desktop application to browse, composite, and recap BeReal GDPR archives",
     "copyright": "Copyright © 2026 NotToxel",

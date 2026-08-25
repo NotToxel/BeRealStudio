@@ -151,17 +151,24 @@ jobs:
       - name: Build Frontend
         run: bun run build
 
-      - name: Build Tauri Desktop Application (Unix)
-        if: runner.os != 'Windows'
+      - name: Build Tauri Desktop Application (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
         shell: bash
         run: |
           set -o pipefail
-          bun run tauri build --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 1)
+          bun run tauri build --bundles deb,appimage --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 1)
+
+      - name: Build Tauri Desktop Application (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run tauri build --bundles dmg,app --verbose 2>&1 | tee tauri-build.log || (echo "=== BUILD LOG TAIL ===" && tail -n 120 tauri-build.log && exit 1)
 
       - name: Build Tauri Desktop Application (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.platform == 'windows-latest'
         run: |
-          bun run tauri build --verbose *>&1 | Tee-Object -FilePath tauri-build.log
+          bun run tauri build --bundles nsis,msi --verbose *>&1 | Tee-Object -FilePath tauri-build.log
           if ($LASTEXITCODE -ne 0) {
             Write-Host "=== BUILD LOG TAIL ==="
             Get-Content tauri-build.log -Tail 120
