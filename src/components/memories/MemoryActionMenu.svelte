@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ExplorerMemory } from '$lib/types';
-  import { exportSingleMemory, openPath, isTauri } from '$lib/tauri';
+  import { exportSingleMemory, revealInFolder, isTauri } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
   import MoreHorizontal from 'lucide-svelte/icons/ellipsis';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
@@ -30,7 +30,7 @@
   async function handleOpenExplorer() {
     closeMenu();
     if (memory.primaryPath) {
-      await openPath(memory.primaryPath);
+      await revealInFolder(memory.primaryPath);
     }
   }
 

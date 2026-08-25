@@ -36,8 +36,12 @@
   let containerEl: HTMLElement | null = null;
   let hasMovedCustom = false;
 
+  let dragInitialClientX = 0;
+  let dragInitialClientY = 0;
+  let wasDragged = false;
+
   function toggleSwap(e?: Event) {
-    if (!interactive || isDragging) return;
+    if (!interactive || isDragging || wasDragged) return;
     e?.stopPropagation();
     swapped = !swapped;
   }
@@ -74,15 +78,29 @@
     }
   }
 
-  // Drag & Move PIP handler
+  // Drag & Move PIP handler with 4-Corner Snap
   function startPipDrag(e: MouseEvent | TouchEvent) {
     if (!interactive) return;
-    e.preventDefault();
     e.stopPropagation();
     isDragging = true;
+    wasDragged = false;
 
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragInitialClientX = clientX;
+    dragInitialClientY = clientY;
+
+    // If currently anchored to a corner, initialize pipPosX/Y from element rect
+    if (!hasMovedCustom && containerEl) {
+      const pipEl = containerEl.querySelector('.pip-frame-wrapper') as HTMLElement;
+      if (pipEl) {
+        const cRect = containerEl.getBoundingClientRect();
+        const pRect = pipEl.getBoundingClientRect();
+        pipPosX = pRect.left - cRect.left;
+        pipPosY = pRect.top - cRect.top;
+      }
+    }
+
     dragStartX = clientX - pipPosX;
     dragStartY = clientY - pipPosY;
 
@@ -97,8 +115,12 @@
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
+    if (Math.hypot(clientX - dragInitialClientX, clientY - dragInitialClientY) > 5) {
+      wasDragged = true;
+    }
+
     const rect = containerEl.getBoundingClientRect();
-    const pipW = (rect.width * 0.29);
+    const pipW = rect.width * 0.29;
     const pipH = pipW * (4 / 3);
 
     let newX = clientX - dragStartX;
@@ -114,11 +136,42 @@
   }
 
   function onPipDragEnd() {
+    if (!isDragging) return;
     isDragging = false;
     window.removeEventListener('mousemove', onPipDragMove);
     window.removeEventListener('mouseup', onPipDragEnd);
     window.removeEventListener('touchmove', onPipDragMove);
     window.removeEventListener('touchend', onPipDragEnd);
+
+    // If dragged, calculate nearest of the 4 corners and snap to it
+    if (wasDragged && containerEl) {
+      const rect = containerEl.getBoundingClientRect();
+      const pipW = rect.width * 0.29;
+      const pipH = pipW * (4 / 3);
+      const centerX = pipPosX + pipW / 2;
+      const centerY = pipPosY + pipH / 2;
+
+      const isLeft = centerX < rect.width / 2;
+      const isTop = centerY < rect.height / 2;
+
+      if (isTop && isLeft) {
+        pipCorner = 'top-left';
+      } else if (isTop && !isLeft) {
+        pipCorner = 'top-right';
+      } else if (!isTop && isLeft) {
+        pipCorner = 'bottom-left';
+      } else {
+        pipCorner = 'bottom-right';
+      }
+
+      // Smoothly transition from custom drag position to snapped corner
+      hasMovedCustom = false;
+
+      // Reset wasDragged after event loop cycle to prevent firing click handler
+      setTimeout(() => {
+        wasDragged = false;
+      }, 50);
+    }
   }
 
   function cycleCorner(e: MouseEvent) {

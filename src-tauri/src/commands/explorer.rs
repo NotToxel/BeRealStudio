@@ -131,7 +131,7 @@ fn load_explorer_memories_inner(
         anyhow::bail!("Selected archive or directory does not exist: {}", archive_path_str);
     }
 
-    let (working_dir, posts, user_name, user_fullname, profile_pic) = if input_path.is_file() {
+    let (working_dir, all_raw_posts, user_name, user_fullname, profile_pic) = if input_path.is_file() {
         // ZIP archive -> cache extract to app cache dir
         let cache_root = app
             .path()
@@ -145,10 +145,23 @@ fn load_explorer_memories_inner(
         let dest_dir = cache_root.join(hash);
         fs::create_dir_all(&dest_dir)?;
 
+        // Instant Cache Hit: Return cached explorer JSON if available
+        let cache_json_file = dest_dir.join("explorer_cache.json");
+        if cache_json_file.exists() {
+            if let Ok(file) = File::open(&cache_json_file) {
+                let reader = BufReader::with_capacity(128 * 1024, file);
+                if let Ok(cached_data) = serde_json::from_reader::<_, ExplorerData>(reader) {
+                    if !cached_data.memories.is_empty() {
+                        return Ok(cached_data);
+                    }
+                }
+            }
+        }
+
         let posts_json_candidate = dest_dir.join("posts.json");
         let memories_json_candidate = dest_dir.join("memories.json");
 
-        // Always ensure archive files are extracted into cache
+        // Extract archive files into cache
         let zip_file = File::open(input_path)?;
         let mut archive = ZipArchive::new(zip_file)?;
 
@@ -181,10 +194,10 @@ fn load_explorer_memories_inner(
             find_json_in_dir(&dest_dir)?
         };
 
-        let posts = parse_posts_from_path(&posts_file)?;
+        let raw_posts = parse_posts_from_path(&posts_file)?;
         (
             dest_dir,
-            posts,
+            raw_posts,
             archive_info.user_name,
             archive_info.user_fullname,
             archive_info.profile_picture_data_url,
@@ -193,15 +206,27 @@ fn load_explorer_memories_inner(
         // Directory
         let archive_info = parser::scan_archive(archive_path_str)?;
         let posts_file = find_json_in_dir(input_path)?;
-        let posts = parse_posts_from_path(&posts_file)?;
+        let raw_posts = parse_posts_from_path(&posts_file)?;
         (
             input_path.to_path_buf(),
-            posts,
+            raw_posts,
             archive_info.user_name,
             archive_info.user_fullname,
             archive_info.profile_picture_data_url,
         )
     };
+
+    // Deduplicate posts by taken_at timestamp and media paths
+    let mut seen_keys = HashSet::new();
+    let mut posts = Vec::with_capacity(all_raw_posts.len());
+    for p in all_raw_posts {
+        let prim_str = p.primary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
+        let sec_str = p.secondary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
+        let dedupe_key = format!("{}:{}:{}", p.taken_at, prim_str, sec_str);
+        if seen_keys.insert(dedupe_key) {
+            posts.push(p);
+        }
+    }
 
     // Pre-build index of all media files in working_dir (lowercase filename -> path)
     let media_index = Arc::new(build_media_file_index(&working_dir));
@@ -351,7 +376,7 @@ fn load_explorer_memories_inner(
 
     let total_count = memories.len();
 
-    Ok(ExplorerData {
+    let data = ExplorerData {
         memories,
         total_count,
         unique_years,
@@ -362,7 +387,15 @@ fn load_explorer_memories_inner(
         user_fullname,
         profile_picture_data_url: profile_pic,
         media_base_path: working_dir.to_string_lossy().to_string(),
-    })
+    };
+
+    // Cache computed data to disk for instant sub-millisecond retrieval on next launch
+    let cache_file = working_dir.join("explorer_cache.json");
+    if let Ok(serialized) = serde_json::to_string(&data) {
+        let _ = fs::write(cache_file, serialized);
+    }
+
+    Ok(data)
 }
 
 /// Helper: Scan directory recursively and build a map of lowercase filename -> absolute PathBuf

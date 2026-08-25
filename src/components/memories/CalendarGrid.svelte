@@ -4,11 +4,13 @@
     calendarCurrentMonth,
     memoriesByDate,
     openFeedAt,
+    activeExplorerView,
   } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import CalendarIcon from 'lucide-svelte/icons/calendar';
+  import Grid from 'lucide-svelte/icons/layout-grid';
 
   const weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -161,6 +163,19 @@
       </div>
     {/each}
   </div>
+
+  <!-- Explore Memories Outline Box Button -->
+  <div class="calendar-footer-actions">
+    <button
+      type="button"
+      class="explore-memories-outline-btn"
+      on:click={() => activeExplorerView.set('grid')}
+      title="Switch to full memories photo grid"
+    >
+      <Grid size={15} />
+      <span>Explore All Memories</span>
+    </button>
+  </div>
 </div>
 
 <style>
@@ -298,6 +313,38 @@
   .empty-offset-cell {
     background: transparent;
     border: none;
+  }
+
+  /* Explore Memories Outline Button */
+  .calendar-footer-actions {
+    display: flex;
+    justify-content: center;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 6px;
+  }
+
+  .explore-memories-outline-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius-full);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .explore-memories-outline-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
   }
 
   @media (max-width: 600px) {

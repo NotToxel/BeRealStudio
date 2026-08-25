@@ -134,8 +134,9 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
         let p_clean = std::path::Path::new(&clean_path);
 
         if p_clean.is_file() {
+            let select_arg = format!("/select,{}", clean_path);
             let _ = Command::new("explorer")
-                .args(["/select,", &clean_path])
+                .arg(&select_arg)
                 .spawn()
                 .map_err(|e| e.to_string())?;
         } else if p_clean.is_dir() {

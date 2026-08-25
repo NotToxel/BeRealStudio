@@ -131,7 +131,16 @@ export const archiveMetadata = currentArchive;
 export const isScanning = writable<boolean>(false);
 
 // Archive scan persistence
-export const lastScannedArchivePath = writable<string>('');
+const initialSavedArchivePath = typeof window !== 'undefined' ? localStorage.getItem('bereal_last_archive_path') || '' : '';
+export const lastScannedArchivePath = writable<string>(initialSavedArchivePath);
+
+if (typeof window !== 'undefined') {
+  lastScannedArchivePath.subscribe((val) => {
+    if (val) {
+      localStorage.setItem('bereal_last_archive_path', val);
+    }
+  });
+}
 
 // Processing & Progress (Active Primary Single View)
 export const isProcessing = writable<boolean>(false);
