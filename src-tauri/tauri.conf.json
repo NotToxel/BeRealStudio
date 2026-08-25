@@ -37,8 +37,10 @@
     "targets": "all",
     "icon": [
       "icons/32x32.png",
+      "icons/64x64.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
     ],
@@ -54,17 +56,10 @@
         "languages": ["en-US"]
       }
     },
-    "macOS": {
-      "dmg": {
-        "background": null
-      }
-    },
+    "macOS": {},
     "linux": {
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libjavascriptcoregtk-4.1-0", "libsoup-3.0-0"]
-      },
-      "appimage": {
-        "bundleMediaFramework": false
       }
     }
   },
