@@ -41,7 +41,32 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Photography",
+    "shortDescription": "BeReal GDPR Archive Explorer & Recap Studio",
+    "longDescription": "Desktop application to browse, composite, and recap BeReal GDPR archives",
+    "copyright": "Copyright © 2026 NotToxel",
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "languages": ["en-US"]
+      }
+    },
+    "macOS": {
+      "dmg": {
+        "background": null
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libjavascriptcoregtk-4.1-0", "libsoup-3.0-0"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
   },
   "plugins": {
     "shell": {
