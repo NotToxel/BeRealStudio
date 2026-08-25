@@ -54,7 +54,7 @@
         "languages": ["en-US"]
       }
     },
-    "macOS": {
+    "macos": {
       "dmg": {
         "background": null
       }

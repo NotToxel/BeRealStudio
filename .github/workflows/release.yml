@@ -136,6 +136,8 @@ jobs:
             libssl-dev \
             pkg-config \
             build-essential \
+            libfontconfig1-dev \
+            libfreetype6-dev \
             libfuse2 \
             libglib2.0-dev \
             curl \
