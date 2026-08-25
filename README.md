@@ -21,7 +21,8 @@ Download the official standalone release for your platform from the [Latest Rele
 | :--- | :--- | :--- |
 | **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64-setup.exe) |
 | **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64_en-US.msi) |
-| **macOS** (Universal) | `.dmg` (Apple Silicon & Intel) | [⬇️ **Download for macOS (.dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_universal.dmg) |
+| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_aarch64.dmg) |
+| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64.dmg) |
 | **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.AppImage) |
 | **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.deb) |
 

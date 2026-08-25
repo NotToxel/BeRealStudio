@@ -12,6 +12,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   ACTIONS_NODE_DEPRECATION_WARNING: 'false'
+  APPIMAGE_EXTRACT_AND_RUN: '1'
 
 jobs:
   create-release:
@@ -94,11 +95,13 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
+            name: 'macOS Apple Silicon'
+          - platform: 'macos-13'
+            name: 'macOS Intel'
           - platform: 'ubuntu-22.04'
-            args: ''
+            name: 'Linux x86_64'
           - platform: 'windows-latest'
-            args: ''
+            name: 'Windows x64'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -112,10 +115,6 @@ jobs:
 
       - name: Setup Rust stable
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Add macOS universal compilation targets
-        if: matrix.platform == 'macos-latest'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
@@ -147,7 +146,7 @@ jobs:
         run: bun install
 
       - name: Build Tauri Desktop Application
-        run: bun run tauri build ${{ matrix.args }}
+        run: bun run tauri build
 
       - name: Upload Release Binaries
         uses: softprops/action-gh-release@v2
