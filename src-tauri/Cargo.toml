@@ -7,7 +7,7 @@ edition = "2021"
 
 [lib]
 name = "bereal_studio_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -60,8 +60,5 @@ thiserror = "2"
 anyhow = "1"
 
 [profile.release]
-panic = "abort"
-codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true
+opt-level = 3
+lto = false

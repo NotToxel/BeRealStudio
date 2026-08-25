@@ -19,6 +19,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "screenshots": "node scripts/capture_screenshots.js",
+    "preflight": "node scripts/preflight.js",
     "tauri": "tauri"
   },
   "license": "MIT",
