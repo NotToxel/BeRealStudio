@@ -13,6 +13,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   ACTIONS_NODE_DEPRECATION_WARNING: 'false'
   APPIMAGE_EXTRACT_AND_RUN: '1'
+  RUST_BACKTRACE: '1'
 
 jobs:
   create-release:
@@ -118,7 +119,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri"
-          key: ${{ matrix.platform }}-v2
+          key: ${{ matrix.platform }}-v4-clean
 
       - name: Install Linux system dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
