@@ -166,20 +166,28 @@ jobs:
           path: tauri-build.log
           if-no-files-found: ignore
 
+      - name: List Generated Bundle Files
+        shell: bash
+        run: |
+          echo "=== Generated Bundle Artifacts ==="
+          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) -print || true
+
       - name: Upload Release Binaries
         uses: softprops/action-gh-release@v2
+        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name || 'v2.0.0' }}
           files: |
+            src-tauri/target/**/*.msi
+            src-tauri/target/**/*.exe
+            src-tauri/target/**/*.dmg
+            src-tauri/target/**/*.deb
+            src-tauri/target/**/*.AppImage
+            src-tauri/target/**/*.appimage
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/**/bundle/dmg/*.dmg
-            src-tauri/target/**/bundle/deb/*.deb
-            src-tauri/target/**/bundle/appimage/*.AppImage
-            src-tauri/target/**/bundle/msi/*.msi
-            src-tauri/target/**/bundle/nsis/*.exe
