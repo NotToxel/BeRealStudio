@@ -150,8 +150,21 @@ jobs:
       - name: Build Frontend
         run: bun run build
 
-      - name: Build Tauri Desktop Application
-        run: bun run tauri build --verbose
+      - name: Build Tauri Desktop Application (Unix)
+        if: runner.os != 'Windows'
+        run: bun run tauri build --verbose 2>&1 | tee tauri-build.log
+
+      - name: Build Tauri Desktop Application (Windows)
+        if: runner.os == 'Windows'
+        run: bun run tauri build --verbose *>&1 | Tee-Object -FilePath tauri-build.log
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.platform }}
+          path: tauri-build.log
+          if-no-files-found: ignore
 
       - name: Upload Release Binaries
         uses: softprops/action-gh-release@v2
