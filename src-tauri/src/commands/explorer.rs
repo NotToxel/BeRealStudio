@@ -40,6 +40,7 @@ pub struct ExplorerMemory {
     pub caption: Option<String>,
     pub location: Option<Location>,
     pub location_name: Option<String>,
+    pub suburb: Option<String>,
     pub city: Option<String>,
     pub country: Option<String>,
     pub primary_path: Option<String>,
@@ -57,6 +58,7 @@ pub struct ExplorerData {
     pub total_count: usize,
     pub unique_years: Vec<i32>,
     pub unique_months: Vec<String>,
+    pub unique_suburbs: Vec<String>,
     pub unique_cities: Vec<String>,
     pub unique_countries: Vec<String>,
     pub user_name: Option<String>,
@@ -280,6 +282,7 @@ fn load_explorer_memories_inner(
 
             // Fast Offline Location & Geocoding
             let mut location_name = None;
+            let mut suburb = None;
             let mut city = None;
             let mut country = None;
 
@@ -294,18 +297,16 @@ fn load_explorer_memories_inner(
 
                 if !resolved.is_empty() {
                     location_name = Some(resolved.clone());
-                    let parts: Vec<&str> = resolved.split(',').collect();
-                    if !parts.is_empty() {
-                        let c = parts[0].trim().to_string();
-                        if !c.is_empty() && !c.contains('°') {
-                            city = Some(c);
-                        }
-                    }
-                    if parts.len() > 1 {
-                        let ctry = parts[parts.len() - 1].trim().to_string();
-                        if !ctry.is_empty() {
-                            country = Some(ctry);
-                        }
+                    let parts: Vec<&str> = resolved.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                    if parts.len() >= 3 {
+                        suburb = Some(parts[0].to_string());
+                        city = Some(parts[1].to_string());
+                        country = Some(parts[parts.len() - 1].to_string());
+                    } else if parts.len() == 2 {
+                        city = Some(parts[0].to_string());
+                        country = Some(parts[1].to_string());
+                    } else if parts.len() == 1 {
+                        city = Some(parts[0].to_string());
                     }
                 }
             }
@@ -351,6 +352,7 @@ fn load_explorer_memories_inner(
                 caption: post.caption.clone(),
                 location: post.location.clone(),
                 location_name,
+                suburb,
                 city,
                 country,
                 primary_path,
@@ -365,12 +367,16 @@ fn load_explorer_memories_inner(
 
     let mut years_set = HashSet::new();
     let mut months_set = HashSet::new();
+    let mut suburbs_set = HashSet::new();
     let mut cities_set = HashSet::new();
     let mut countries_set = HashSet::new();
 
     for m in &memories {
         years_set.insert(m.year);
         months_set.insert(m.month_key.clone());
+        if let Some(sub) = &m.suburb {
+            suburbs_set.insert(sub.clone());
+        }
         if let Some(c) = &m.city {
             cities_set.insert(c.clone());
         }
@@ -385,6 +391,9 @@ fn load_explorer_memories_inner(
     let mut unique_months: Vec<String> = months_set.into_iter().collect();
     unique_months.sort();
 
+    let mut unique_suburbs: Vec<String> = suburbs_set.into_iter().collect();
+    unique_suburbs.sort();
+
     let mut unique_cities: Vec<String> = cities_set.into_iter().collect();
     unique_cities.sort();
 
@@ -398,6 +407,7 @@ fn load_explorer_memories_inner(
         total_count,
         unique_years,
         unique_months,
+        unique_suburbs,
         unique_cities,
         unique_countries,
         user_name,

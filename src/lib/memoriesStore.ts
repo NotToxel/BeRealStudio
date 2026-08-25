@@ -7,8 +7,9 @@ export const initialFilterState: ExplorerFilterState = {
   searchQuery: '',
   selectedYear: 'all',
   selectedMonth: 'all',
-  selectedCity: 'all',
   selectedCountry: 'all',
+  selectedCity: 'all',
+  selectedSuburb: 'all',
   hasLocationOnly: false,
   hasBtsOnly: false,
   hasCaptionOnly: false,
@@ -30,6 +31,37 @@ export const explorerFilter = writable<ExplorerFilterState>({ ...initialFilterSt
 // Current month viewed in the Calendar view ("YYYY-MM")
 export const calendarCurrentMonth = writable<string>('');
 
+// ─── Derived Location & Date Counts Store ─────────────────────────────────────
+export interface ExplorerFilterCounts {
+  byYear: Map<number, number>;
+  byMonth: Map<string, number>;
+  byCountry: Map<string, number>;
+  byCity: Map<string, number>;
+  bySuburb: Map<string, number>;
+}
+
+export const explorerFilterCounts = derived(explorerData, ($data): ExplorerFilterCounts => {
+  const counts: ExplorerFilterCounts = {
+    byYear: new Map(),
+    byMonth: new Map(),
+    byCountry: new Map(),
+    byCity: new Map(),
+    bySuburb: new Map(),
+  };
+
+  if (!$data || !$data.memories) return counts;
+
+  for (const m of $data.memories) {
+    counts.byYear.set(m.year, (counts.byYear.get(m.year) || 0) + 1);
+    counts.byMonth.set(m.monthKey, (counts.byMonth.get(m.monthKey) || 0) + 1);
+    if (m.country) counts.byCountry.set(m.country, (counts.byCountry.get(m.country) || 0) + 1);
+    if (m.city) counts.byCity.set(m.city, (counts.byCity.get(m.city) || 0) + 1);
+    if (m.suburb) counts.bySuburb.set(m.suburb, (counts.bySuburb.get(m.suburb) || 0) + 1);
+  }
+
+  return counts;
+});
+
 // ─── Derived Filtered Memories Store ──────────────────────────────────────────
 
 export const filteredMemories = derived<[typeof explorerData, typeof explorerFilter], ExplorerMemory[]>(
@@ -38,12 +70,13 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
     if (!$data || !$data.memories) return [];
 
     return $data.memories.filter((m: ExplorerMemory) => {
-      // 1. Text search (caption, location, city, country, date)
+      // 1. Text search (caption, location, suburb, city, country, date)
       if ($filter.searchQuery.trim()) {
         const q = $filter.searchQuery.toLowerCase().trim();
         const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
         const locationMatch =
           (m.locationName ? m.locationName.toLowerCase().includes(q) : false) ||
+          (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
           (m.city ? m.city.toLowerCase().includes(q) : false) ||
           (m.country ? m.country.toLowerCase().includes(q) : false);
         const dateMatch =
@@ -63,17 +96,22 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
         return false;
       }
 
-      // 4. City filter
-      if ($filter.selectedCity !== 'all' && m.city !== $filter.selectedCity) {
-        return false;
-      }
-
-      // 5. Country filter
+      // 4. Country filter
       if ($filter.selectedCountry !== 'all' && m.country !== $filter.selectedCountry) {
         return false;
       }
 
-      // 6. Flags
+      // 5. City filter
+      if ($filter.selectedCity !== 'all' && m.city !== $filter.selectedCity) {
+        return false;
+      }
+
+      // 6. Suburb filter
+      if ($filter.selectedSuburb !== 'all' && m.suburb !== $filter.selectedSuburb) {
+        return false;
+      }
+
+      // 7. Flags
       if ($filter.hasLocationOnly && !m.location && !m.locationName) return false;
       if ($filter.hasBtsOnly && !m.btsPath) return false;
       if ($filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
@@ -90,8 +128,9 @@ export const activeFilterCount = derived(explorerFilter, ($f) => {
   if ($f.searchQuery.trim()) count++;
   if ($f.selectedYear !== 'all') count++;
   if ($f.selectedMonth !== 'all') count++;
-  if ($f.selectedCity !== 'all') count++;
   if ($f.selectedCountry !== 'all') count++;
+  if ($f.selectedCity !== 'all') count++;
+  if ($f.selectedSuburb !== 'all') count++;
   if ($f.hasLocationOnly) count++;
   if ($f.hasBtsOnly) count++;
   if ($f.hasCaptionOnly) count++;

@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { explorerFilter, explorerData, filteredMemories, resetFilters } from '$lib/memoriesStore';
+  import {
+    explorerFilter,
+    explorerData,
+    filteredMemories,
+    explorerFilterCounts,
+    resetFilters,
+  } from '$lib/memoriesStore';
   import Search from 'lucide-svelte/icons/search';
   import X from 'lucide-svelte/icons/circle-x';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Film from 'lucide-svelte/icons/film';
   import MessageSquare from 'lucide-svelte/icons/message-square';
-  import Repeat from 'lucide-svelte/icons/repeat';
   import Filter from 'lucide-svelte/icons/filter';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
 
@@ -15,15 +20,16 @@
     $explorerFilter.searchQuery !== '' ||
     $explorerFilter.selectedYear !== 'all' ||
     $explorerFilter.selectedMonth !== 'all' ||
-    $explorerFilter.selectedCity !== 'all' ||
     $explorerFilter.selectedCountry !== 'all' ||
+    $explorerFilter.selectedCity !== 'all' ||
+    $explorerFilter.selectedSuburb !== 'all' ||
     $explorerFilter.hasLocationOnly ||
     $explorerFilter.hasBtsOnly ||
-    $explorerFilter.hasCaptionOnly ||
-    $explorerFilter.retakesOnly;
+    $explorerFilter.hasCaptionOnly;
 
   $: totalMemories = $explorerData?.totalCount ?? 0;
   $: countShown = $filteredMemories.length;
+  $: counts = $explorerFilterCounts;
 </script>
 
 <div class="filter-bar-container">
@@ -34,7 +40,7 @@
       <input
         type="text"
         class="search-input"
-        placeholder="Search memories by caption, location, or date..."
+        placeholder="Search memories by caption, suburb, city, or date..."
         bind:value={$explorerFilter.searchQuery}
       />
       {#if $explorerFilter.searchQuery}
@@ -84,16 +90,6 @@
 
       <button
         type="button"
-        class="filter-chip chip-retakes"
-        class:active={$explorerFilter.retakesOnly}
-        on:click={() => ($explorerFilter.retakesOnly = !$explorerFilter.retakesOnly)}
-      >
-        <Repeat size={12} />
-        <span>Retakes</span>
-      </button>
-
-      <button
-        type="button"
         class="filter-chip advanced-toggle"
         class:active={showAdvanced}
         on:click={() => (showAdvanced = !showAdvanced)}
@@ -126,68 +122,99 @@
     </div>
   </div>
 
-  <!-- Advanced Dropdowns Drawer (City, Country, Year, Month) -->
+  <!-- Advanced Dropdowns Drawer (Country, City, Suburb, Year, Month) with counts -->
   {#if showAdvanced && $explorerData}
     <div class="advanced-filter-drawer">
-      {#if $explorerData.uniqueYears.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-year-select">Year</label>
-          <select
-            id="filter-year-select"
-            class="filter-select"
-            bind:value={$explorerFilter.selectedYear}
-          >
-            <option value="all">All Years ({$explorerData.uniqueYears.length})</option>
-            {#each $explorerData.uniqueYears as yr}
-              <option value={yr}>{yr}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-
-      {#if $explorerData.uniqueMonths.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-month-select">Month</label>
-          <select
-            id="filter-month-select"
-            class="filter-select"
-            bind:value={$explorerFilter.selectedMonth}
-          >
-            <option value="all">All Months</option>
-            {#each $explorerData.uniqueMonths as mo}
-              <option value={mo}>{mo}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-
-      {#if $explorerData.uniqueCities.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-city-select">City</label>
-          <select
-            id="filter-city-select"
-            class="filter-select"
-            bind:value={$explorerFilter.selectedCity}
-          >
-            <option value="all">All Cities ({$explorerData.uniqueCities.length})</option>
-            {#each $explorerData.uniqueCities as city}
-              <option value={city}>{city}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-
+      <!-- Country Filter -->
       {#if $explorerData.uniqueCountries.length > 0}
         <div class="filter-dropdown-group">
           <label class="dropdown-label" for="filter-country-select">Country</label>
           <select
             id="filter-country-select"
             class="filter-select"
+            class:is-active={$explorerFilter.selectedCountry !== 'all'}
             bind:value={$explorerFilter.selectedCountry}
           >
             <option value="all">All Countries ({$explorerData.uniqueCountries.length})</option>
             {#each $explorerData.uniqueCountries as country}
-              <option value={country}>{country}</option>
+              {@const cnt = counts.byCountry.get(country) || 0}
+              <option value={country}>{country} ({cnt})</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+
+      <!-- City Filter -->
+      {#if $explorerData.uniqueCities.length > 0}
+        <div class="filter-dropdown-group">
+          <label class="dropdown-label" for="filter-city-select">City</label>
+          <select
+            id="filter-city-select"
+            class="filter-select"
+            class:is-active={$explorerFilter.selectedCity !== 'all'}
+            bind:value={$explorerFilter.selectedCity}
+          >
+            <option value="all">All Cities ({$explorerData.uniqueCities.length})</option>
+            {#each $explorerData.uniqueCities as city}
+              {@const cnt = counts.byCity.get(city) || 0}
+              <option value={city}>{city} ({cnt})</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+
+      <!-- Suburb / Area Filter -->
+      {#if $explorerData.uniqueSuburbs && $explorerData.uniqueSuburbs.length > 0}
+        <div class="filter-dropdown-group">
+          <label class="dropdown-label" for="filter-suburb-select">Suburb / Area</label>
+          <select
+            id="filter-suburb-select"
+            class="filter-select"
+            class:is-active={$explorerFilter.selectedSuburb !== 'all'}
+            bind:value={$explorerFilter.selectedSuburb}
+          >
+            <option value="all">All Suburbs ({$explorerData.uniqueSuburbs.length})</option>
+            {#each $explorerData.uniqueSuburbs as suburb}
+              {@const cnt = counts.bySuburb.get(suburb) || 0}
+              <option value={suburb}>{suburb} ({cnt})</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+
+      <!-- Year Filter -->
+      {#if $explorerData.uniqueYears.length > 0}
+        <div class="filter-dropdown-group">
+          <label class="dropdown-label" for="filter-year-select">Year</label>
+          <select
+            id="filter-year-select"
+            class="filter-select"
+            class:is-active={$explorerFilter.selectedYear !== 'all'}
+            bind:value={$explorerFilter.selectedYear}
+          >
+            <option value="all">All Years ({$explorerData.uniqueYears.length})</option>
+            {#each $explorerData.uniqueYears as yr}
+              {@const cnt = counts.byYear.get(yr) || 0}
+              <option value={yr}>{yr} ({cnt})</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+
+      <!-- Month Filter -->
+      {#if $explorerData.uniqueMonths.length > 0}
+        <div class="filter-dropdown-group">
+          <label class="dropdown-label" for="filter-month-select">Month</label>
+          <select
+            id="filter-month-select"
+            class="filter-select"
+            class:is-active={$explorerFilter.selectedMonth !== 'all'}
+            bind:value={$explorerFilter.selectedMonth}
+          >
+            <option value="all">All Months</option>
+            {#each $explorerData.uniqueMonths as mo}
+              {@const cnt = counts.byMonth.get(mo) || 0}
+              <option value={mo}>{mo} ({cnt})</option>
             {/each}
           </select>
         </div>
@@ -315,13 +342,6 @@
     box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25);
   }
 
-  .filter-chip.chip-retakes.active {
-    background: rgba(168, 85, 247, 0.16);
-    border-color: #a855f7;
-    color: #c084fc;
-    box-shadow: 0 2px 10px rgba(168, 85, 247, 0.25);
-  }
-
   .filter-chip.advanced-toggle.active {
     background: rgba(139, 92, 246, 0.18);
     border-color: #8b5cf6;
@@ -411,9 +431,19 @@
     font-size: 12px;
     outline: none;
     cursor: pointer;
+    transition: all var(--transition-fast);
   }
 
   .filter-select:focus {
-    border-color: #ffe600;
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  }
+
+  .filter-select.is-active {
+    background: #141420;
+    border-color: #38bdf8;
+    color: #38bdf8;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.2);
   }
 </style>

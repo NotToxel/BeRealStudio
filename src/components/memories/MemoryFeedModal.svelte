@@ -185,9 +185,6 @@
                   <span class="separator">•</span>
                   <Clock size={11} class="text-muted" />
                   <span class="time-text">{memory.timeFormatted}</span>
-                  {#if memory.retakeCounter > 0}
-                    <span class="retake-tag">• {memory.retakeCounter} retakes</span>
-                  {/if}
                 </div>
               </div>
 
@@ -444,11 +441,6 @@
   .separator {
     color: var(--text-muted);
     opacity: 0.5;
-  }
-
-  .retake-tag {
-    color: #fbbf24;
-    font-weight: 500;
   }
 
   .post-header-actions {

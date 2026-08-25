@@ -301,6 +301,7 @@ export interface ExplorerMemory {
     longitude: number;
   };
   locationName?: string;
+  suburb?: string;
   city?: string;
   country?: string;
   primaryPath?: string;
@@ -316,6 +317,7 @@ export interface ExplorerData {
   totalCount: number;
   uniqueYears: number[];
   uniqueMonths: string[];
+  uniqueSuburbs: string[];
   uniqueCities: string[];
   uniqueCountries: string[];
   userName?: string;
@@ -344,8 +346,9 @@ export interface ExplorerFilterState {
   searchQuery: string;
   selectedYear: number | 'all';
   selectedMonth: string | 'all'; // "YYYY-MM" or "all"
-  selectedCity: string | 'all';
   selectedCountry: string | 'all';
+  selectedCity: string | 'all';
+  selectedSuburb: string | 'all';
   hasLocationOnly: boolean;
   hasBtsOnly: boolean;
   hasCaptionOnly: boolean;

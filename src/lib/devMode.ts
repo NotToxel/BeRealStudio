@@ -359,6 +359,7 @@ export function loadDemoExplorer() {
     totalCount: demoMemories.length,
     uniqueYears: [2024],
     uniqueMonths: ['2024-08'],
+    uniqueSuburbs: ['Soho', 'Old Town'],
     uniqueCities: ['London', 'Margate'],
     uniqueCountries: ['United Kingdom'],
     userName: 'toxel',

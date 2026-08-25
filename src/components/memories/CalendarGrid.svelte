@@ -88,105 +88,127 @@
       openFeedAt(posts[0]);
     }
   }
+
+  let scrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function handleWheel(e: WheelEvent) {
+    if (isPickerOpen) return;
+    if (Math.abs(e.deltaY) > 20) {
+      if (scrollDebounceTimer) return;
+      if (e.deltaY > 0) {
+        if (hasNextMonth) nextMonth();
+      } else {
+        if (hasPrevMonth) prevMonth();
+      }
+      scrollDebounceTimer = setTimeout(() => {
+        scrollDebounceTimer = null;
+      }, 240);
+    }
+  }
 </script>
 
-<div class="calendar-view-container">
-  <!-- Month Switcher Header with Rich Picker -->
+<div class="calendar-view-container" on:wheel={handleWheel}>
+  <!-- Month Switcher Header with Centered Nav Cluster -->
   <div class="calendar-header-bar">
-    <div class="month-title-group">
+    <div class="calendar-nav-cluster">
       <button
         type="button"
-        class="month-picker-trigger-btn"
-        class:is-active={isPickerOpen}
-        on:click={() => (isPickerOpen = !isPickerOpen)}
-        title="Click to open Month & Year picker"
-        aria-expanded={isPickerOpen}
-      >
-        <CalendarIcon size={16} class="text-sky-400" />
-        <span class="month-title-text">{monthTitle}</span>
-        <ChevronDown size={14} class="picker-chevron {isPickerOpen ? 'rotate-180' : ''}" />
-      </button>
-
-      <!-- Rich Month / Year Popover -->
-      {#if isPickerOpen}
-        <div class="month-picker-popover">
-          <div class="picker-year-row">
-            <button
-              type="button"
-              class="picker-nav-btn"
-              on:click={() => pickerYear--}
-              title="Previous Year"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span class="picker-year-title">{pickerYear}</span>
-            <button
-              type="button"
-              class="picker-nav-btn"
-              on:click={() => pickerYear++}
-              title="Next Year"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          <div class="picker-months-grid">
-            {#each monthNames as mName, mIdx}
-              {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
-              {@const isCurrent = mKey === yearMonth}
-              {@const hasData = availableMonths.includes(mKey)}
-
-              <button
-                type="button"
-                class="picker-month-btn"
-                class:is-selected={isCurrent}
-                class:has-memories={hasData}
-                on:click={() => selectMonthFromPicker(mIdx)}
-              >
-                <span>{mName}</span>
-                {#if hasData}
-                  <span class="month-data-dot"></span>
-                {/if}
-              </button>
-            {/each}
-          </div>
-
-          <div class="picker-footer-row">
-            <button
-              type="button"
-              class="picker-today-btn"
-              on:click={jumpToLatestMonth}
-            >
-              <Sparkles size={12} class="text-amber-400" />
-              <span>Latest Month</span>
-            </button>
-          </div>
-        </div>
-      {/if}
-    </div>
-
-    <div class="month-nav-actions">
-      <button
-        type="button"
-        class="month-nav-btn"
+        class="month-nav-btn prev-btn"
         disabled={!hasPrevMonth}
         on:click={prevMonth}
-        title="Previous Month"
+        title="Previous Month (or scroll up)"
         aria-label="Previous month"
       >
         <ChevronLeft size={16} />
       </button>
 
+      <div class="month-title-group">
+        <button
+          type="button"
+          class="month-picker-trigger-btn"
+          class:is-active={isPickerOpen}
+          on:click={() => (isPickerOpen = !isPickerOpen)}
+          title="Click to open Month & Year picker"
+          aria-expanded={isPickerOpen}
+        >
+          <CalendarIcon size={16} class="text-sky-400" />
+          <span class="month-title-text">{monthTitle}</span>
+          <ChevronDown size={14} class="picker-chevron {isPickerOpen ? 'rotate-180' : ''}" />
+        </button>
+
+        <!-- Rich Month / Year Popover -->
+        {#if isPickerOpen}
+          <div class="month-picker-popover">
+            <div class="picker-year-row">
+              <button
+                type="button"
+                class="picker-nav-btn"
+                on:click={() => pickerYear--}
+                title="Previous Year"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span class="picker-year-title">{pickerYear}</span>
+              <button
+                type="button"
+                class="picker-nav-btn"
+                on:click={() => pickerYear++}
+                title="Next Year"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div class="picker-months-grid">
+              {#each monthNames as mName, mIdx}
+                {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
+                {@const isCurrent = mKey === yearMonth}
+                {@const hasData = availableMonths.includes(mKey)}
+
+                <button
+                  type="button"
+                  class="picker-month-btn"
+                  class:is-selected={isCurrent}
+                  class:has-memories={hasData}
+                  on:click={() => selectMonthFromPicker(mIdx)}
+                >
+                  <span>{mName}</span>
+                  {#if hasData}
+                    <span class="month-data-dot"></span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+
+            <div class="picker-footer-row">
+              <button
+                type="button"
+                class="picker-today-btn"
+                on:click={jumpToLatestMonth}
+              >
+                <Sparkles size={12} class="text-amber-400" />
+                <span>Latest Month</span>
+              </button>
+            </div>
+          </div>
+        {/if}
+      </div>
+
       <button
         type="button"
-        class="month-nav-btn"
+        class="month-nav-btn next-btn"
         disabled={!hasNextMonth}
         on:click={nextMonth}
-        title="Next Month"
+        title="Next Month (or scroll down)"
         aria-label="Next month"
       >
         <ChevronRight size={16} />
       </button>
+    </div>
+
+    <!-- Scroll Hint Badge -->
+    <div class="scroll-hint-tag" title="Use mouse wheel or trackpad to flip between months">
+      <span>Scroll to flip months</span>
     </div>
   </div>
 
@@ -287,6 +309,23 @@
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border-subtle);
     position: relative;
+  }
+
+  .calendar-nav-cluster {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .scroll-hint-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: #14141d;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-subtle);
+    user-select: none;
   }
 
   .month-title-group {

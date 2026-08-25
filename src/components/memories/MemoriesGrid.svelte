@@ -38,7 +38,7 @@
             isVideo={memory.isVideo}
             alt="BeReal {memory.dateFormatted}"
             dayNumberOverlay={memory.dayNumber}
-            badgeText={memory.retakeCounter > 0 ? `(${memory.retakeCounter})` : memory.btsPath ? 'BTS' : ''}
+            badgeText={memory.btsPath ? 'BTS' : ''}
             size="md"
             interactive={false}
           />
