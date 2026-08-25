@@ -126,7 +126,6 @@ pub async fn open_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn show_in_folder(path: String) -> Result<(), String> {
-    let _p = std::path::Path::new(&path);
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
@@ -167,6 +166,7 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
+        let p = std::path::Path::new(&path);
         if p.is_file() {
             let _ = Command::new("open").args(["-R", &path]).spawn().map_err(|e| e.to_string())?;
         } else {
@@ -177,6 +177,7 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
+        let p = std::path::Path::new(&path);
         let target = if p.is_file() { p.parent().unwrap_or(p) } else { p };
         let _ = Command::new("xdg-open").arg(target).spawn().map_err(|e| e.to_string())?;
         Ok(())
