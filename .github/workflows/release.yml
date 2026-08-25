@@ -138,6 +138,7 @@ jobs:
             libfreetype6-dev \
             libfuse2 \
             libglib2.0-dev \
+            squashfs-tools \
             curl \
             wget \
             file
@@ -146,7 +147,7 @@ jobs:
         run: bun install
 
       - name: Build Tauri Desktop Application
-        run: bun run tauri build
+        run: bun run tauri build --verbose
 
       - name: Upload Release Binaries
         uses: softprops/action-gh-release@v2
