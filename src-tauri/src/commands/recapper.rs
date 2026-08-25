@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::{path::Path, time::Instant};
 use tauri::{AppHandle, State};
 
@@ -12,6 +13,7 @@ use crate::{
         audio,
         timing,
         geocoder,
+        font_resolver,
         frame_renderer,
         video_encoder,
     },
@@ -39,7 +41,9 @@ pub async fn start_recapper(
         (em, None)
     };
 
-    let res = run_recapper(config, emitter).await;
+    let res = tauri::async_runtime::spawn_blocking(move || run_recapper(config, emitter))
+        .await
+        .map_err(|e| format!("Task execution failed: {}", e))?;
 
     if let Some(ref jid) = jid_clean {
         state.unregister_job(jid);
@@ -54,7 +58,7 @@ pub async fn cancel_recapper(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
-async fn run_recapper(
+fn run_recapper(
     config: RecapperConfig,
     emitter: ProgressEmitter,
 ) -> anyhow::Result<ProcessingResult> {
@@ -174,8 +178,58 @@ async fn run_recapper(
         }
     }
 
-    // ── Step 5 & 6: Zero-Copy Streaming Frame Rendering & FFmpeg Pipe ────────
-    emitter.info("Rendering frames and streaming directly to FFmpeg video encoder...");
+    // ── Step 5: Multi-Core Parallel Frame Rendering (Rayon) ──────────────────
+    emitter.info(format!("Rendering {} frames across all CPU cores with Rayon multi-threading...", total));
+    let font = font_resolver::load_font(&config.font_path).unwrap_or_else(|_| {
+        font_resolver::load_font("inter").expect("Default font must be available")
+    });
+
+    let rendered_counter = std::sync::atomic::AtomicUsize::new(0);
+    let frames_rendered: anyhow::Result<Vec<(image::RgbImage, f64)>> = (0..total)
+        .into_par_iter()
+        .map(|i| {
+            if emitter.is_aborted() {
+                anyhow::bail!("Aborted");
+            }
+            let img_path = &image_paths[i];
+            let duration = durations[i];
+
+            let date_str = if config.date_enabled {
+                extract_date_from_filename(img_path)
+                    .map(|dt| dt.format(&config.date_format).to_string())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let loc_str = &location_strings[i];
+
+            let frame = match frame_renderer::render_frame_with_font(img_path, &config, &date_str, loc_str, &font) {
+                Ok(f) => f,
+                Err(e) => {
+                    emitter.warn(format!("Frame render error for {}: {}", img_path.display(), e));
+                    let (w, h) = config.resolution;
+                    image::RgbImage::new(w, h)
+                }
+            };
+
+            let done = rendered_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            let pct = 25.0 + (done as f32 / total as f32) * 50.0; // 25% -> 75%
+            emitter.emit_progress(&ProgressEvent {
+                job_id: None,
+                stage: ProcessingStage::RenderingFrames,
+                current: done,
+                total,
+                percentage: pct,
+                current_file: img_path.file_name().map(|n| n.to_string_lossy().to_string()),
+            });
+
+            Ok((frame, duration))
+        })
+        .collect();
+
+    let frames_vec = frames_rendered?;
+
+    // ── Step 6: GPU-Accelerated Hardware Video Encoding (FFmpeg) ──────────────
     let out_path = Path::new(&config.output_path);
     if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)
@@ -188,59 +242,45 @@ async fn run_recapper(
         .map(|dur| (dur * fps as f64).round() as u64)
         .sum();
 
-    let mut current_idx = 0usize;
-    let config_clone = config.clone();
-    let emitter_clone = emitter.clone();
+    let ffmpeg_bin = crate::pipeline::video_ops::detect_ffmpeg()?;
+    let (_enc_args, encoder_name) = video_encoder::detect_best_encoder(&ffmpeg_bin);
+    emitter.info(format!("Encoding video with hardware encoder: {}...", encoder_name));
 
+    emitter.emit_progress(&ProgressEvent {
+        job_id: None,
+        stage: ProcessingStage::EncodingVideo,
+        current: 0,
+        total: total_video_frames as usize,
+        percentage: 75.0,
+        current_file: None,
+    });
+
+    let mut current_frame_idx = 0usize;
+    let emitter_clone = emitter.clone();
     let res = video_encoder::encode_slideshow_streaming(
         total_video_frames,
         || {
-            if emitter_clone.is_aborted() || current_idx >= total {
+            if emitter_clone.is_aborted() || current_frame_idx >= frames_vec.len() {
                 return Ok(None);
             }
-
-            let i = current_idx;
-            current_idx += 1;
-            let img_path = &image_paths[i];
-            let duration = durations[i];
-
-            let date_str = if config_clone.date_enabled {
-                extract_date_from_filename(img_path)
-                    .map(|dt| dt.format(&config_clone.date_format).to_string())
-                    .unwrap_or_default()
-            } else {
-                String::new()
-            };
-
-            let loc_str = &location_strings[i];
-
-            match frame_renderer::render_frame(img_path, &config_clone, &date_str, loc_str) {
-                Ok(frame) => {
-                    let progress_pct = 20.0 + (i as f32 / total as f32) * 78.0;
-                    emitter_clone.emit_progress(&ProgressEvent {
-                        job_id: None,
-                        stage: ProcessingStage::RenderingFrames,
-                        current: i + 1,
-                        total,
-                        percentage: progress_pct,
-                        current_file: img_path.file_name().map(|n| n.to_string_lossy().to_string()),
-                    });
-                    Ok(Some((frame, duration)))
-                }
-                Err(e) => {
-                    emitter_clone.warn(format!("Frame render error for {}: {}", img_path.display(), e));
-                    // Fallback to empty/black frame to keep audio sync
-                    let (w, h) = config_clone.resolution;
-                    let blank = image::RgbImage::new(w, h);
-                    Ok(Some((blank, duration)))
-                }
-            }
+            let (ref frame, dur) = frames_vec[current_frame_idx];
+            current_frame_idx += 1;
+            Ok(Some((frame.clone(), dur)))
         },
         Path::new(&config.music_path),
         out_path,
         &config,
-        |_pct| {
-            // Streaming progress is emitted per frame batch
+        |stream_pct| {
+            let encode_pct = 75.0 + stream_pct * 24.0; // 75% -> 99%
+            let current_frames = (stream_pct * total_video_frames as f32) as usize;
+            emitter_clone.emit_progress(&ProgressEvent {
+                job_id: None,
+                stage: ProcessingStage::EncodingVideo,
+                current: current_frames,
+                total: total_video_frames as usize,
+                percentage: encode_pct,
+                current_file: None,
+            });
         },
     );
 

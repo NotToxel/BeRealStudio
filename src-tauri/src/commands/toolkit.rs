@@ -44,7 +44,9 @@ pub async fn start_toolkit(
         (em, None)
     };
 
-    let res = run_toolkit(config, emitter).await;
+    let res = tauri::async_runtime::spawn_blocking(move || run_toolkit(config, emitter))
+        .await
+        .map_err(|e| format!("Task execution failed: {}", e))?;
 
     if let Some(ref jid) = jid_clean {
         state.unregister_job(jid);
@@ -192,7 +194,7 @@ pub async fn cancel_toolkit(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
-async fn run_toolkit(
+fn run_toolkit(
     config: ToolkitConfig,
     emitter: ProgressEmitter,
 ) -> anyhow::Result<ProcessingResult> {

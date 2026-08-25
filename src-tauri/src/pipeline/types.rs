@@ -530,3 +530,13 @@ impl Default for AppSettings {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HardwareAccelerationInfo {
+    pub gpu_name: String,
+    pub encoder_name: String,
+    pub is_gpu_accelerated: bool,
+    pub cpu_cores: usize,
+    pub parallel_threads: usize,
+}

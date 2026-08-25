@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import {
     currentView,
     activeFeature,
@@ -7,14 +6,13 @@
     recapperConfig,
     progressState,
     liveLogs,
-    recordActivity,
     getPreferredRecapInputFolder,
     getSensibleRecapOutputPath,
   } from '$lib/stores';
-  import { exportDebugLog, showInFolder } from '$lib/tauri';
+  import { exportDebugLog, showInFolder, openFile } from '$lib/tauri';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
-  import ExternalLink from 'lucide-svelte/icons/external-link';
+  import Play from 'lucide-svelte/icons/play';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import Download from 'lucide-svelte/icons/download';
   import Sparkles from 'lucide-svelte/icons/sparkles';
@@ -23,31 +21,26 @@
   import History from 'lucide-svelte/icons/history';
   import LogConsole from '$components/LogConsole.svelte';
 
-  onMount(() => {
-    const isTk = $activeFeature === 'toolkit';
-    const out = isTk ? $toolkitConfig.outputPath : $recapperConfig.outputPath;
-    const inp = isTk ? $toolkitConfig.inputPath : $recapperConfig.inputFolder;
-    recordActivity({
-      type: isTk ? 'toolkit' : 'recapper',
-      title: isTk ? 'Photo Processing Suite' : 'Recap Video Generator',
-      outputPath: out,
-      inputPath: inp,
-      itemCount: $progressState.total || $progressState.current || 1,
-      durationSecs: 0,
-      status: 'success',
-      details: isTk
-        ? `Format: ${$toolkitConfig.convertFormat} • Combined: ${$toolkitConfig.createCombined ? 'Yes' : 'No'}`
-        : `Speed: ${$recapperConfig.speedMode} • ${$recapperConfig.fps} FPS`,
-    });
-  });
+  $: isRecapper = $activeFeature === 'recapper';
+  $: outputPath = isRecapper ? $recapperConfig.outputPath : $toolkitConfig.outputPath;
 
   async function handleOpenOutput() {
-    const out = $activeFeature === 'toolkit' ? $toolkitConfig.outputPath : $recapperConfig.outputPath;
-    if (out) {
+    if (outputPath) {
       try {
-        await showInFolder(out);
+        await showInFolder(outputPath);
       } catch (e) {
         console.error('Failed to open output path:', e);
+      }
+    }
+  }
+
+  async function handlePlayVideo() {
+    if (outputPath) {
+      try {
+        await openFile(outputPath);
+      } catch (e) {
+        console.error('Failed to launch video player:', e);
+        await showInFolder(outputPath);
       }
     }
   }
@@ -76,35 +69,55 @@
 
 <div class="complete-view">
   <!-- Celebration Banner -->
-  <div class="card celebration-card">
-    <div class="badge-icon-wrap">
-      <CheckCircle size={36} class="text-emerald-400" />
+  <div class="card celebration-card" class:celebration-card-purple={isRecapper}>
+    <div class="badge-icon-wrap" class:badge-icon-purple={isRecapper}>
+      <CheckCircle size={36} class={isRecapper ? 'text-purple-400' : 'text-emerald-400'} />
     </div>
 
     <div class="celebrate-text">
       <div class="badge-row">
-        <span class="badge badge-success">Finished Successfully</span>
+        <span class="badge {isRecapper ? 'badge-purple' : 'badge-success'}">Finished Successfully</span>
       </div>
       <h1 class="title-lg font-bold text-white">
-        {$activeFeature === 'toolkit' ? 'All Memories Processed & Restored!' : 'Recap Video Generated!'}
+        {isRecapper ? 'Recap Video Generated Successfully!' : 'All Memories Processed & Restored!'}
       </h1>
       <p class="text-secondary subtitle">
-        {$activeFeature === 'toolkit'
-          ? `All photos converted, EXIF metadata injected, and dual-camera composites generated.`
-          : `Music-synchronized vertical recap video rendered and exported.`}
+        {isRecapper
+          ? 'Your music-synchronized vertical recap MP4 video has been rendered and saved.'
+          : 'All photos converted, EXIF metadata injected, and dual-camera composites generated.'}
       </p>
     </div>
 
     <div class="actions-row">
-      <button type="button" class="btn btn-primary btn-sm" on:click={handleOpenOutput}>
-        <FolderOpen size={14} />
-        <span>Open Output in File Explorer</span>
-      </button>
+      {#if isRecapper}
+        <button type="button" class="btn btn-accent-violet btn-sm" on:click={handlePlayVideo}>
+          <Play size={14} />
+          <span>Play Recap Video Directly</span>
+        </button>
 
-      {#if $activeFeature === 'toolkit'}
+        <button type="button" class="btn btn-secondary btn-sm" on:click={handleOpenOutput}>
+          <FolderOpen size={14} />
+          <span>Show in File Explorer</span>
+        </button>
+
+        <button type="button" class="btn btn-secondary btn-sm" on:click={() => currentView.set('recapper-config')}>
+          <RotateCcw size={14} />
+          <span>Create Another Recap</span>
+        </button>
+      {:else}
+        <button type="button" class="btn btn-primary btn-sm" on:click={handleOpenOutput}>
+          <FolderOpen size={14} />
+          <span>Open Output in File Explorer</span>
+        </button>
+
         <button type="button" class="btn btn-accent-violet btn-sm" on:click={handleOpenRecapper}>
           <Film size={14} />
           <span>Generate Recap Video Now &rarr;</span>
+        </button>
+
+        <button type="button" class="btn btn-secondary btn-sm" on:click={() => currentView.set('toolkit-config')}>
+          <Camera size={14} />
+          <span>Process More Photos</span>
         </button>
       {/if}
 
@@ -120,7 +133,7 @@
 
       <button type="button" class="btn btn-ghost btn-sm" on:click={handleExportLogs}>
         <Download size={14} />
-        <span>Export Activity Log</span>
+        <span>Export Log</span>
       </button>
     </div>
   </div>
@@ -129,11 +142,20 @@
   <div class="metrics-grid">
     <div class="metric-card card">
       <div class="metric-head">
-        <Camera size={16} class="text-amber-400" />
-        <span class="text-secondary">Processed Count</span>
+        {#if isRecapper}
+          <Film size={16} class="text-purple-400" />
+          <span class="text-secondary">Recap Output</span>
+        {:else}
+          <Camera size={16} class="text-amber-400" />
+          <span class="text-secondary">Processed Memories</span>
+        {/if}
       </div>
-      <strong class="metric-val text-amber-400">{$progressState.total || $progressState.current}</strong>
-      <span class="text-muted text-xs">Total items completed</span>
+      <strong class="metric-val {isRecapper ? 'text-purple-400' : 'text-amber-400'}">
+        {$progressState.total || $progressState.current || 1} {isRecapper ? 'Frames' : 'Photos'}
+      </strong>
+      <span class="text-muted text-xs">
+        {isRecapper ? 'Music-synchronized video rendered' : 'EXIF & GPS metadata embedded'}
+      </span>
     </div>
 
     <div class="metric-card card">
@@ -142,18 +164,20 @@
         <span class="text-secondary">Status</span>
       </div>
       <strong class="metric-val text-emerald-400">100%</strong>
-      <span class="text-muted text-xs">Zero dropped frames</span>
+      <span class="text-muted text-xs">
+        {isRecapper ? 'Zero dropped frames • Ready' : 'Dual-camera PIP created'}
+      </span>
     </div>
 
     <div class="metric-card card">
       <div class="metric-head">
         <FolderOpen size={16} class="text-sky-400" />
-        <span class="text-secondary">Target Location</span>
+        <span class="text-secondary">{isRecapper ? 'Video File Destination' : 'Output Folder'}</span>
       </div>
-      <strong class="metric-val path-val text-sky-400">
-        {$activeFeature === 'toolkit' ? $toolkitConfig.outputPath : $recapperConfig.outputPath}
+      <strong class="metric-val path-val text-sky-400" title={outputPath}>
+        {outputPath || 'Saved locally'}
       </strong>
-      <span class="text-muted text-xs">Saved on local storage</span>
+      <span class="text-muted text-xs">Saved on local disk</span>
     </div>
   </div>
 
@@ -180,6 +204,11 @@
     flex-wrap: wrap;
   }
 
+  .celebration-card-purple {
+    border-color: rgba(168, 85, 247, 0.35);
+    box-shadow: 0 8px 32px rgba(168, 85, 247, 0.1);
+  }
+
   .badge-icon-wrap {
     width: 60px;
     height: 60px;
@@ -190,6 +219,12 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+  }
+
+  .badge-icon-purple {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
   }
 
   .celebrate-text {

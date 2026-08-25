@@ -478,17 +478,12 @@ fn geocode_online(lat: f64, lon: f64, rules: &[LocationRule]) -> Result<String> 
         lat, lon
     );
 
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("BeRealStudio/1.2 (https://github.com/berealstudio)")
+    let response: serde_json::Value = ureq::get(&url)
+        .set("User-Agent", "BeRealStudio/1.2 (https://github.com/berealstudio)")
         .timeout(Duration::from_secs(10))
-        .build()
-        .context("Failed to build HTTP client")?;
-
-    let response: serde_json::Value = client
-        .get(&url)
-        .send()
-        .context("Nominatim request failed")?
-        .json()
+        .call()
+        .context("Nominatim HTTP request failed")?
+        .into_json()
         .context("Nominatim returned invalid JSON")?;
 
     let addr = &response["address"];

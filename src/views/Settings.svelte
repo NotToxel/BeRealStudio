@@ -13,6 +13,7 @@
   import {
     detectFfmpeg,
     checkExiftool,
+    checkHardwareAcceleration,
     saveSettings,
     resetSettings,
     clearDebugLogs,
@@ -24,8 +25,10 @@
     deleteOfflineGeoDb,
     onDownloadProgress,
   } from '$lib/tauri';
+  import type { HardwareAccelerationInfo } from '$lib/types';
   import { offlineGeoDbStatus, isDownloadingGeoDb, downloadGeoDbProgress } from '$lib/stores';
   import Cpu from 'lucide-svelte/icons/cpu';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
@@ -45,6 +48,15 @@
   let showResetModal = false;
   let exiftoolPath: string | null = null;
   let checkingExiftool = false;
+  let hwInfo: HardwareAccelerationInfo | null = null;
+
+  async function detectHwInfo() {
+    try {
+      hwInfo = await checkHardwareAcceleration();
+    } catch (e) {
+      console.warn('Failed to detect hardware acceleration:', e);
+    }
+  }
 
   async function detectExiftoolHandler() {
     checkingExiftool = true;
@@ -62,6 +74,7 @@
       await detectFfmpeg();
     }
     await detectExiftoolHandler();
+    await detectHwInfo();
     try {
       const dbStatus = await checkOfflineGeoDb();
       offlineGeoDbStatus.set(dbStatus);
@@ -418,6 +431,28 @@
           </p>
         </div>
       </div>
+
+      {#if hwInfo}
+        <div class="dependency-status" style="margin-top: 10px;">
+          <div class="dep-icon" class:found={hwInfo.isGpuAccelerated}>
+            <Sparkles size={18} class={hwInfo.isGpuAccelerated ? 'text-emerald-400' : 'text-sky-400'} />
+          </div>
+
+          <div class="dep-info">
+            <div class="dep-name">
+              <strong>Hardware Acceleration &amp; Parallelism</strong>
+              {#if hwInfo.isGpuAccelerated}
+                <span class="badge badge-success">GPU Accelerated</span>
+              {:else}
+                <span class="badge badge-info">Multi-Core CPU ({hwInfo.cpuCores} Threads)</span>
+              {/if}
+            </div>
+            <p class="dep-path text-secondary">
+              Video Encoder: <strong class="text-white">{hwInfo.encoderName}</strong> &bull; Rayon Parallelism: <strong class="text-white">{hwInfo.parallelThreads} Active CPU Worker Threads</strong>
+            </p>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- 3. Offline Reverse Geocoding Datasets -->

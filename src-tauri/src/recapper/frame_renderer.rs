@@ -14,20 +14,29 @@ pub fn render_frame(
     date_str: &str,
     location_str: &str,
 ) -> Result<image::RgbImage> {
+    let font = load_font(&config.font_path).unwrap_or_else(|_| {
+        load_font("inter").expect("Default Inter font must be available")
+    });
+    render_frame_with_font(image_path, config, date_str, location_str, &font)
+}
+
+/// Render a Recapper frame with a pre-loaded FontArc reference (avoids font re-parsing in multi-threaded Rayon loops).
+pub fn render_frame_with_font(
+    image_path: &std::path::Path,
+    config: &RecapperConfig,
+    date_str: &str,
+    location_str: &str,
+    font: &FontArc,
+) -> Result<image::RgbImage> {
     let img = image::open(image_path)
         .with_context(|| format!("Cannot open {}", image_path.display()))?;
 
     let (target_w, target_h) = config.resolution;
     let resized = img
-        .resize_to_fill(target_w, target_h, image::imageops::FilterType::Lanczos3)
+        .resize_to_fill(target_w, target_h, image::imageops::FilterType::Triangle)
         .to_rgba8();
 
     let mut canvas = resized;
-
-    // Load font from built-in fonts or custom path
-    let font = load_font(&config.font_path).unwrap_or_else(|_| {
-        load_font("inter").expect("Default Inter font must be available")
-    });
 
     let scale = PxScale::from(config.font_size as f32);
     let shadow = config.shadow_strength as i32;

@@ -40,10 +40,10 @@
 
   $: stages = isRecapper
     ? [
-        { id: 'audio', name: 'Audio Analysis', startPct: 0, endPct: 15 },
-        { id: 'geo', name: 'Reverse Geocoding', startPct: 15, endPct: 30 },
-        { id: 'render', name: 'Frame Rendering', startPct: 30, endPct: 70 },
-        { id: 'encode', name: 'FFmpeg Encoding', startPct: 70, endPct: 100 },
+        { id: 'audio', name: 'Audio Analysis', startPct: 0, endPct: 10 },
+        { id: 'geo', name: 'Reverse Geocoding', startPct: 10, endPct: 25 },
+        { id: 'render', name: 'Multi-Core Rendering', startPct: 25, endPct: 75 },
+        { id: 'encode', name: 'GPU Video Encoding', startPct: 75, endPct: 100 },
       ]
     : [
         { id: 'scan', name: 'Archive Scan', startPct: 0, endPct: 10 },

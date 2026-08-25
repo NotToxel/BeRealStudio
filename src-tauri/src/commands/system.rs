@@ -29,6 +29,29 @@ pub async fn check_exiftool() -> Result<String, String> {
 }
 
 #[tauri::command]
+pub async fn check_hardware_acceleration() -> Result<crate::pipeline::types::HardwareAccelerationInfo, String> {
+    let parallel_threads = rayon::current_num_threads();
+
+    let ffmpeg_res = detect_ffmpeg();
+    let (encoder_name, is_gpu) = match ffmpeg_res {
+        Ok(ffmpeg_path) => {
+            let (_, name) = crate::recapper::video_encoder::detect_best_encoder(&ffmpeg_path);
+            let is_gpu = name.contains("GPU");
+            (name.to_string(), is_gpu)
+        }
+        Err(_) => ("FFmpeg not detected".to_string(), false),
+    };
+
+    Ok(crate::pipeline::types::HardwareAccelerationInfo {
+        gpu_name: if is_gpu { "NVIDIA GeForce / Hardware Accelerated GPU".to_string() } else { "Multi-Core CPU".to_string() },
+        encoder_name,
+        is_gpu_accelerated: is_gpu,
+        cpu_cores: parallel_threads,
+        parallel_threads,
+    })
+}
+
+#[tauri::command]
 pub async fn list_system_fonts() -> Result<Vec<FontInfo>, String> {
     Ok(get_system_fonts())
 }
@@ -69,6 +92,36 @@ pub async fn delete_offline_geodb(app: AppHandle, tier: Option<String>) -> Resul
 pub async fn analyze_audio(path: String, buckets: Option<usize>) -> Result<crate::recapper::audio::AudioAnalysis, String> {
     let p = std::path::Path::new(&path);
     crate::recapper::audio::analyze_audio(p, buckets.unwrap_or(120)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_file(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let clean_path = path.replace('/', "\\");
+        let _ = Command::new("cmd")
+            .args(["/C", "start", "", &clean_path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let _ = Command::new("open").arg(&path).spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        let _ = Command::new("xdg-open").arg(&path).spawn().map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 #[tauri::command]

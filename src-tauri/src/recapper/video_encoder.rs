@@ -10,7 +10,7 @@ use crate::pipeline::types::RecapperConfig;
 use crate::pipeline::video_ops::detect_ffmpeg;
 
 /// Detect the best available video encoder (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox, or CPU libx264).
-fn detect_best_encoder(ffmpeg: &Path) -> (Vec<String>, &'static str) {
+pub fn detect_best_encoder(ffmpeg: &Path) -> (Vec<String>, &'static str) {
     if let Ok(output) = Command::new(ffmpeg).args(["-hide_banner", "-encoders"]).output() {
         let text = String::from_utf8_lossy(&output.stdout);
         // 1. NVIDIA NVENC GPU

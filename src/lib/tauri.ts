@@ -17,6 +17,7 @@ import type {
   AudioAnalysis,
   ActivityRecord,
   DestinationStatus,
+  HardwareAccelerationInfo,
 } from './types';
 
 export function isTauri(): boolean {
@@ -153,6 +154,10 @@ export async function cleanupCancelledOutput(path: string): Promise<void> {
   return await safeInvoke<void>('cleanup_cancelled_output', { path });
 }
 
+export async function checkHardwareAcceleration(): Promise<HardwareAccelerationInfo> {
+  return await safeInvoke<HardwareAccelerationInfo>('check_hardware_acceleration');
+}
+
 // File / Folder Pickers
 export async function pickFolder(title?: string): Promise<string | null> {
   if (!isTauri()) return null;
@@ -198,6 +203,16 @@ export async function showInFolder(path: string): Promise<void> {
     await safeInvoke('show_in_folder', { path });
   } catch (e) {
     console.warn('Native show_in_folder fallback to openPath:', e);
+    await openPath(path);
+  }
+}
+
+export async function openFile(path: string): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    await safeInvoke('open_file', { path });
+  } catch (e) {
+    console.warn('Native open_file fallback to openPath:', e);
     await openPath(path);
   }
 }

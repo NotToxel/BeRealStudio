@@ -13,11 +13,12 @@
     liveLogs,
     activeFeature,
   } from '$lib/stores';
-  import { showInFolder, cancelJob, cancelToolkit, cancelRecapper, cleanupCancelledOutput } from '$lib/tauri';
+  import { showInFolder, openFile, cancelJob, cancelToolkit, cancelRecapper, cleanupCancelledOutput } from '$lib/tauri';
   import Modal from '$components/Modal.svelte';
   import type { ActiveJob } from '$lib/types';
   import History from 'lucide-svelte/icons/history';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
+  import Play from 'lucide-svelte/icons/play';
   import ExternalLink from 'lucide-svelte/icons/external-link';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Film from 'lucide-svelte/icons/film';
@@ -35,7 +36,7 @@
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Layers from 'lucide-svelte/icons/layers';
-  import Maximize2 from 'lucide-svelte/icons/minimize-2';
+  import Maximize2 from 'lucide-svelte/icons/maximize-2';
 
   let showClearConfirm = false;
   let expandedLogs: Record<string, boolean> = {};
@@ -83,6 +84,15 @@
       await showInFolder(path);
     } catch (e) {
       alert(`Could not open path:\n${path}\n\nError: ${e}`);
+    }
+  }
+
+  async function handlePlayFile(path: string) {
+    if (!path) return;
+    try {
+      await openFile(path);
+    } catch (e) {
+      alert(`Could not play file:\n${path}\n\nError: ${e}`);
     }
   }
 
@@ -549,11 +559,11 @@
               {#if item.type === 'recapper' || item.outputPath.endsWith('.mp4')}
                 <button
                   type="button"
-                  class="btn btn-ghost btn-sm"
-                  on:click={() => handleOpen(item.outputPath)}
+                  class="btn btn-accent-violet btn-sm"
+                  on:click={() => handlePlayFile(item.outputPath)}
                 >
-                  <ExternalLink size={13} />
-                  <span>Open Video Directly</span>
+                  <Play size={13} />
+                  <span>Play Video Directly</span>
                 </button>
               {/if}
             </div>

@@ -263,3 +263,11 @@ export interface DestinationStatus {
   isFile: boolean;
   fileCount: number;
 }
+
+export interface HardwareAccelerationInfo {
+  gpuName: string;
+  encoderName: string;
+  isGpuAccelerated: boolean;
+  cpuCores: number;
+  parallelThreads: number;
+}
