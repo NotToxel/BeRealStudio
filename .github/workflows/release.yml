@@ -183,16 +183,73 @@ jobs:
           find src-tauri/target/release/bundle/ -type f || true
 
       - name: Upload Release Binaries
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ needs.create-release.outputs.tag_name }}"
-          if [ -z "$TAG" ] || [ "$TAG" = "true" ]; then
-            TAG="v2.0.0"
-          fi
-          echo "Uploading desktop binaries to release $TAG in ${{ github.repository }}..."
-          find src-tauri/target/release/bundle/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" -o -name "*.zip" \) | while read -r file; do
-            echo "Uploading: $file"
-            gh release upload "$TAG" "$file" --repo "${{ github.repository }}" --clobber
-          done
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const tagName = '${{ needs.create-release.outputs.tag_name }}' || 'v2.0.0';
+            const resolvedTag = (tagName && tagName !== 'true') ? tagName : 'v2.0.0';
+
+            function findFiles(dir, exts) {
+              let results = [];
+              if (!fs.existsSync(dir)) return results;
+              const list = fs.readdirSync(dir, { withFileTypes: true });
+              for (const file of list) {
+                const fullPath = path.join(dir, file.name);
+                if (file.isDirectory()) {
+                  results = results.concat(findFiles(fullPath, exts));
+                } else if (exts.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()))) {
+                  results.push(fullPath);
+                }
+              }
+              return results;
+            }
+
+            const bundleDir = path.join(process.env.GITHUB_WORKSPACE, 'src-tauri', 'target', 'release', 'bundle');
+            const exts = ['.dmg', '.deb', '.appimage', '.exe', '.msi', '.tar.gz', '.zip'];
+            const files = findFiles(bundleDir, exts);
+
+            console.log(`Found ${files.length} bundle binaries in ${bundleDir}:`);
+            files.forEach(f => console.log(' - ' + f));
+
+            if (files.length === 0) {
+              console.log('No matching bundle files found to upload.');
+              return;
+            }
+
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: resolvedTag
+            });
+
+            for (const filePath of files) {
+              const fileName = path.basename(filePath);
+              const fileData = fs.readFileSync(filePath);
+
+              const existing = release.data.assets.find(a => a.name === fileName);
+              if (existing) {
+                console.log(`Removing old asset ${fileName} (${existing.id})...`);
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: existing.id
+                });
+              }
+
+              console.log(`Uploading ${fileName} (${(fileData.length / 1024 / 1024).toFixed(2)} MB)...`);
+              await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+                name: fileName,
+                data: fileData,
+                headers: {
+                  'content-type': 'application/octet-stream',
+                  'content-length': fileData.length
+                }
+              });
+              console.log(`Uploaded: ${fileName}`);
+            }
