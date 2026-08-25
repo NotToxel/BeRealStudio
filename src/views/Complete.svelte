@@ -8,6 +8,8 @@
     progressState,
     liveLogs,
     recordActivity,
+    getPreferredRecapInputFolder,
+    getSensibleRecapOutputPath,
   } from '$lib/stores';
   import { exportDebugLog, showInFolder } from '$lib/tauri';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
@@ -61,6 +63,13 @@
   }
 
   function handleOpenRecapper() {
+    if ($toolkitConfig.outputPath) {
+      $recapperConfig.inputFolder = getPreferredRecapInputFolder($toolkitConfig.outputPath, $toolkitConfig.createCombined);
+      if (!$recapperConfig.outputPath) {
+        $recapperConfig.outputPath = getSensibleRecapOutputPath($recapperConfig.inputFolder);
+      }
+    }
+    activeFeature.set('recapper');
     currentView.set('recapper-config');
   }
 </script>

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     currentView,
+    toolkitConfig,
     recapperConfig,
     isProcessing,
     progressState,
@@ -18,6 +19,8 @@
     isDownloadingGeoDb,
     downloadGeoDbProgress,
     recordActivity,
+    getPreferredRecapInputFolder,
+    getSensibleRecapOutputPath,
   } from '$lib/stores';
   import {
     startRecapper,
@@ -298,6 +301,25 @@
     $recapperConfig.locationPosition = checked ? 'AboveDate' : 'BelowDate';
   }
 
+  function selectToolkitFolder(sub: 'combined' | 'singles' | 'combined_reversed' | 'root') {
+    if (!$toolkitConfig.outputPath) return;
+    const sep = $toolkitConfig.outputPath.includes('\\') ? '\\' : '/';
+    const base = $toolkitConfig.outputPath.replace(/[\\/]+$/, '');
+    let target = base;
+    if (sub !== 'root') {
+      target = `${base}${sep}${sub}`;
+    }
+    $recapperConfig.inputFolder = target;
+    if (!$recapperConfig.outputPath) {
+      $recapperConfig.outputPath = getSensibleRecapOutputPath(target);
+    }
+  }
+
+  // Auto-generate sensible default video destination whenever input folder changes if output path is empty
+  $: if ($recapperConfig.inputFolder && !$recapperConfig.outputPath) {
+    $recapperConfig.outputPath = getSensibleRecapOutputPath($recapperConfig.inputFolder);
+  }
+
   let missingInputFolder = false;
   let missingMusicPath = false;
   let missingOutputPath = false;
@@ -414,6 +436,59 @@
           <Music size={18} class="text-amber-400" />
           <h2 class="title-sm">1. Media Sources</h2>
         </div>
+
+        {#if $toolkitConfig.outputPath}
+          <div class="toolkit-source-suggestion">
+            <div class="suggestion-header">
+              <div class="suggestion-left">
+                <Sparkles size={13} class="text-amber-400" />
+                <span class="suggestion-title">Photo Suite Output Detected</span>
+              </div>
+              <span class="suggestion-path font-mono text-muted">{$toolkitConfig.outputPath}</span>
+            </div>
+            <div class="suggestion-actions">
+              <span class="suggestion-label">Quick Select Folder:</span>
+              <button
+                type="button"
+                class="quick-pill-btn"
+                class:active={$recapperConfig.inputFolder.endsWith('combined') && !$recapperConfig.inputFolder.endsWith('combined_reversed')}
+                on:click={() => selectToolkitFolder('combined')}
+                title="Use Picture-in-Picture composite photos"
+              >
+                combined/
+              </button>
+              <button
+                type="button"
+                class="quick-pill-btn"
+                class:active={$recapperConfig.inputFolder.endsWith('singles')}
+                on:click={() => selectToolkitFolder('singles')}
+                title="Use single photos"
+              >
+                singles/
+              </button>
+              {#if $toolkitConfig.createReversed}
+                <button
+                  type="button"
+                  class="quick-pill-btn"
+                  class:active={$recapperConfig.inputFolder.endsWith('combined_reversed')}
+                  on:click={() => selectToolkitFolder('combined_reversed')}
+                  title="Use reversed perspective photos"
+                >
+                  combined_reversed/
+                </button>
+              {/if}
+              <button
+                type="button"
+                class="quick-pill-btn"
+                class:active={$recapperConfig.inputFolder === $toolkitConfig.outputPath}
+                on:click={() => selectToolkitFolder('root')}
+                title="Use root output folder (auto-discovers subfolders)"
+              >
+                Root Folder
+              </button>
+            </div>
+          </div>
+        {/if}
 
         <FilePicker
           id="recapper-input-folder"
@@ -1982,6 +2057,86 @@
   .stack-btn-sub {
     font-size: 11px;
     color: var(--text-muted);
+  }
+
+  /* Photo Suite Output Suggestion Box */
+  .toolkit-source-suggestion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #0d0d12;
+    border: 1px solid rgba(255, 230, 0, 0.25);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    box-shadow: 0 4px 16px rgba(255, 230, 0, 0.05);
+  }
+
+  .suggestion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .suggestion-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .suggestion-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffe600;
+  }
+
+  .suggestion-path {
+    font-size: 11px;
+    word-break: break-all;
+    max-width: 100%;
+  }
+
+  .suggestion-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .suggestion-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .quick-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    background: #14141c;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .quick-pill-btn:hover {
+    color: var(--text-main);
+    background: #1c1c28;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .quick-pill-btn.active {
+    background: rgba(255, 230, 0, 0.15);
+    border-color: rgba(255, 230, 0, 0.45);
+    color: #ffe600;
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.12);
   }
 
   /* Font Class Bindings */

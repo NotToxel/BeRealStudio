@@ -5,10 +5,26 @@
   <p>Restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
   <p>
     <a href="https://github.com/NotToxel/BeRealStudio"><img src="https://img.shields.io/badge/GitHub-NotToxel%2FBeRealStudio-yellow?style=flat&logo=github" alt="GitHub Repo" /></a>
-    <img src="https://img.shields.io/badge/Version-1.4.0-blue?style=flat" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-1.5.0-blue?style=flat" alt="Version" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
     <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat" alt="Cross Platform" />
   </p>
+</div>
+
+---
+
+## 🖼️ Application Showcase
+
+<div align="center">
+
+| 🏠 Home Dashboard & Archive Scanner | 📸 Photo Processing & Dual Perspective |
+|:---:|:---:|
+| ![Home Dashboard](docs/screenshots/01_home_dashboard.png) | ![Photo Processing](docs/screenshots/02_photo_toolkit_config.png) |
+
+| 🎬 Recap Video Generator & Audio Waveforms | ⚡ Active Operations & History Queue |
+|:---:|:---:|
+| ![Recap Video Generator](docs/screenshots/03_recap_video_config.png) | ![Activity History](docs/screenshots/04_activity_history.png) |
+
 </div>
 
 ---
@@ -206,7 +222,8 @@ BeRealStudio/
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
 │
-└── package.json                            # App manifest & dependencies (v1.4.0)
+└── package.json                            # App manifest & dependencies (v1.5.0)
+└── README.md                               # User documentation & GDPR guide
 ```
 
 ---

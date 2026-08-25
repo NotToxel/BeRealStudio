@@ -6,25 +6,55 @@ import {
   activityHistory,
   activeJobs,
   unreadActivityCount,
+  lastScannedArchivePath,
+  defaultToolkitConfig,
+  defaultRecapperConfig,
 } from './stores';
 import type { ArchiveInfo, MonthCount, ActiveJob, ActivityRecord } from './types';
 
 export const isDev = import.meta.env.DEV;
 
+export function isDemoExplicitlyRequested(): boolean {
+  if (typeof window === 'undefined') return false;
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.get('demo') === '1' || sessionStorage.getItem('bereal_studio_demo_active') === '1';
+}
+
 export function loadDemoArchive() {
   const months: MonthCount[] = [
-    { month: '2024-01', count: 8 },
-    { month: '2024-02', count: 11 },
-    { month: '2024-03', count: 14 },
-    { month: '2024-04', count: 18 },
-    { month: '2024-05', count: 22 },
-    { month: '2024-06', count: 19 },
-    { month: '2024-07', count: 16 },
-    { month: '2024-08', count: 25 },
-    { month: '2024-09', count: 20 },
-    { month: '2024-10', count: 15 },
-    { month: '2024-11', count: 12 },
-    { month: '2024-12', count: 10 },
+    { month: '2022-04', count: 12 },
+    { month: '2022-05', count: 28 },
+    { month: '2022-06', count: 25 },
+    { month: '2022-07', count: 30 },
+    { month: '2022-08', count: 27 },
+    { month: '2022-09', count: 24 },
+    { month: '2022-10', count: 29 },
+    { month: '2022-11', count: 26 },
+    { month: '2022-12', count: 28 },
+    { month: '2023-01', count: 29 },
+    { month: '2023-02', count: 26 },
+    { month: '2023-03', count: 30 },
+    { month: '2023-04', count: 28 },
+    { month: '2023-05', count: 31 },
+    { month: '2023-06', count: 29 },
+    { month: '2023-07', count: 31 },
+    { month: '2023-08', count: 30 },
+    { month: '2023-09', count: 28 },
+    { month: '2023-10', count: 30 },
+    { month: '2023-11', count: 27 },
+    { month: '2023-12', count: 29 },
+    { month: '2024-01', count: 30 },
+    { month: '2024-02', count: 28 },
+    { month: '2024-03', count: 31 },
+    { month: '2024-04', count: 29 },
+    { month: '2024-05', count: 31 },
+    { month: '2024-06', count: 28 },
+    { month: '2024-07', count: 30 },
+    { month: '2024-08', count: 31 },
+    { month: '2024-09', count: 27 },
+    { month: '2024-10', count: 29 },
+    { month: '2024-11', count: 26 },
+    { month: '2024-12', count: 28 },
   ];
 
   const totalEntries = months.reduce((s, m) => s + m.count, 0);
@@ -32,8 +62,8 @@ export function loadDemoArchive() {
   const mockMeta: ArchiveInfo = {
     isValid: true,
     archiveType: 'Zip',
-    userName: 'alex',
-    userFullname: 'Alex Developer',
+    userName: 'toxel',
+    userFullname: 'Caleb Lim',
     entryCount: totalEntries,
     validPostCount: totalEntries,
     corruptedPostCount: 0,
@@ -43,30 +73,32 @@ export function loadDemoArchive() {
     missingFilesSample: [],
     primaryPhotoCount: totalEntries,
     secondaryPhotoCount: totalEntries,
-    primaryVideoCount: 0,
-    secondaryVideoCount: 0,
-    btsCount: Math.floor(totalEntries * 0.4),
-    withLocationCount: Math.floor(totalEntries * 0.8),
-    withCaptionCount: Math.floor(totalEntries * 0.6),
-    earliestDate: '2024-01-02T14:22:10.000Z',
+    primaryVideoCount: 14,
+    secondaryVideoCount: 14,
+    btsCount: Math.floor(totalEntries * 0.75),
+    withLocationCount: Math.floor(totalEntries * 0.88),
+    withCaptionCount: Math.floor(totalEntries * 0.62),
+    retakeStats: { min: 0, max: 9, avg: 1.6 },
+    earliestDate: '2022-04-19T12:03:02.704Z',
     latestDate: '2024-12-31T23:58:45.000Z',
     hasPostsJson: true,
     hasPhotosDir: true,
     hasUserJson: true,
-    hasVideos: false,
+    hasVideos: true,
     hasBts: true,
     monthlyHistogram: months,
     validationErrors: [],
     warnings: [],
-    postsJsonPath: 'C:\\Users\\Developer\\Downloads\\BeReal_GDPR_Demo\\posts.json',
-    mediaBasePath: 'C:\\Users\\Developer\\Downloads\\BeReal_GDPR_Demo\\Photos',
+    postsJsonPath: 'C:\\Development\\BeRealStudio\\archive\\bereal-gdpr-photo-toolkit\\posts.json',
+    mediaBasePath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR\\Photos',
   };
 
   currentArchive.set(mockMeta);
+  lastScannedArchivePath.set('C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR.zip');
   toolkitConfig.update((cfg) => ({
     ...cfg,
-    inputPath: 'C:\\Users\\Developer\\Downloads\\BeReal_Archive_2024_GDPR.zip',
-    outputPath: 'C:\\Users\\Developer\\Downloads\\BeReal_Photos',
+    inputPath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR.zip',
+    outputPath: 'C:\\Users\\cl\\Pictures\\BeReal_Photos',
     dateRangeStart: '2024-01-01',
     dateRangeEnd: '2024-12-31',
     convertFormat: 'Jpeg',
@@ -190,6 +222,9 @@ export function loadDemoActiveJobs() {
 }
 
 export function loadAllDemoData() {
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('bereal_studio_demo_active', '1');
+  }
   loadDemoArchive();
   loadDemoRecapper();
   loadDemoHistory();
@@ -197,8 +232,24 @@ export function loadAllDemoData() {
 }
 
 export function clearAllDemoData() {
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('bereal_studio_demo_active');
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('demo')) {
+        url.searchParams.delete('demo');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch {
+      // Ignore URL parse error
+    }
+  }
+
   currentArchive.set(null);
-  activeJobs.set([]);
-  activityHistory.set([]);
+  lastScannedArchivePath.set('');
+  toolkitConfig.set({ ...defaultToolkitConfig });
+  recapperConfig.set({ ...defaultRecapperConfig });
+  activeJobs.update((jobs) => jobs.filter((j) => !j.id.startsWith('demo_')));
+  activityHistory.update((hist) => hist.filter((r) => !r.id.startsWith('demo_')));
   unreadActivityCount.set(0);
 }

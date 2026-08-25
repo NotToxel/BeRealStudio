@@ -218,9 +218,16 @@ async fn run_toolkit(
     let dir_singles = out_base.join("singles");
     let dir_combined = out_base.join("combined");
     let dir_reversed = out_base.join("combined_reversed");
-    std::fs::create_dir_all(&dir_singles)?;
-    if config.create_combined { std::fs::create_dir_all(&dir_combined)?; }
-    if config.create_reversed { std::fs::create_dir_all(&dir_reversed)?; }
+    std::fs::create_dir_all(&dir_singles)
+        .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_singles.display(), e))?;
+    if config.create_combined {
+        std::fs::create_dir_all(&dir_combined)
+            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_combined.display(), e))?;
+    }
+    if config.create_reversed {
+        std::fs::create_dir_all(&dir_reversed)
+            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", dir_reversed.display(), e))?;
+    }
     emitter.info(format!("Output: {}", out_base.display()));
 
     // ── Stage 4: Process each entry (parallel) ───────────────────────────────

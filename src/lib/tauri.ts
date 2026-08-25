@@ -15,60 +15,96 @@ import type {
   OfflineGeoDbStatus,
   DownloadProgressEvent,
   AudioAnalysis,
+  ActivityRecord,
 } from './types';
+
+export function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+export async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri()) {
+    throw new Error(`[Tauri Mock] Command '${cmd}' called outside Tauri runtime.`);
+  }
+  return await invoke<T>(cmd, args);
+}
 
 // Archive & Scanning
 export async function scanArchive(path: string): Promise<ArchiveInfo> {
-  return await invoke<ArchiveInfo>('scan_archive', { path });
+  return await safeInvoke<ArchiveInfo>('scan_archive', { path });
 }
 
 export async function extractZip(zipPath: string, destDir: string): Promise<string> {
-  return await invoke<string>('extract_zip', { zipPath, destDir });
+  return await safeInvoke<string>('extract_zip', { zipPath, destDir });
 }
 
 // Processing
 export async function startToolkit(config: ToolkitConfig, jobId?: string): Promise<ProcessingResult> {
-  return await invoke<ProcessingResult>('start_toolkit', { config, jobId });
+  return await safeInvoke<ProcessingResult>('start_toolkit', { config, jobId });
 }
 
 export async function cancelToolkit(): Promise<void> {
-  return await invoke<void>('cancel_toolkit');
+  return await safeInvoke<void>('cancel_toolkit');
 }
 
 export async function startRecapper(config: RecapperConfig, jobId?: string): Promise<ProcessingResult> {
-  return await invoke<ProcessingResult>('start_recapper', { config, jobId });
+  return await safeInvoke<ProcessingResult>('start_recapper', { config, jobId });
 }
 
 export async function cancelRecapper(): Promise<void> {
-  return await invoke<void>('cancel_recapper');
+  return await safeInvoke<void>('cancel_recapper');
 }
 
 export async function cancelJob(jobId: string): Promise<boolean> {
-  return await invoke<boolean>('cancel_job', { jobId });
+  return await safeInvoke<boolean>('cancel_job', { jobId });
 }
 
 export async function listActiveJobs(): Promise<string[]> {
-  return await invoke<string[]>('list_active_jobs');
+  return await safeInvoke<string[]>('list_active_jobs');
 }
 
 // Settings
 export async function loadSettings(): Promise<AppSettings> {
-  return await invoke<AppSettings>('load_settings');
+  return await safeInvoke<AppSettings>('load_settings');
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
-  return await invoke<void>('save_settings', { settings });
+  return await safeInvoke<void>('save_settings', { settings });
 }
 
 export async function resetSettings(): Promise<AppSettings> {
-  return await invoke<AppSettings>('reset_settings');
+  return await safeInvoke<AppSettings>('reset_settings');
+}
+
+export async function loadActivityHistory(): Promise<ActivityRecord[]> {
+  try {
+    return await safeInvoke<ActivityRecord[]>('load_activity_history');
+  } catch {
+    return [];
+  }
+}
+
+export async function saveActivityHistory(history: ActivityRecord[]): Promise<void> {
+  try {
+    await safeInvoke<void>('save_activity_history', { history });
+  } catch (e) {
+    console.warn('Failed to save activity history to native store:', e);
+  }
+}
+
+export async function clearNativeActivityHistory(): Promise<void> {
+  try {
+    await safeInvoke<void>('clear_activity_history');
+  } catch (e) {
+    console.warn('Failed to clear native activity history:', e);
+  }
 }
 
 import { ffmpegInfo } from './stores';
 
 // System
 export async function checkFfmpeg(): Promise<string> {
-  return await invoke<string>('check_ffmpeg');
+  return await safeInvoke<string>('check_ffmpeg');
 }
 
 export async function detectFfmpeg(): Promise<string | null> {
@@ -84,24 +120,25 @@ export async function detectFfmpeg(): Promise<string | null> {
 }
 
 export async function listSystemFonts(): Promise<FontInfo[]> {
-  return await invoke<FontInfo[]>('list_system_fonts');
+  return await safeInvoke<FontInfo[]>('list_system_fonts');
 }
 
 // Debug logs
 export async function exportDebugLog(outputPath: string): Promise<string> {
-  return await invoke<string>('export_debug_log', { outputPath });
+  return await safeInvoke<string>('export_debug_log', { outputPath });
 }
 
 export async function getDebugLogs(): Promise<LogEvent[]> {
-  return await invoke<LogEvent[]>('get_debug_logs');
+  return await safeInvoke<LogEvent[]>('get_debug_logs');
 }
 
 export async function clearDebugLogs(): Promise<void> {
-  return await invoke<void>('clear_debug_logs');
+  return await safeInvoke<void>('clear_debug_logs');
 }
 
 // File / Folder Pickers
 export async function pickFolder(title?: string): Promise<string | null> {
+  if (!isTauri()) return null;
   const selected = await open({
     directory: true,
     multiple: false,
@@ -114,6 +151,7 @@ export async function pickFile(
   title: string,
   extensions: string[]
 ): Promise<string | null> {
+  if (!isTauri()) return null;
   const selected = await open({
     directory: false,
     multiple: false,
@@ -128,6 +166,7 @@ export async function saveFilePicker(
   defaultPath?: string,
   extensions: string[] = ['json']
 ): Promise<string | null> {
+  if (!isTauri()) return null;
   const selected = await save({
     title,
     defaultPath,
@@ -137,8 +176,9 @@ export async function saveFilePicker(
 }
 
 export async function showInFolder(path: string): Promise<void> {
+  if (!isTauri()) return;
   try {
-    await invoke('show_in_folder', { path });
+    await safeInvoke('show_in_folder', { path });
   } catch (e) {
     console.warn('Native show_in_folder fallback to openPath:', e);
     await openPath(path);
@@ -149,26 +189,25 @@ export async function revealInFolder(path: string): Promise<void> {
   await showInFolder(path);
 }
 
-
 // Geocoding Database
 export async function checkOfflineGeoDb(): Promise<OfflineGeoDbStatus> {
-  return await invoke<OfflineGeoDbStatus>('check_offline_geodb');
+  return await safeInvoke<OfflineGeoDbStatus>('check_offline_geodb');
 }
 
 export async function downloadOfflineGeoDb(tier?: string): Promise<void> {
-  return await invoke<void>('download_offline_geodb', { tier });
+  return await safeInvoke<void>('download_offline_geodb', { tier });
 }
 
 export async function setActiveGeoDbTier(tier: string): Promise<OfflineGeoDbStatus> {
-  return await invoke<OfflineGeoDbStatus>('set_active_geodb_tier', { tier });
+  return await safeInvoke<OfflineGeoDbStatus>('set_active_geodb_tier', { tier });
 }
 
 export async function deleteOfflineGeoDb(tier?: string): Promise<OfflineGeoDbStatus> {
-  return await invoke<OfflineGeoDbStatus>('delete_offline_geodb', { tier });
+  return await safeInvoke<OfflineGeoDbStatus>('delete_offline_geodb', { tier });
 }
 
 export async function analyzeAudio(path: string, buckets: number = 120): Promise<AudioAnalysis> {
-  return await invoke<AudioAnalysis>('analyze_audio', { path, buckets });
+  return await safeInvoke<AudioAnalysis>('analyze_audio', { path, buckets });
 }
 
 // Generic Typed Event Subscription Wrapper
@@ -176,6 +215,9 @@ export async function subscribeToEvent<T>(
   event: string,
   cb: (payload: T) => void
 ): Promise<UnlistenFn> {
+  if (!isTauri()) {
+    return () => {};
+  }
   return await listen<T>(event, (e) => cb(e.payload));
 }
 

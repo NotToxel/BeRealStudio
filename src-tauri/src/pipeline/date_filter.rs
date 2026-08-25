@@ -32,7 +32,8 @@ pub fn filter_by_date_range(
 }
 
 /// Filter image paths in a directory by the date encoded in their filename prefix (YYYY-MM-DDTHH-MM-SS).
-/// Falls back to file modification time if the name doesn't match.
+/// Falls back to subfolders (combined/, singles/, combined_reversed/) if the root contains no direct images,
+/// and falls back to file modification time if the name doesn't match date pattern.
 pub fn filter_images_by_date(
     image_dir: &Path,
     start: Option<&str>,
@@ -41,15 +42,58 @@ pub fn filter_images_by_date(
     let start_dt: Option<DateTime<Utc>> = start.and_then(|s| parse_date_bound(s, false));
     let end_dt: Option<DateTime<Utc>> = end.and_then(|s| parse_date_bound(s, true));
 
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(image_dir)?
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| {
-            p.is_file()
-                && p.extension()
-                    .map(|e| matches!(e.to_str(), Some("jpg" | "jpeg" | "png" | "webp")))
-                    .unwrap_or(false)
-        })
+    // Helper to collect direct image files from a directory
+    let collect_direct_images = |dir: &Path| -> Vec<PathBuf> {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.is_file()
+                        && p.extension()
+                            .map(|e| matches!(e.to_str(), Some("jpg" | "jpeg" | "png" | "webp")))
+                            .unwrap_or(false)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    };
+
+    // 1. Check direct image children
+    let mut raw_images = collect_direct_images(image_dir);
+
+    // 2. If no direct images in root, check standard Photo Toolkit output subdirectories
+    if raw_images.is_empty() {
+        let combined_dir = image_dir.join("combined");
+        let singles_dir = image_dir.join("singles");
+        let reversed_dir = image_dir.join("combined_reversed");
+
+        if combined_dir.is_dir() {
+            raw_images = collect_direct_images(&combined_dir);
+        }
+        if raw_images.is_empty() && singles_dir.is_dir() {
+            raw_images = collect_direct_images(&singles_dir);
+        }
+        if raw_images.is_empty() && reversed_dir.is_dir() {
+            raw_images = collect_direct_images(&reversed_dir);
+        }
+        // 3. Fallback: scan immediate subdirectories recursively
+        if raw_images.is_empty() {
+            if let Ok(sub_entries) = std::fs::read_dir(image_dir) {
+                for sub in sub_entries.flatten() {
+                    let sub_path = sub.path();
+                    if sub_path.is_dir() {
+                        let sub_imgs = collect_direct_images(&sub_path);
+                        raw_images.extend(sub_imgs);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut paths: Vec<PathBuf> = raw_images
+        .into_iter()
         .filter(|p| {
             let dt = extract_date_from_path(p);
             let after_start = start_dt.map(|s| dt.map(|d| d >= s).unwrap_or(true)).unwrap_or(true);
@@ -141,5 +185,20 @@ mod tests {
         let p = PathBuf::from("2024-03-15T14-30-00_primary.jpg");
         let dt = extract_date_from_path(&p);
         assert!(dt.is_some());
+    }
+
+    #[test]
+    fn test_filter_images_subfolder_fallback() {
+        let temp_dir = std::env::temp_dir().join(format!("test_bereal_filter_{}", std::process::id()));
+        let combined_dir = temp_dir.join("combined");
+        let _ = std::fs::create_dir_all(&combined_dir);
+        let test_file = combined_dir.join("2024-03-15T14-30-00_combined.jpg");
+        let _ = std::fs::write(&test_file, b"fake image");
+
+        let found = filter_images_by_date(&temp_dir, None, None).expect("filter should succeed");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0], test_file);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

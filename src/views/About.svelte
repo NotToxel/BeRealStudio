@@ -50,7 +50,7 @@
               <strong class="text-white text-sm font-bold">NotToxel / BeRealStudio</strong>
               <span class="badge badge-yellow text-xs font-mono">v{APP_VERSION}</span>
             </div>
-            <p class="text-secondary text-xs mt-0.5">
+            <p class="text-secondary text-xs author-subline">
               Authored &amp; maintained by <button type="button" class="author-inline-link" on:click={() => openLink('https://github.com/NotToxel')}>NotToxel</button> &bull; MIT Licensed
             </p>
           </div>
@@ -135,14 +135,35 @@
         <h2 class="title-sm">How to Download Your Archive from BeReal</h2>
       </div>
 
-      <ol class="steps-list text-secondary">
-        <li>Open the <strong>BeReal</strong> mobile app and tap your <strong>Profile icon</strong> in the top-right corner.</li>
-        <li>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</li>
-        <li>Select <strong>Ask a Question</strong> &rarr; Tap <strong>Troubleshooting</strong> &rarr; Select <strong>Other</strong>.</li>
-        <li>Tap <strong>Contact Us</strong> at the bottom of the article &rarr; Tap the <strong>Topic</strong> dropdown.</li>
-        <li>Select the topic: <strong>"I'd like to request a copy of my data"</strong>.</li>
-        <li>Type a short message with at least <strong>10 characters</strong> (e.g., <em>"Please provide a full copy of my account data"</em>) and submit your request.</li>
-        <li>BeReal support will email you a secure download link containing your raw archive ZIP with <code>posts.json</code> and all full-resolution memories.</li>
+      <ol class="gdpr-step-list text-secondary">
+        <li>
+          <span class="step-badge font-mono">1</span>
+          <span>Open the <strong>BeReal</strong> mobile app and tap your <strong>Profile icon</strong> in the top-right corner.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">2</span>
+          <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">3</span>
+          <span>Select <strong>Ask a Question</strong> &rarr; Tap <strong>Troubleshooting</strong> &rarr; Select <strong>Other</strong>.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">4</span>
+          <span>Tap <strong>Contact Us</strong> at the bottom of the article &rarr; Tap the <strong>Topic</strong> dropdown.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">5</span>
+          <span>Select the topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">6</span>
+          <span>Type a short message with at least <strong>10 characters</strong> (e.g., <em>"Please provide a full copy of my account data"</em>) and submit your request.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">7</span>
+          <span>BeReal support will email you a secure download link containing your raw archive ZIP with <code>posts.json</code> and all full-resolution memories.</span>
+        </li>
       </ol>
     </div>
 
@@ -300,10 +321,21 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
 
+  .author-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .repo-name-row {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .author-subline {
+    margin: 0;
+    line-height: 1.4;
   }
 
   .author-inline-link {
@@ -364,13 +396,38 @@
     line-height: 1.4;
   }
 
-  .steps-list {
-    margin-left: 20px;
-    font-size: 13px;
-    line-height: 1.7;
+  .gdpr-step-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .gdpr-step-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+
+  .step-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.14);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
   }
 
   .credits-list {

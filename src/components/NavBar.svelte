@@ -12,7 +12,6 @@
   import Info from 'lucide-svelte/icons/info';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Sparkles from 'lucide-svelte/icons/sparkles';
-  import FlaskConical from 'lucide-svelte/icons/flask-conical';
 
   let showDevMenu = false;
 
@@ -174,25 +173,6 @@
           <Info size={15} />
           <span class="aux-label">About</span>
         </button>
-
-        {#if isDev}
-          <button
-            type="button"
-            class="aux-nav-item dev-pill-btn"
-            class:active={$currentArchive !== null}
-            on:click={() => {
-              if ($currentArchive) {
-                clearAllDemoData();
-              } else {
-                loadAllDemoData();
-              }
-            }}
-            title="Dev Mode: Click or press Ctrl+Shift+D to inject/clear demo data"
-          >
-            <FlaskConical size={14} class="text-amber-400" />
-            <span class="aux-label font-mono">{$currentArchive ? 'Clear Demo' : 'Load Demo'}</span>
-          </button>
-        {/if}
       </div>
     </div>
   </div>
@@ -441,23 +421,6 @@
     font-size: 10px;
     font-family: var(--font-mono);
     font-weight: 700;
-  }
-
-  .dev-pill-btn {
-    border: 1px dashed rgba(245, 158, 11, 0.4);
-    color: #f59e0b;
-  }
-
-  .dev-pill-btn:hover {
-    background: rgba(245, 158, 11, 0.12);
-    border-color: rgba(245, 158, 11, 0.8);
-    color: #fbbf24;
-  }
-
-  .dev-pill-btn.active {
-    background: rgba(245, 158, 11, 0.2);
-    border-color: #f59e0b;
-    color: #ffffff;
   }
 
   .core-nav-btn:disabled,

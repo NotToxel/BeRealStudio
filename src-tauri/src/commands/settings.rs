@@ -55,3 +55,52 @@ pub async fn reset_settings(app: AppHandle) -> Result<AppSettings, String> {
 
     Ok(default_settings)
 }
+
+const ACTIVITY_KEY: &str = "activity_history";
+const ACTIVITY_FILE: &str = "activity_history.json";
+
+#[tauri::command]
+pub async fn load_activity_history(app: AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    let store = app
+        .store(ACTIVITY_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    if let Some(val) = store.get(ACTIVITY_KEY) {
+        if let Ok(history) = serde_json::from_value::<Vec<serde_json::Value>>(val) {
+            return Ok(history);
+        }
+    }
+
+    Ok(vec![])
+}
+
+#[tauri::command]
+pub async fn save_activity_history(history: Vec<serde_json::Value>, app: AppHandle) -> Result<(), String> {
+    let store = app
+        .store(ACTIVITY_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let val = serde_json::to_value(&history)
+        .map_err(|e| format!("Failed to serialize activity history: {}", e))?;
+
+    store.set(ACTIVITY_KEY, val);
+    store
+        .save()
+        .map_err(|e| format!("Failed to save activity store: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_activity_history(app: AppHandle) -> Result<(), String> {
+    let store = app
+        .store(ACTIVITY_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    store.set(ACTIVITY_KEY, serde_json::json!([]));
+    store
+        .save()
+        .map_err(|e| format!("Failed to clear activity store: {}", e))?;
+
+    Ok(())
+}

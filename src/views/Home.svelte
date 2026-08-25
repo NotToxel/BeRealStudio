@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { currentView, activeFeature } from '$lib/stores';
+  import {
+    currentView,
+    activeFeature,
+    toolkitConfig,
+    recapperConfig,
+    getPreferredRecapInputFolder,
+    getSensibleRecapOutputPath,
+  } from '$lib/stores';
   import Camera from 'lucide-svelte/icons/camera';
   import Film from 'lucide-svelte/icons/film';
   import ArrowRight from 'lucide-svelte/icons/arrow-right';
@@ -10,6 +17,12 @@
   }
 
   function openRecapper() {
+    if (!$recapperConfig.inputFolder && $toolkitConfig.outputPath) {
+      $recapperConfig.inputFolder = getPreferredRecapInputFolder($toolkitConfig.outputPath, $toolkitConfig.createCombined);
+      if (!$recapperConfig.outputPath) {
+        $recapperConfig.outputPath = getSensibleRecapOutputPath($recapperConfig.inputFolder);
+      }
+    }
     activeFeature.set('recapper');
     currentView.set('recapper-config');
   }

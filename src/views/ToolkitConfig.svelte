@@ -732,22 +732,22 @@
               {isCompositing ? 'Compositing Preview' : 'Metadata Preview'}
             </span>
           </div>
-          <span class="badge badge-yellow format-badge">
+          <span class="badge badge-yellow format-badge font-mono">
             {$toolkitConfig.convertFormat === 'Jpeg'
-              ? `JPEG • ${$toolkitConfig.quality}%`
+              ? `JPEG ${$toolkitConfig.quality}%`
               : $toolkitConfig.convertFormat === 'Png'
-              ? 'PNG • Lossless'
-              : 'WebP • Lossless'}
+              ? 'PNG Lossless'
+              : 'WebP Lossless'}
           </span>
         </div>
 
         {#if isCompositing}
-          <!-- Preview View Mode Selector (Standard vs Reversed) -->
+          <!-- Preview View Mode Selector (Standard vs Reversed) when Both Angles enabled -->
           {#if compositePerspective === 'both'}
-            <div class="preview-mode-tabs">
+            <div class="preview-angle-tabs">
               <button
                 type="button"
-                class="tab-btn"
+                class="angle-tab-btn"
                 class:active={previewTab === 'standard'}
                 on:click={() => (previewTab = 'standard')}
               >
@@ -755,18 +755,18 @@
               </button>
               <button
                 type="button"
-                class="tab-btn active-reversed"
+                class="angle-tab-btn active-rev"
                 class:active={previewTab === 'reversed'}
                 on:click={() => (previewTab = 'reversed')}
               >
                 <Repeat size={11} />
-                Reversed Output
+                <span>Reversed Output</span>
               </button>
             </div>
           {:else if compositePerspective === 'reversed_only'}
-            <div class="preview-mode-single-banner">
+            <div class="preview-single-angle-banner">
               <Repeat size={12} class="text-purple-400" />
-              <span>Reversed Angle Preview (Selfie Canvas)</span>
+              <span>Reversed Perspective (Selfie Canvas)</span>
             </div>
           {/if}
 
@@ -782,11 +782,11 @@
                 class="cam-layer layer-primary"
                 class:is-swapped={previewTab === 'reversed' || compositePerspective === 'reversed_only'}
               >
-                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Person Silhouette (Selfie)' : 'Landscape & Environment (Main Camera)'}>
+                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Selfie Camera (Front)' : 'Main Camera (Back / Landscape)'}>
                   {#if previewTab === 'reversed' || compositePerspective === 'reversed_only'}
-                    <User size={13} class="badge-icon text-purple-300" />
+                    <User size={14} class="badge-icon text-purple-300" />
                   {:else}
-                    <Mountain size={13} class="badge-icon text-sky-300" />
+                    <Mountain size={14} class="badge-icon text-sky-300" />
                   {/if}
                 </div>
               </div>
@@ -797,11 +797,11 @@
                 class:is-swapped={previewTab === 'reversed' || compositePerspective === 'reversed_only'}
               >
                 <div class="pip-lens-circle"></div>
-                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Landscape & Environment (Main Camera)' : 'Person Silhouette (Selfie)'}>
+                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Main Camera (Back / Landscape)' : 'Selfie Camera (Front)'}>
                   {#if previewTab === 'reversed' || compositePerspective === 'reversed_only'}
-                    <Mountain size={13} class="badge-icon text-sky-300" />
+                    <Mountain size={14} class="badge-icon text-sky-300" />
                   {:else}
-                    <User size={13} class="badge-icon text-purple-300" />
+                    <User size={14} class="badge-icon text-purple-300" />
                   {/if}
                 </div>
               </div>
@@ -832,63 +832,70 @@
           </div>
         {/if}
 
-        <!-- Live Metadata & Active Features Pillbox -->
+        <!-- Structured Specifications & Active Options Box -->
         <div class="preview-info-box">
           <div class="info-row">
-            <span class="info-label">Active Output:</span>
-            <strong class="info-val font-mono text-yellow-400">
+            <span class="info-label">Target Folder:</span>
+            <code class="info-path-val font-mono">
               {#if isCompositing}
                 {#if compositePerspective === 'reversed_only'}
-                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined_reversed/' : 'side_by_side_reversed/'}
+                  combined_reversed/
                 {:else if compositePerspective === 'both'}
-                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined/ & combined_reversed/' : 'side_by_side/ & side_by_side_reversed/'}
+                  combined/ &amp; combined_reversed/
                 {:else}
-                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined/' : 'side_by_side/'}
+                  combined/
                 {/if}
               {:else}
-                primary/ &amp; secondary/ (Standalone)
+                singles/ (primary/ &amp; secondary/)
               {/if}
-            </strong>
+            </code>
           </div>
 
           <div class="info-row">
-            <span class="info-label">Mode:</span>
-            <span class="text-secondary text-xs">
+            <span class="info-label">Compositing Mode:</span>
+            <span class="text-secondary text-xs font-medium">
               {#if !isCompositing}
-                EXIF &amp; Format Restoration Only
-              {:else if compositePerspective === 'reversed_only'}
-                Dual-Camera (Reversed Angle Only)
-              {:else if compositePerspective === 'both'}
-                Dual-Camera (Standard + Reversed Sets)
+                Individual Files Only
+              {:else if $toolkitConfig.combineMode === 'PictureInPicture'}
+                Picture-in-Picture ({compositePerspective === 'both' ? 'Dual Angles' : compositePerspective === 'reversed_only' ? 'Reversed' : 'Standard'})
               {:else}
-                Dual-Camera (Standard Perspective)
+                Side-by-Side Split ({compositePerspective === 'both' ? 'Dual Angles' : compositePerspective === 'reversed_only' ? 'Reversed' : 'Standard'})
               {/if}
             </span>
           </div>
 
-          {#if $toolkitConfig.embedExif}
-            <div class="feature-tag tag-emerald">
-              <Sparkles size={12} />
-              <span>EXIF Timestamps &amp; GPS Injected</span>
-            </div>
-          {/if}
+          <!-- Rich Feature Identity Cards -->
+          {#if $toolkitConfig.embedExif || $toolkitConfig.createMotionPhotos}
+            <div class="active-features-cards">
+              {#if $toolkitConfig.embedExif}
+                <div class="feature-status-card status-exif">
+                  <div class="feature-status-icon icon-emerald">
+                    <MapPin size={14} />
+                  </div>
+                  <div class="feature-status-body">
+                    <div class="feature-status-head">
+                      <strong class="feature-status-title">EXIF &amp; GPS Injected</strong>
+                      <span class="feature-status-dot dot-emerald"></span>
+                    </div>
+                    <span class="feature-status-desc">Restores capture dates &amp; coordinates</span>
+                  </div>
+                </div>
+              {/if}
 
-          {#if $toolkitConfig.createMotionPhotos}
-            <div class="feature-tag tag-cyan">
-              <Sparkles size={12} />
-              <span>Samsung SEFH &amp; Google Motion Photo Muxed</span>
-            </div>
-          {/if}
-
-          {#if isCompositing && compositePerspective === 'reversed_only'}
-            <div class="feature-tag tag-violet">
-              <Repeat size={12} />
-              <span>Reversed Perspectives Only</span>
-            </div>
-          {:else if isCompositing && compositePerspective === 'both'}
-            <div class="feature-tag tag-violet">
-              <Repeat size={12} />
-              <span>Reversed Dual Angles Exported</span>
+              {#if $toolkitConfig.createMotionPhotos}
+                <div class="feature-status-card status-motion">
+                  <div class="feature-status-icon icon-cyan">
+                    <Film size={14} />
+                  </div>
+                  <div class="feature-status-body">
+                    <div class="feature-status-head">
+                      <strong class="feature-status-title">Live &amp; Motion Photos</strong>
+                      <span class="feature-status-badge">Samsung + Google</span>
+                    </div>
+                    <span class="feature-status-desc">SEFH / XMP micro-video muxed</span>
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -1456,61 +1463,6 @@
     flex-shrink: 0;
   }
 
-  .preview-mode-tabs {
-    display: flex;
-    background: #0d0d10;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: 2px;
-    gap: 2px;
-  }
-
-  .preview-mode-single-banner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 5px 10px;
-    background: rgba(168, 85, 247, 0.1);
-    border: 1px solid rgba(168, 85, 247, 0.25);
-    border-radius: var(--radius-md);
-    font-size: 11px;
-    font-weight: 600;
-    color: #d8b4fe;
-  }
-
-  .tab-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 5px 8px;
-    font-size: 11.5px;
-    font-weight: 600;
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-  }
-
-  .tab-btn:hover {
-    color: var(--text-main);
-  }
-
-  .tab-btn.active {
-    background: #1a1a24;
-    color: #ffe600;
-  }
-
-  .tab-btn.active.active-reversed {
-    background: rgba(139, 92, 246, 0.2);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-  }
-
   /* ── Perspective Segmented Selector ── */
   .perspective-segmented {
     display: grid;
@@ -1790,45 +1742,38 @@
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   }
 
-  /* Smooth Unified Camera Badges */
+  /* Smooth Unified Camera Badges (Icon-Only) */
   .camera-badge {
     position: absolute;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: rgba(0, 0, 0, 0.72);
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-sm);
     color: #ffffff;
-    white-space: nowrap;
     user-select: none;
     transition: all 0.48s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .morph-stage.mode-pip .layer-primary .camera-badge {
-    bottom: 12px;
-    left: 12px;
-    padding: 3px 8px;
-    font-size: 11px;
-    font-weight: 500;
+    bottom: 10px;
+    left: 10px;
+    padding: 4px;
   }
 
   .morph-stage.mode-pip .layer-secondary .camera-badge {
     top: 6px;
     left: 6px;
-    padding: 2px 5px;
-    font-size: 9.5px;
-    font-weight: 700;
+    padding: 3px;
   }
 
   .morph-stage.mode-sbs .layer-primary .camera-badge,
   .morph-stage.mode-sbs .layer-secondary .camera-badge {
-    bottom: 10px;
-    left: 10px;
-    padding: 3px 7px;
-    font-size: 10.5px;
-    font-weight: 600;
+    bottom: 8px;
+    left: 8px;
+    padding: 4px;
   }
 
   .pip-lens-circle {
@@ -1850,13 +1795,69 @@
     pointer-events: none;
   }
 
+  /* ── Perspective Angle Tabs (Both Angles Mode) ── */
+  .preview-angle-tabs {
+    display: flex;
+    background: #0d0d12;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 3px;
+  }
+
+  .angle-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .angle-tab-btn:hover {
+    color: var(--text-main);
+  }
+
+  .angle-tab-btn.active {
+    background: rgba(255, 230, 0, 0.16);
+    color: #ffe600;
+  }
+
+  .angle-tab-btn.active-rev.active {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+  }
+
+  .preview-single-angle-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 600;
+    color: #d8b4fe;
+  }
+
+  /* ── Structured Preview Info Box ── */
   .preview-info-box {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    background: #0d0d10;
+    gap: 8px;
+    background: #0d0d12;
     border: 1px solid var(--border-subtle);
-    padding: 8px 10px;
+    padding: 10px 12px;
     border-radius: var(--radius-md);
   }
 
@@ -1869,16 +1870,121 @@
 
   .info-label {
     color: var(--text-secondary);
+    font-weight: 500;
   }
 
-  .feature-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+  .info-path-val {
+    font-size: 11px;
+    color: #fbbf24;
+    background: rgba(0, 0, 0, 0.35);
     padding: 2px 6px;
     border-radius: 4px;
-    font-size: 10.5px;
-    font-weight: 500;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+  }
+
+  /* ── Active Features Rich Visual Identity Cards ── */
+  .active-features-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .feature-status-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  .status-exif {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .status-motion {
+    background: rgba(6, 182, 212, 0.08);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+  }
+
+  .feature-status-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .icon-emerald {
+    background: rgba(16, 185, 129, 0.18);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+  }
+
+  .icon-cyan {
+    background: rgba(6, 182, 212, 0.18);
+    color: #38bdf8;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+  }
+
+  .feature-status-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .feature-status-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .feature-status-title {
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  .status-exif .feature-status-title {
+    color: #34d399;
+  }
+
+  .status-motion .feature-status-title {
+    color: #38bdf8;
+  }
+
+  .feature-status-dot.dot-emerald {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.9);
+  }
+
+  .feature-status-badge {
+    font-size: 9.5px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(6, 182, 212, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+  }
+
+  .feature-status-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.25;
   }
 
   /* Standalone Individual Photos Grid */
@@ -1920,24 +2026,6 @@
     color: var(--text-secondary);
     font-weight: 500;
     text-align: center;
-  }
-
-  .tag-emerald {
-    background: rgba(16, 185, 129, 0.12);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.25);
-  }
-
-  .tag-cyan {
-    background: rgba(6, 182, 212, 0.12);
-    color: #38bdf8;
-    border: 1px solid rgba(6, 182, 212, 0.25);
-  }
-
-  .tag-violet {
-    background: rgba(139, 92, 246, 0.12);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.25);
   }
 
   @media (max-width: 900px) {

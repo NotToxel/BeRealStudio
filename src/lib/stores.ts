@@ -77,6 +77,50 @@ currentView.subscribe((view) => {
 export const toolkitConfig = writable<ToolkitConfig>({ ...defaultToolkitConfig });
 export const recapperConfig = writable<RecapperConfig>({ ...defaultRecapperConfig });
 
+export function getPreferredRecapInputFolder(toolkitOutputPath: string, createCombined: boolean = true): string {
+  if (!toolkitOutputPath) return '';
+  const sep = toolkitOutputPath.includes('\\') ? '\\' : '/';
+  const clean = toolkitOutputPath.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (clean.endsWith('/combined') || clean.endsWith('/singles') || clean.endsWith('/combined_reversed')) {
+    return toolkitOutputPath;
+  }
+  const sub = createCombined ? 'combined' : 'singles';
+  return `${toolkitOutputPath.replace(/[\\/]+$/, '')}${sep}${sub}`;
+}
+
+export function getSensibleRecapOutputPath(inputFolder: string): string {
+  if (!inputFolder) return '';
+  const sep = inputFolder.includes('\\') ? '\\' : '/';
+  const clean = inputFolder.replace(/\\/g, '/').replace(/\/+$/, '');
+  const lastSlash = clean.lastIndexOf('/');
+  
+  // If the input folder is inside combined/singles/etc., save recap.mp4 in the parent folder
+  if (clean.endsWith('/combined') || clean.endsWith('/singles') || clean.endsWith('/combined_reversed')) {
+    const parent = lastSlash !== -1 ? inputFolder.slice(0, lastSlash) : inputFolder;
+    return `${parent}${sep}BeReal_Recap.mp4`;
+  }
+  return `${inputFolder.replace(/[\\/]+$/, '')}${sep}BeReal_Recap.mp4`;
+}
+
+// Automatically link toolkit output to recapper input if recapper input is empty
+toolkitConfig.subscribe((tk) => {
+  if (tk.outputPath) {
+    recapperConfig.update((rc) => {
+      let updated = false;
+      let newRc = { ...rc };
+      if (!rc.inputFolder) {
+        newRc.inputFolder = getPreferredRecapInputFolder(tk.outputPath, tk.createCombined);
+        updated = true;
+      }
+      if (!rc.outputPath && newRc.inputFolder) {
+        newRc.outputPath = getSensibleRecapOutputPath(newRc.inputFolder);
+        updated = true;
+      }
+      return updated ? newRc : rc;
+    });
+  }
+});
+
 // Scan Metadata
 export const currentArchive = writable<ArchiveInfo | null>(null);
 export const archiveMetadata = currentArchive;
@@ -254,12 +298,27 @@ function loadStoredActivity(): ActivityRecord[] {
 
 export const activityHistory = writable<ActivityRecord[]>(loadStoredActivity());
 
+// Dynamic saver to avoid circular dependency
+let saveActivityNative: ((hist: ActivityRecord[]) => Promise<void>) | null = null;
+let clearActivityNative: (() => Promise<void>) | null = null;
+
+export function registerNativeActivitySync(
+  saver: (hist: ActivityRecord[]) => Promise<void>,
+  clearer: () => Promise<void>
+) {
+  saveActivityNative = saver;
+  clearActivityNative = clearer;
+}
+
 if (typeof window !== 'undefined') {
   activityHistory.subscribe((list) => {
     try {
       localStorage.setItem('bereal_studio_activity_history', JSON.stringify(list));
     } catch {
       // Ignore storage quota errors
+    }
+    if (saveActivityNative) {
+      saveActivityNative(list).catch(() => {});
     }
   });
 }
@@ -276,6 +335,9 @@ export function recordActivity(entry: Omit<ActivityRecord, 'id' | 'timestamp'>) 
 
 export function clearActivityHistory() {
   activityHistory.set([]);
+  if (clearActivityNative) {
+    clearActivityNative().catch(() => {});
+  }
 }
 
 export function deleteActivityRecord(id: string) {

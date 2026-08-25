@@ -143,7 +143,8 @@ async fn run_recapper(
     emitter.info("Rendering frames and streaming directly to FFmpeg video encoder...");
     let out_path = Path::new(&config.output_path);
     if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent)?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", parent.display(), e))?;
     }
 
     let fps = config.fps;

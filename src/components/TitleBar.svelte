@@ -1,42 +1,52 @@
 <script lang="ts">
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount, onDestroy } from 'svelte';
+  import { isTauri } from '$lib/tauri';
 
-  const appWindow = getCurrentWindow();
   let isMaximized = false;
   let unlistenResize: (() => void) | undefined;
 
+  function getWindow() {
+    return isTauri() ? getCurrentWindow() : null;
+  }
+
   async function checkMaximized() {
+    const win = getWindow();
+    if (!win) return;
     try {
-      isMaximized = await appWindow.isMaximized();
+      isMaximized = await win.isMaximized();
     } catch {
       // Fallback
     }
   }
 
   async function minimize() {
+    const win = getWindow();
+    if (!win) return;
     try {
-      await appWindow.minimize();
+      await win.minimize();
     } catch (e) {
       console.error('Minimize error:', e);
     }
   }
 
   async function toggleMaximize() {
+    const win = getWindow();
+    if (!win) return;
     try {
-      const max = await appWindow.isMaximized();
+      const max = await win.isMaximized();
       if (max) {
-        await appWindow.unmaximize();
+        await win.unmaximize();
         isMaximized = false;
       } else {
-        await appWindow.maximize();
+        await win.maximize();
         isMaximized = true;
       }
     } catch (e) {
       console.error('Toggle maximize error:', e);
       try {
-        await appWindow.toggleMaximize();
-        isMaximized = await appWindow.isMaximized();
+        await win.toggleMaximize();
+        isMaximized = await win.isMaximized();
       } catch (err2) {
         console.error('Fallback toggle maximize error:', err2);
       }
@@ -44,27 +54,32 @@
   }
 
   async function toggleFullscreen() {
+    const win = getWindow();
+    if (!win) return;
     try {
-      const fs = await appWindow.isFullscreen();
-      await appWindow.setFullscreen(!fs);
+      const fs = await win.isFullscreen();
+      await win.setFullscreen(!fs);
     } catch (e) {
       console.error('Fullscreen error:', e);
     }
   }
 
   async function close() {
+    const win = getWindow();
+    if (!win) return;
     try {
-      await appWindow.close();
+      await win.close();
     } catch (e) {
       console.error('Close error:', e);
     }
   }
 
   function handleMouseDown(e: MouseEvent) {
-    // Only drag on primary left click and if not clicking a button
+    const win = getWindow();
+    if (!win) return;
     if (e.button === 0 && !(e.target as HTMLElement)?.closest('button')) {
       try {
-        appWindow.startDragging();
+        win.startDragging();
       } catch (err) {
         console.error('Drag error:', err);
       }
@@ -79,9 +94,11 @@
   }
 
   onMount(async () => {
+    const win = getWindow();
+    if (!win) return;
     await checkMaximized();
     try {
-      unlistenResize = await appWindow.onResized(() => {
+      unlistenResize = await win.onResized(() => {
         checkMaximized();
       });
     } catch {
