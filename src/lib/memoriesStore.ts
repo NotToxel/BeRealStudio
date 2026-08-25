@@ -244,3 +244,40 @@ export function prevFeedMemory() {
 export function resetFilters() {
   explorerFilter.set({ ...initialFilterState });
 }
+
+// ─── Custom Context Menu State ────────────────────────────────────────────────
+export interface ContextMenuState {
+  isOpen: boolean;
+  x: number;
+  y: number;
+  memory: ExplorerMemory | null;
+}
+
+export const contextMenuState = writable<ContextMenuState>({
+  isOpen: false,
+  x: 0,
+  y: 0,
+  memory: null,
+});
+
+export function openContextMenu(e: MouseEvent, memory: ExplorerMemory) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // Clamp coordinates to viewport dimensions
+  const menuWidth = 230;
+  const menuHeight = 280;
+  const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+  const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+  contextMenuState.set({
+    isOpen: true,
+    x: Math.max(10, x),
+    y: Math.max(10, y),
+    memory,
+  });
+}
+
+export function closeContextMenu() {
+  contextMenuState.update((s) => ({ ...s, isOpen: false }));
+}

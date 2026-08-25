@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { filteredMemories, openFeedAt } from '$lib/memoriesStore';
+  import { filteredMemories, openFeedAt, openContextMenu } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import Images from 'lucide-svelte/icons/images';
   import Sparkles from 'lucide-svelte/icons/sparkles';
@@ -28,6 +28,7 @@
           role="button"
           tabindex="0"
           on:click={() => handleMemoryClick(memory)}
+          on:contextmenu={(e) => openContextMenu(e, memory)}
           on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleMemoryClick(memory)}
         >
           <DualCameraFrame

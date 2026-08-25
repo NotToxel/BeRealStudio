@@ -4,7 +4,10 @@
   import TitleBar from '$components/TitleBar.svelte';
   import NavBar from '$components/NavBar.svelte';
   import ErrorModal from '$components/ErrorModal.svelte';
+  import MemoryContextMenu from '$components/memories/MemoryContextMenu.svelte';
 </script>
+
+<svelte:window on:contextmenu={(e) => e.preventDefault()} />
 
 <div class="app-container">
   <TitleBar />
@@ -15,6 +18,7 @@
 </div>
 
 <ErrorModal />
+<MemoryContextMenu />
 
 <style>
   :global(body) {

@@ -4,6 +4,7 @@
     calendarCurrentMonth,
     memoriesByDate,
     openFeedAt,
+    openContextMenu,
     activeExplorerView,
   } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
@@ -221,6 +222,7 @@
         role="button"
         tabindex={hasPost ? 0 : -1}
         on:click={() => hasPost && handleDayClick(dayNum)}
+        on:contextmenu={(e) => hasPost && primaryPost && openContextMenu(e, primaryPost)}
         on:keydown={(e) => hasPost && (e.key === 'Enter' || e.key === ' ') && handleDayClick(dayNum)}
       >
         {#if hasPost && primaryPost}
