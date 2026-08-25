@@ -166,21 +166,47 @@ jobs:
           path: tauri-build.log
           if-no-files-found: ignore
 
-      - name: Package macOS .app into tarball
-        if: runner.os == 'macOS'
+      - name: Stage Release Artifacts
         shell: bash
         run: |
-          if [ -d "src-tauri/target/release/bundle/macos" ]; then
-            cd src-tauri/target/release/bundle/macos
-            tar -czf "BeReal-Studio-macOS-app.tar.gz" *.app 2>/dev/null || true
-            cd -
+          mkdir -p "$GITHUB_WORKSPACE/release-artifacts"
+          
+          # 1. Package Linux binaries
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio" ]; then
+              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-Linux-x86_64"
+            fi
           fi
 
-      - name: List Generated Bundle Files
-        shell: bash
-        run: |
-          echo "=== All files in src-tauri/target/release/bundle ==="
-          find src-tauri/target/release/bundle/ -type f || true
+          # 2. Package macOS binaries
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio" ]; then
+              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-macOS-arm64"
+            fi
+            if [ -d "src-tauri/target/release/bundle/macos" ]; then
+              cd src-tauri/target/release/bundle/macos
+              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS.app.tar.gz" *.app 2>/dev/null || true
+              cd -
+            fi
+          fi
+
+          # 3. Package Windows binaries
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio.exe" ]; then
+              cp "src-tauri/target/release/bereal-studio.exe" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Windows-x64.exe"
+            fi
+          fi
+
+          # 4. Copy all generated installer packages (.dmg, .deb, .AppImage, .msi, .exe)
+          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.msi" \) -exec cp {} "$GITHUB_WORKSPACE/release-artifacts/" \; 2>/dev/null || true
+          find src-tauri/target/release/bundle/ -type f \( -name "*.exe" \) -exec cp {} "$GITHUB_WORKSPACE/release-artifacts/" \; 2>/dev/null || true
+
+          echo "=== Staged files in release-artifacts/ ==="
+          ls -la "$GITHUB_WORKSPACE/release-artifacts/"
 
       - name: Upload Release Binaries
         uses: actions/github-script@v7
@@ -192,43 +218,21 @@ jobs:
             const tagName = '${{ needs.create-release.outputs.tag_name }}' || 'v2.0.0';
             const resolvedTag = (tagName && tagName !== 'true') ? tagName : 'v2.0.0';
 
-            function findFiles(dir, exts) {
-              let results = [];
-              if (!fs.existsSync(dir)) return results;
-              const list = fs.readdirSync(dir, { withFileTypes: true });
-              for (const file of list) {
-                if (file.name === 'node_modules' || file.name === '.git' || file.name === '.svelte-kit' || file.name === 'deps' || file.name === 'incremental') continue;
-                const fullPath = path.join(dir, file.name);
-                if (file.isDirectory()) {
-                  results = results.concat(findFiles(fullPath, exts));
-                } else {
-                  const lower = file.name.toLowerCase();
-                  if (exts.some(ext => lower.endsWith(ext))) {
-                    results.push(fullPath);
-                  }
-                }
-              }
-              return results;
+            const artifactDir = path.join(process.env.GITHUB_WORKSPACE, 'release-artifacts');
+            if (!fs.existsSync(artifactDir)) {
+              console.log('Artifact directory does not exist.');
+              return;
             }
 
-            const searchDirs = [
-              path.join(process.env.GITHUB_WORKSPACE, 'src-tauri', 'target'),
-              path.join(process.env.GITHUB_WORKSPACE, 'target')
-            ];
+            const files = fs.readdirSync(artifactDir)
+              .map(f => path.join(artifactDir, f))
+              .filter(f => fs.statSync(f).isFile());
 
-            const exts = ['.dmg', '.deb', '.appimage', '.exe', '.msi', '.tar.gz', '.zip'];
-            let files = [];
-            for (const sDir of searchDirs) {
-              if (fs.existsSync(sDir)) {
-                files = files.concat(findFiles(sDir, exts));
-              }
-            }
-
-            console.log(`Found ${files.length} release files:`);
-            files.forEach(f => console.log(' - ' + f));
+            console.log(`Found ${files.length} release artifacts to upload:`);
+            files.forEach(f => console.log(' - ' + path.basename(f) + ' (' + (fs.statSync(f).size / 1024 / 1024).toFixed(2) + ' MB)'));
 
             if (files.length === 0) {
-              console.log('No matching bundle files found in target directories.');
+              console.log('No files found to upload.');
               return;
             }
 
@@ -238,13 +242,8 @@ jobs:
               tag: resolvedTag
             });
 
-            const uploadedNames = new Set();
-
             for (const filePath of files) {
               const fileName = path.basename(filePath);
-              if (uploadedNames.has(fileName)) continue;
-              uploadedNames.add(fileName);
-
               const fileData = fs.readFileSync(filePath);
 
               const existing = release.data.assets.find(a => a.name === fileName);
@@ -269,5 +268,5 @@ jobs:
                   'content-length': fileData.length
                 }
               });
-              console.log(`Uploaded: ${fileName}`);
+              console.log(`Successfully uploaded: ${fileName}`);
             }
