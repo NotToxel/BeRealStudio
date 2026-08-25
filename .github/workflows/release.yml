@@ -166,27 +166,33 @@ jobs:
           path: tauri-build.log
           if-no-files-found: ignore
 
+      - name: Package macOS .app into tarball
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -d "src-tauri/target/release/bundle/macos" ]; then
+            cd src-tauri/target/release/bundle/macos
+            tar -czf "BeReal-Studio-macOS-app.tar.gz" *.app 2>/dev/null || true
+            cd -
+          fi
+
       - name: List Generated Bundle Files
         shell: bash
         run: |
-          echo "=== Generated Bundle Artifacts ==="
-          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" -o -name "*.zip" \) -print || true
+          echo "=== All files in src-tauri/target/release/bundle ==="
+          find src-tauri/target/release/bundle/ -type f || true
 
       - name: Upload Release Binaries
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
           TAG="${{ needs.create-release.outputs.tag_name }}"
           if [ -z "$TAG" ] || [ "$TAG" = "true" ]; then
             TAG="v2.0.0"
           fi
           echo "Uploading desktop binaries to release $TAG in ${{ github.repository }}..."
-          shopt -s globstar nullglob
-          for file in src-tauri/target/**/*.{dmg,deb,AppImage,appimage,exe,msi,zip}; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file..."
-              gh release upload "$TAG" "$file" --repo "${{ github.repository }}" --clobber
-            fi
+          find src-tauri/target/release/bundle/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" -o -name "*.zip" \) | while read -r file; do
+            echo "Uploading: $file"
+            gh release upload "$TAG" "$file" --repo "${{ github.repository }}" --clobber
           done
