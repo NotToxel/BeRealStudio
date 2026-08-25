@@ -261,27 +261,41 @@ jobs:
               const fileName = path.basename(filePath);
               const fileData = fs.readFileSync(filePath);
 
-              const existing = release.data.assets.find(a => a.name === fileName);
-              if (existing) {
-                console.log(`Removing old asset ${fileName} (${existing.id})...`);
-                await github.rest.repos.deleteReleaseAsset({
+              try {
+                const freshRelease = await github.rest.repos.getReleaseByTag({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  asset_id: existing.id
+                  tag: resolvedTag
                 });
-              }
 
-              console.log(`Uploading ${fileName} (${(fileData.length / 1024 / 1024).toFixed(2)} MB)...`);
-              await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.data.id,
-                name: fileName,
-                data: fileData,
-                headers: {
-                  'content-type': 'application/octet-stream',
-                  'content-length': fileData.length
+                const existing = freshRelease.data.assets.find(a => a.name === fileName);
+                if (existing) {
+                  console.log(`Removing old asset ${fileName} (${existing.id})...`);
+                  try {
+                    await github.rest.repos.deleteReleaseAsset({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      asset_id: existing.id
+                    });
+                  } catch (e) {
+                    console.log(`Note on delete: ${e.message}`);
+                  }
                 }
-              });
-              console.log(`Successfully uploaded: ${fileName}`);
+
+                console.log(`Uploading ${fileName} (${(fileData.length / 1024 / 1024).toFixed(2)} MB)...`);
+                await github.rest.repos.uploadReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.data.id,
+                  name: fileName,
+                  data: fileData,
+                  headers: {
+                    'content-type': 'application/octet-stream',
+                    'content-length': fileData.length
+                  }
+                });
+                console.log(`Successfully uploaded: ${fileName}`);
+              } catch (err) {
+                console.warn(`Warning uploading ${fileName}: ${err.message}`);
+              }
             }
