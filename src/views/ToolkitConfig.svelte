@@ -29,6 +29,7 @@
   import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
   import XCircle from 'lucide-svelte/icons/circle-x';
   import User from 'lucide-svelte/icons/circle-user';
+  import Mountain from 'lucide-svelte/icons/mountain';
   import FileCode from 'lucide-svelte/icons/file-code';
   import HelpCircle from 'lucide-svelte/icons/circle-help';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
@@ -37,6 +38,7 @@
   import MapPin from 'lucide-svelte/icons/map-pin';
   import MessageSquare from 'lucide-svelte/icons/message-square';
   import Clapperboard from 'lucide-svelte/icons/clapperboard';
+  import Film from 'lucide-svelte/icons/film';
   import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import Stepper from '$components/Stepper.svelte';
@@ -239,6 +241,7 @@
               </div>
 
               <div class="metadata-banner">
+                <!-- 1. Total Memories -->
                 <div class="meta-item">
                   <div class="meta-icon-label">
                     <Camera size={12} class="text-amber-400" />
@@ -247,34 +250,42 @@
                   <strong class="text-amber-400 font-mono">{$archiveMetadata.validPostCount}</strong>
                 </div>
 
-                <div class="meta-item">
-                  <div class="meta-icon-label">
-                    <CheckCircle size={12} class="text-emerald-400" />
-                    <span class="meta-label">Primary / Selfie</span>
-                  </div>
-                  <strong class="text-emerald-400 font-mono">
-                    {$archiveMetadata.primaryPhotoCount} / {$archiveMetadata.secondaryPhotoCount}
-                  </strong>
-                </div>
-
+                <!-- 2. BTS Videos -->
                 <div class="meta-item">
                   <div class="meta-icon-label">
                     <Clapperboard size={12} class="text-sky-400" />
-                    <span class="meta-label">BTS / Videos</span>
+                    <span class="meta-label">BTS Videos</span>
                   </div>
-                  <strong class="text-sky-400 font-mono">
-                    {$archiveMetadata.btsCount} BTS · {$archiveMetadata.primaryVideoCount + $archiveMetadata.secondaryVideoCount} vids
+                  <strong class="text-sky-400 font-mono">{$archiveMetadata.btsCount}</strong>
+                </div>
+
+                <!-- 3. Dual Videos -->
+                <div class="meta-item">
+                  <div class="meta-icon-label">
+                    <Film size={12} class="text-indigo-400" />
+                    <span class="meta-label">Dual Videos</span>
+                  </div>
+                  <strong class="text-indigo-400 font-mono">
+                    {$archiveMetadata.primaryVideoCount + $archiveMetadata.secondaryVideoCount}
                   </strong>
                 </div>
 
+                <!-- 4. GPS Location -->
                 <div class="meta-item">
                   <div class="meta-icon-label">
-                    <MapPin size={12} class="text-purple-400" />
-                    <span class="meta-label">With GPS / Captions</span>
+                    <MapPin size={12} class="text-emerald-400" />
+                    <span class="meta-label">With GPS</span>
                   </div>
-                  <strong class="text-purple-300 font-mono">
-                    {$archiveMetadata.withLocationCount} GPS · {$archiveMetadata.withCaptionCount} caps
-                  </strong>
+                  <strong class="text-emerald-400 font-mono">{$archiveMetadata.withLocationCount}</strong>
+                </div>
+
+                <!-- 5. Captions -->
+                <div class="meta-item">
+                  <div class="meta-icon-label">
+                    <MessageSquare size={12} class="text-purple-400" />
+                    <span class="meta-label">With Captions</span>
+                  </div>
+                  <strong class="text-purple-300 font-mono">{$archiveMetadata.withCaptionCount}</strong>
                 </div>
 
                 <!-- Span info full row -->
@@ -357,11 +368,40 @@
                 </ul>
 
                 <div class="gdpr-guide-tip">
-                  <HelpCircle size={14} class="text-sky-400 flex-shrink-0" />
-                  <div>
-                    <strong>How to download your authentic archive from BeReal:</strong><br />
-                    Profile icon &rarr; <strong>Help</strong> &rarr; <strong>Contact Us</strong> &rarr; <strong>Ask a Question</strong> &rarr; <strong>Troubleshooting</strong> &rarr; <strong>Other</strong> &rarr; <strong>Contact Us</strong> &rarr; Topic: <strong>"I'd like to request a copy of my data"</strong> (enter &ge;10 characters in message and submit).
+                  <div class="gdpr-guide-head">
+                    <HelpCircle size={15} class="text-sky-400 flex-shrink-0" />
+                    <strong>How to Download Your Authentic Archive from BeReal:</strong>
                   </div>
+                  <ol class="gdpr-step-list">
+                    <li>
+                      <span class="step-badge font-mono">1</span>
+                      <span>Tap your <strong>Profile icon</strong> in the top-right corner.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">2</span>
+                      <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">3</span>
+                      <span>Select <strong>Ask a Question</strong> &rarr; <strong>Troubleshooting</strong> &rarr; <strong>Other</strong>.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">4</span>
+                      <span>Tap <strong>Contact Us</strong> at the bottom of the article.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">5</span>
+                      <span>Select Topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">6</span>
+                      <span>Type a message with at least <strong>10 characters</strong> and submit your request.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">7</span>
+                      <span>BeReal will email you a secure download link containing your raw archive ZIP.</span>
+                    </li>
+                  </ol>
                 </div>
               </div>
             </div>
@@ -444,13 +484,19 @@
         <div class="divider"></div>
 
         <Toggle
-          label="Inject Original EXIF &amp; GPS Metadata"
+          label="Embed EXIF &amp; GPS Metadata"
+          description="Restores original capture date, GPS tags, and camera metadata"
+          tooltip="Embeds authentic ISO capture timestamps, geolocation coordinates, and IPTC tags into JPEG/WebP photos."
+          icon={MapPin}
           bind:checked={$toolkitConfig.embedExif}
           accentColor="emerald"
         />
 
         <Toggle
-          label="Mux Samsung / Google Motion Photos"
+          label="Live &amp; Motion Photos"
+          description="Embeds BTS micro-video clips into interactive moving photos"
+          tooltip="Muxes BTS video clips into photos compatible with Samsung Gallery (SEFH) and Google Photos (GCamera XMP)."
+          icon={Film}
           bind:checked={$toolkitConfig.createMotionPhotos}
           accentColor="cyan"
         />
@@ -464,7 +510,10 @@
         </div>
 
         <Toggle
-          label="Generate Combined Memories"
+          label="Dual-Camera Compositing"
+          description="Merges primary and selfie cameras into unified memory photos"
+          tooltip="Combines both camera views into single composite photos using Picture-in-Picture or Side-by-Side layout."
+          icon={Layers}
           bind:checked={$toolkitConfig.createCombined}
           accentColor="yellow"
         />
@@ -472,35 +521,54 @@
         {#if $toolkitConfig.createCombined}
           <div class="sub-options-box">
             <div class="field-group">
-              <label for="combine-select" class="label">Dual-Camera Combination Mode</label>
-              <select id="combine-select" class="input-select" bind:value={$toolkitConfig.combineMode}>
-                <option value="PictureInPicture">Picture-in-Picture</option>
-                <option value="SideBySide">Side-by-Side</option>
-              </select>
+              <span class="label">Dual-Camera Combination Mode</span>
+              <div class="combine-mode-segmented">
+                <button
+                  type="button"
+                  class="combine-mode-btn"
+                  class:active={$toolkitConfig.combineMode === 'PictureInPicture'}
+                  on:click={() => ($toolkitConfig.combineMode = 'PictureInPicture')}
+                >
+                  <div class="mini-diagram pip-mini">
+                    <span class="mini-bg"></span>
+                    <span class="mini-inset"></span>
+                  </div>
+                  <div class="mode-info">
+                    <span class="mode-name">Picture-in-Picture</span>
+                    <span class="mode-subtext">Authentic corner overlay</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  class="combine-mode-btn"
+                  class:active={$toolkitConfig.combineMode === 'SideBySide'}
+                  on:click={() => ($toolkitConfig.combineMode = 'SideBySide')}
+                >
+                  <div class="mini-diagram sbs-mini">
+                    <span class="mini-left"></span>
+                    <span class="mini-right"></span>
+                  </div>
+                  <div class="mode-info">
+                    <span class="mode-name">Side-by-Side</span>
+                    <span class="mode-subtext">Split dual view layout</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div class="divider"></div>
 
             <Toggle
-              label="Generate Reversed Memories"
+              label="Generate Reversed Angles"
+              description="Exports secondary-perspective memories with swapped cameras"
+              tooltip="Exports additional memories where the selfie camera is the background canvas and the main camera is the overlay."
+              icon={Repeat}
               bind:checked={$toolkitConfig.createReversed}
               accentColor="violet"
             />
           </div>
         {/if}
-      </div>
-
-      <!-- Start Button -->
-      <div class="action-footer">
-        <button
-          type="button"
-          class="btn btn-accent-yellow btn-lg"
-          class:btn-disabled-look={!isConfigValid}
-          on:click={handleStart}
-        >
-          <Play size={16} fill="currentColor" />
-          <span>Start Processing Archive &rarr;</span>
-        </button>
       </div>
     </div>
 
@@ -547,45 +615,42 @@
             </div>
           {/if}
 
-          <!-- Canvas Frame -->
+          <!-- Animated Morphing Canvas Frame -->
           <div class="mockup-frame" class:is-sbs={$toolkitConfig.combineMode === 'SideBySide'}>
-            {#if $toolkitConfig.combineMode === 'PictureInPicture'}
-              <!-- PIP Layout Canvas -->
-              <div class="pip-canvas">
-                <!-- Main Background Canvas -->
-                <div
-                  class="canvas-main-bg"
-                  class:is-secondary={previewTab === 'reversed'}
-                >
-                  <div class="camera-tag">
-                    <Camera size={12} />
-                    <span>{previewTab === 'reversed' ? 'Secondary Camera (Selfie)' : 'Primary Camera (Main)'}</span>
-                  </div>
+            <div
+              class="morph-stage"
+              class:mode-pip={$toolkitConfig.combineMode === 'PictureInPicture'}
+              class:mode-sbs={$toolkitConfig.combineMode === 'SideBySide'}
+            >
+              <!-- Primary Camera Layer (Environment / Landscape) -->
+              <div
+                class="cam-layer layer-primary"
+                class:is-swapped={previewTab === 'reversed'}
+              >
+                <div class="camera-badge" title={previewTab === 'reversed' ? 'Person Silhouette (Selfie)' : 'Landscape & Environment (Main Camera)'}>
+                  {#if previewTab === 'reversed'}
+                    <User size={13} class="badge-icon text-purple-300" />
+                  {:else}
+                    <Mountain size={13} class="badge-icon text-sky-300" />
+                  {/if}
                 </div>
+              </div>
 
-                <!-- Overlaid PIP Window (at authentic 55,55 corner) -->
-                <div
-                  class="canvas-pip-overlay"
-                  class:is-primary={previewTab === 'reversed'}
-                >
-                  <div class="pip-tag">
-                    <span>{previewTab === 'reversed' ? 'Primary' : 'Selfie'}</span>
-                  </div>
-                  <div class="pip-lens-circle"></div>
+              <!-- Secondary / Selfie Camera Layer (Person Silhouette) -->
+              <div
+                class="cam-layer layer-secondary"
+                class:is-swapped={previewTab === 'reversed'}
+              >
+                <div class="pip-lens-circle"></div>
+                <div class="camera-badge" title={previewTab === 'reversed' ? 'Landscape & Environment (Main Camera)' : 'Person Silhouette (Selfie)'}>
+                  {#if previewTab === 'reversed'}
+                    <Mountain size={13} class="badge-icon text-sky-300" />
+                  {:else}
+                    <User size={13} class="badge-icon text-purple-300" />
+                  {/if}
                 </div>
               </div>
-            {:else}
-              <!-- Side by Side Layout Canvas -->
-              <div class="sbs-canvas">
-                <div class="sbs-pane" class:pane-left={true}>
-                  <span class="pane-label">{previewTab === 'reversed' ? 'Secondary' : 'Primary'}</span>
-                </div>
-                <div class="sbs-divider-line"></div>
-                <div class="sbs-pane" class:pane-right={true}>
-                  <span class="pane-label">{previewTab === 'reversed' ? 'Primary' : 'Secondary'}</span>
-                </div>
-              </div>
-            {/if}
+            </div>
           </div>
         {:else}
           <!-- Standalone Individual Photos Canvas (No Combination) -->
@@ -655,6 +720,19 @@
             </div>
           {/if}
         </div>
+
+        <!-- Start Processing Button -->
+        <div class="action-footer preview-action-footer">
+          <button
+            type="button"
+            class="btn btn-accent-yellow btn-lg w-full"
+            class:btn-disabled-look={!isConfigValid}
+            on:click={handleStart}
+          >
+            <Play size={16} fill="currentColor" />
+            <span>Start Processing Archive &rarr;</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -711,7 +789,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
-    align-items: center;
+    align-items: start;
   }
 
   .field-group {
@@ -1088,21 +1166,75 @@
 
   .gdpr-guide-tip {
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
     gap: 8px;
-    background: rgba(56, 189, 248, 0.08);
-    border: 1px solid rgba(56, 189, 248, 0.2);
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
+    background: rgba(56, 189, 248, 0.07);
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
     font-size: 11.5px;
     color: var(--text-secondary);
     line-height: 1.4;
+  }
+
+  .gdpr-guide-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #e0f2fe;
+    font-size: 12px;
+  }
+
+  .gdpr-step-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 0;
+    margin: 0;
+  }
+
+  .gdpr-step-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--text-secondary);
+  }
+
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
   }
 
   .action-footer {
     display: flex;
     justify-content: flex-end;
     padding-top: 10px;
+  }
+
+  .preview-action-footer {
+    display: flex;
+    width: 100%;
+    padding-top: 6px;
+  }
+
+  .preview-action-footer .w-full {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+    font-size: 13.5px;
+    font-weight: 700;
   }
 
   /* ── Right Column / Live Mockup ── */
@@ -1208,117 +1340,266 @@
     aspect-ratio: 4 / 3;
   }
 
-  .pip-canvas {
-    width: 100%;
-    height: 100%;
-    position: relative;
+  /* ── Combine Mode Segmented Cards ── */
+  .combine-mode-segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 
-  .canvas-main-bg {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #090d16 100%);
-    position: relative;
+  .combine-mode-btn {
     display: flex;
-    align-items: flex-end;
-    padding: 12px;
-    transition: background 0.2s ease;
-  }
-
-  .canvas-main-bg.is-secondary {
-    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 50%, #090720 100%);
-  }
-
-  .camera-tag {
-    display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #ffffff;
+    gap: 10px;
+    padding: 9px 12px;
+    background: #0e0e13;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
   }
 
-  .canvas-pip-overlay {
+  .combine-mode-btn:hover {
+    background: #15151e;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .combine-mode-btn.active {
+    background: rgba(255, 230, 0, 0.08);
+    border-color: rgba(255, 230, 0, 0.4);
+    box-shadow: 0 0 14px rgba(255, 230, 0, 0.12);
+  }
+
+  .mini-diagram {
+    width: 26px;
+    height: 32px;
+    background: #1c1c26;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .combine-mode-btn.active .mini-diagram {
+    border-color: rgba(255, 230, 0, 0.6);
+  }
+
+  .pip-mini .mini-bg {
     position: absolute;
+    inset: 0;
+    background: #1e293b;
+  }
+
+  .pip-mini .mini-inset {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 13px;
+    background: #ffe600;
+    border-radius: 2px;
+    border: 1px solid #000000;
+  }
+
+  .sbs-mini {
+    display: flex;
+    gap: 1px;
+    background: #000000;
+  }
+
+  .sbs-mini .mini-left {
+    flex: 1;
+    background: #334155;
+    height: 100%;
+  }
+
+  .sbs-mini .mini-right {
+    flex: 1;
+    background: #ffe600;
+    height: 100%;
+  }
+
+  .mode-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mode-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .combine-mode-btn.active .mode-name {
+    color: #ffe600;
+  }
+
+  .mode-subtext {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.25;
+  }
+
+  /* ── Morphing Stage Canvas ── */
+  .mockup-frame {
+    width: 100%;
+    max-width: 270px;
+    margin: 0 auto;
+    aspect-ratio: 3 / 4;
+    background: #000000;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--border-medium);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+    transition: aspect-ratio 0.45s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mockup-frame.is-sbs {
+    aspect-ratio: 4 / 3;
+    max-width: 320px;
+  }
+
+  .morph-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .cam-layer {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: hidden;
+    transition: all 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Mode: Picture-in-Picture */
+  .morph-stage.mode-pip .layer-primary {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border-right: none;
+    z-index: 1;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+
+  .morph-stage.mode-pip .layer-primary.is-swapped {
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+  }
+
+  .morph-stage.mode-pip .layer-secondary {
     top: 14px;
     left: 14px;
     width: 32%;
     aspect-ratio: 3 / 4;
-    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
-    border: 2.5px solid #000000;
     border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 6px;
-    transition: all 0.2s ease;
+    border: 2.5px solid #000000;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+    z-index: 10;
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
   }
 
-  .canvas-pip-overlay.is-primary {
+  .morph-stage.mode-pip .layer-secondary.is-swapped {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-color: #000000;
   }
 
-  .pip-tag {
+  /* Mode: Side-by-Side */
+  .morph-stage.mode-sbs .layer-primary {
+    top: 0;
+    left: 0;
+    width: calc(50% - 1px);
+    height: 100%;
+    border-radius: 0;
+    border-right: 2px solid rgba(0, 0, 0, 0.95);
+    z-index: 1;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+
+  .morph-stage.mode-sbs .layer-primary.is-swapped {
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+  }
+
+  .morph-stage.mode-sbs .layer-secondary {
+    top: 0;
+    left: 50%;
+    width: 50%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    z-index: 1;
+    background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+  }
+
+  .morph-stage.mode-sbs .layer-secondary.is-swapped {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  }
+
+  /* Smooth Unified Camera Badges */
+  .camera-badge {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #ffffff;
+    white-space: nowrap;
+    user-select: none;
+    transition: all 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .morph-stage.mode-pip .layer-primary .camera-badge {
+    bottom: 12px;
+    left: 12px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .morph-stage.mode-pip .layer-secondary .camera-badge {
+    top: 6px;
+    left: 6px;
+    padding: 2px 5px;
     font-size: 9.5px;
     font-weight: 700;
-    color: #ffffff;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 1px 4px;
-    border-radius: 3px;
-    align-self: flex-start;
+  }
+
+  .morph-stage.mode-sbs .layer-primary .camera-badge,
+  .morph-stage.mode-sbs .layer-secondary .camera-badge {
+    bottom: 10px;
+    left: 10px;
+    padding: 3px 7px;
+    font-size: 10.5px;
+    font-weight: 600;
   }
 
   .pip-lens-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: 14px;
     height: 14px;
     border-radius: 50%;
     background: #0f172a;
     border: 1.5px solid #475569;
-    align-self: center;
-    margin-bottom: 8px;
+    transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Side by side layout */
-  .sbs-canvas {
-    width: 100%;
-    height: 100%;
-    display: flex;
-  }
-
-  .sbs-pane {
-    flex: 1;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #1e293b;
-    position: relative;
-  }
-
-  .pane-right {
-    background: #0f172a;
-  }
-
-  .pane-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #ffffff;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-
-  .sbs-divider-line {
-    width: 2px;
-    height: 100%;
-    background: #000000;
+  .morph-stage.mode-sbs .pip-lens-circle {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+    pointer-events: none;
   }
 
   .preview-info-box {

@@ -4,8 +4,11 @@
     activityHistory,
     clearActivityHistory,
     deleteActivityRecord,
+    isProcessing,
+    progressState,
+    activeFeature,
   } from '$lib/stores';
-  import { openPath } from '$lib/tauri';
+  import { openPath, cancelToolkit, cancelRecapper } from '$lib/tauri';
   import History from 'lucide-svelte/icons/history';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
   import ExternalLink from 'lucide-svelte/icons/external-link';
@@ -16,6 +19,8 @@
   import CheckCircle from 'lucide-svelte/icons/circle-check';
   import Clock from 'lucide-svelte/icons/clock';
   import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
+  import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import XCircle from 'lucide-svelte/icons/circle-x';
 
   let showClearConfirm = false;
 
@@ -62,6 +67,20 @@
     clearActivityHistory();
     showClearConfirm = false;
   }
+
+  async function handleCancelActive() {
+    try {
+      if ($activeFeature === 'toolkit') {
+        await cancelToolkit();
+      } else {
+        await cancelRecapper();
+      }
+    } catch (e) {
+      console.warn('Failed to cancel active task:', e);
+    } finally {
+      isProcessing.set(false);
+    }
+  }
 </script>
 
 <div class="activity-view">
@@ -73,13 +92,16 @@
     </button>
     <div class="header-titles">
       <h1 class="title-md font-bold">Activity &amp; Generation History</h1>
-      <span class="badge badge-sky font-mono">{$activityHistory.length} runs</span>
+      <span class="badge badge-sky font-mono">
+        {$activityHistory.length} {$activityHistory.length === 1 ? 'Run' : 'Runs'}
+      </span>
     </div>
     {#if $activityHistory.length > 0}
       <button
         type="button"
         class="btn btn-ghost btn-sm text-muted hover:text-red-400"
         on:click={() => (showClearConfirm = true)}
+        title="Clear All Generation History"
       >
         <Trash2 size={13} />
         <span>Clear History</span>
@@ -106,6 +128,45 @@
             Yes, Clear History
           </button>
         </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Active Background Task Banner -->
+  {#if $isProcessing}
+    <div class="active-task-banner card">
+      <div class="active-task-head">
+        <div class="active-task-left">
+          <div class="active-task-spinner">
+            <Loader2 size={20} class="animate-spin text-amber-400" />
+          </div>
+          <div class="active-task-titles">
+            <div class="title-row">
+              <span class="active-title font-bold text-white">
+                {$activeFeature === 'toolkit' ? 'Photo Processing Suite' : 'Recap Video Generator'}
+              </span>
+              <span class="badge badge-yellow font-mono">{$progressState.stage || 'Processing'}</span>
+            </div>
+            <span class="active-desc text-secondary text-xs font-mono">
+              {$progressState.current} of {$progressState.total} items completed &bull; <strong class="text-amber-300 font-mono">{$progressState.percentage.toFixed(2)}%</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="active-task-actions">
+          <button type="button" class="btn btn-accent-yellow btn-sm" on:click={() => currentView.set('processing')}>
+            <ExternalLink size={13} />
+            <span>View Live Terminal</span>
+          </button>
+          <button type="button" class="btn btn-danger btn-sm" on:click={handleCancelActive}>
+            <XCircle size={13} />
+            <span>Cancel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="active-task-track">
+        <div class="active-task-fill" style="width: {Math.min(Math.max($progressState.percentage, 0), 100)}%;"></div>
       </div>
     </div>
   {/if}
@@ -156,12 +217,12 @@
 
             <div class="head-right">
               <span class="badge badge-success font-mono">
-                <CheckCircle size={11} /> {item.itemCount} items
+                <CheckCircle size={11} /> {item.itemCount} {item.itemCount === 1 ? 'Item' : 'Items'}
               </span>
               <button
                 type="button"
                 class="btn-delete"
-                title="Remove from history"
+                title="Remove From History"
                 on:click={() => deleteActivityRecord(item.id)}
               >
                 <Trash2 size={13} />
@@ -409,6 +470,83 @@
     gap: 8px;
     flex-wrap: wrap;
     padding-top: 4px;
+  }
+
+  /* Active Task Banner */
+  .active-task-banner {
+    background: #15151c;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 24px rgba(245, 158, 11, 0.12);
+  }
+
+  .active-task-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .active-task-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .active-task-spinner {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .active-task-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .active-title {
+    font-size: 15px;
+  }
+
+  .active-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .active-task-track {
+    width: 100%;
+    height: 6px;
+    background: #09090c;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .active-task-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #ffe600);
+    border-radius: 999px;
+    box-shadow: 0 0 10px rgba(255, 230, 0, 0.6);
+    transition: width 0.18s ease;
   }
 
   /* Modal Backdrop */

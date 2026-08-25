@@ -48,7 +48,7 @@
         type="button"
         class="btn-step"
         on:click={decrement}
-        title="Decrease size"
+        title="Decrease Font Size"
         disabled={value <= 30}
       >
         <Minus size={11} />
@@ -73,7 +73,7 @@
         type="button"
         class="btn-step"
         on:click={increment}
-        title="Increase size"
+        title="Increase Font Size"
         disabled={value >= 200}
       >
         <Plus size={11} />

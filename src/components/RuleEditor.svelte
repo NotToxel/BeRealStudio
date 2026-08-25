@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LocationRule } from '$lib/types';
+  import { openPath } from '$lib/tauri';
   import Plus from 'lucide-svelte/icons/plus';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -9,10 +10,66 @@
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import Lightbulb from 'lucide-svelte/icons/lightbulb';
+  import Globe from 'lucide-svelte/icons/globe';
+  import ExternalLink from 'lucide-svelte/icons/external-link';
 
   export let rules: LocationRule[] = [];
 
   let isExpanded = false;
+
+  const ISO_COUNTRIES = [
+    { code: 'us', name: 'United States' },
+    { code: 'gb', name: 'United Kingdom' },
+    { code: 'ca', name: 'Canada' },
+    { code: 'au', name: 'Australia' },
+    { code: 'fr', name: 'France' },
+    { code: 'de', name: 'Germany' },
+    { code: 'es', name: 'Spain' },
+    { code: 'it', name: 'Italy' },
+    { code: 'jp', name: 'Japan' },
+    { code: 'nl', name: 'Netherlands' },
+    { code: 'be', name: 'Belgium' },
+    { code: 'ch', name: 'Switzerland' },
+    { code: 'at', name: 'Austria' },
+    { code: 'se', name: 'Sweden' },
+    { code: 'no', name: 'Norway' },
+    { code: 'dk', name: 'Denmark' },
+    { code: 'fi', name: 'Finland' },
+    { code: 'ie', name: 'Ireland' },
+    { code: 'pt', name: 'Portugal' },
+    { code: 'pl', name: 'Poland' },
+    { code: 'gr', name: 'Greece' },
+    { code: 'cz', name: 'Czechia' },
+    { code: 'nz', name: 'New Zealand' },
+    { code: 'br', name: 'Brazil' },
+    { code: 'mx', name: 'Mexico' },
+    { code: 'ar', name: 'Argentina' },
+    { code: 'cl', name: 'Chile' },
+    { code: 'kr', name: 'South Korea' },
+    { code: 'sg', name: 'Singapore' },
+    { code: 'in', name: 'India' },
+    { code: 'za', name: 'South Africa' },
+    { code: 'ae', name: 'United Arab Emirates' },
+    { code: 'tr', name: 'Turkey' },
+    { code: 'is', name: 'Iceland' },
+    { code: 'hr', name: 'Croatia' },
+    { code: 'hu', name: 'Hungary' },
+    { code: 'th', name: 'Thailand' },
+    { code: 'vn', name: 'Vietnam' },
+    { code: 'id', name: 'Indonesia' },
+    { code: 'my', name: 'Malaysia' },
+    { code: 'ph', name: 'Philippines' },
+    { code: 'eg', name: 'Egypt' },
+    { code: 'il', name: 'Israel' },
+  ];
+
+  async function openIsoGuide() {
+    try {
+      await openPath('https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2');
+    } catch {
+      window.open('https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2', '_blank');
+    }
+  }
 
   // Ensure there is always a default fallback rule
   $: if (!rules.some((r) => r.condition === 'Default')) {
@@ -35,11 +92,11 @@
   };
 
   const TOKENS = [
-    { label: '{city}', desc: 'City or town' },
-    { label: '{suburb}', desc: 'Neighborhood/suburb' },
+    { label: '{city}', desc: 'City or Town Name' },
+    { label: '{suburb}', desc: 'Neighborhood or Suburb' },
     { label: '{state}', desc: 'State / County / Region' },
-    { label: '{country}', desc: 'Full country name' },
-    { label: '{country_code}', desc: '2-letter country code' },
+    { label: '{country}', desc: 'Full Country Name' },
+    { label: '{country_code}', desc: 'Two-Letter Country Code' },
   ];
 
   function addRule() {
@@ -162,14 +219,28 @@
     <div class="accordion-body">
       <div class="header-actions">
         <span class="priority-note">
-          Rules evaluate <strong>top-to-bottom</strong>. The first matching country rule applies.
+          Rules evaluate <strong>top-to-bottom</strong>. The first matching rule applies.
         </span>
 
-        <button type="button" class="btn btn-secondary btn-sm" on:click={addRule}>
-          <Plus size={13} />
-          <span>Add Custom Rule</span>
-        </button>
+        <div class="header-tools">
+          <button type="button" class="btn-link-help" on:click={openIsoGuide} title="Open ISO 3166-1 Country Codes List on Wikipedia">
+            <Globe size={12} class="text-sky-400" />
+            <span>ISO Country Codes List</span>
+            <ExternalLink size={10} />
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" on:click={addRule}>
+            <Plus size={13} />
+            <span>Add Custom Rule</span>
+          </button>
+        </div>
       </div>
+
+      <!-- Datalist of Standard ISO Country Codes -->
+      <datalist id="iso-country-codes">
+        {#each ISO_COUNTRIES as c}
+          <option value={c.code}>{c.code.toUpperCase()} — {c.name}</option>
+        {/each}
+      </datalist>
 
       <!-- Single Clear Suggestion if no custom rules exist -->
       {#if matchRules.length === 0}
@@ -253,8 +324,15 @@
               <input
                 type="text"
                 class="input-text input-val font-mono"
+                list={field === 'country_code' ? 'iso-country-codes' : undefined}
                 value={val}
-                placeholder="e.g. us, gb"
+                placeholder={field === 'country_code'
+                  ? 'e.g. us, gb, ca'
+                  : field === 'city'
+                  ? 'e.g. New York, London'
+                  : field === 'state'
+                  ? 'e.g. California, Ontario'
+                  : 'e.g. United States'}
                 on:input={(e) => updateCondition(idx, field, e.currentTarget.value)}
               />
 
@@ -411,6 +489,34 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn-link-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: #38bdf8;
+    padding: 4px 9px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-link-help:hover {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.45);
+    color: #7dd3fc;
   }
 
   .priority-note {

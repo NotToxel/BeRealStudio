@@ -46,7 +46,7 @@
         type="button"
         class="btn-step"
         on:click={decrement}
-        title="Decrease value"
+        title="Decrease Value"
         disabled={value <= min}
       >
         <Minus size={11} />
@@ -72,7 +72,7 @@
         type="button"
         class="btn-step"
         on:click={increment}
-        title="Increase value"
+        title="Increase Value"
         disabled={value >= max}
       >
         <Plus size={11} />

@@ -10,6 +10,7 @@
   import XCircle from 'lucide-svelte/icons/circle-x';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Minimize2 from 'lucide-svelte/icons/minimize-2';
   import { onMount } from 'svelte';
   import ProgressBar from '$components/ProgressBar.svelte';
   import LogConsole from '$components/LogConsole.svelte';
@@ -34,6 +35,10 @@
       currentView.set('home');
     }
   }
+
+  function handleRunInBackground() {
+    currentView.set($activeFeature === 'toolkit' ? 'toolkit-config' : 'recapper-config');
+  }
 </script>
 
 <div class="processing-view">
@@ -50,15 +55,22 @@
           <span class="badge badge-yellow">{$progressState.stage}</span>
         </div>
         <p class="text-secondary text-sub">
-          {$progressState.current} of {$progressState.total} items &bull; {$progressState.percentage}% completed
+          {$progressState.current} of {$progressState.total} items &bull; <strong class="text-white font-mono">{$progressState.percentage.toFixed(2)}%</strong> completed
         </p>
       </div>
     </div>
 
-    <button type="button" class="btn btn-danger btn-sm" on:click={handleCancel}>
-      <XCircle size={14} />
-      <span>Cancel Operation</span>
-    </button>
+    <div class="actions-group">
+      <button type="button" class="btn btn-secondary btn-sm" on:click={handleRunInBackground} title="Continue working while processing runs in background">
+        <Minimize2 size={14} />
+        <span>Hide to Background</span>
+      </button>
+
+      <button type="button" class="btn btn-danger btn-sm" on:click={handleCancel}>
+        <XCircle size={14} />
+        <span>Cancel Operation</span>
+      </button>
+    </div>
   </div>
 
   <ProgressBar
@@ -121,5 +133,11 @@
   .text-sub {
     font-size: 12.5px;
     font-family: var(--font-mono);
+  }
+
+  .actions-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 </style>

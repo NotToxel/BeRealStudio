@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentView, isProcessing } from '$lib/stores';
+  import { currentView, isProcessing, progressState, activeFeature, activityHistory } from '$lib/stores';
   import type { ViewMode } from '$lib/types';
   import Home from 'lucide-svelte/icons/house';
   import Images from 'lucide-svelte/icons/images';
@@ -7,10 +7,9 @@
   import History from 'lucide-svelte/icons/history';
   import Settings from 'lucide-svelte/icons/settings';
   import Info from 'lucide-svelte/icons/info';
-  import { activityHistory } from '$lib/stores';
+  import Loader2 from 'lucide-svelte/icons/loader-circle';
 
   function navigate(mode: ViewMode) {
-    if ($isProcessing) return;
     currentView.set(mode);
   }
 </script>
@@ -23,7 +22,6 @@
         type="button"
         class="brand-btn"
         on:click={() => navigate('home')}
-        disabled={$isProcessing}
         title="Return to Home Dashboard"
       >
         <div class="logo-mark">
@@ -31,7 +29,7 @@
         </div>
         <div class="brand-text">
           <span class="brand-title">BeReal Studio</span>
-          <span class="brand-ver">v1.1.0</span>
+          <span class="brand-ver">v1.2.0</span>
         </div>
       </button>
     </div>
@@ -44,7 +42,6 @@
           class="core-nav-btn photos-btn"
           class:active={$currentView === 'toolkit-config'}
           on:click={() => navigate('toolkit-config')}
-          disabled={$isProcessing}
         >
           <Images size={15} />
           <span>Photos</span>
@@ -55,7 +52,6 @@
           class="core-nav-btn recap-btn"
           class:active={$currentView === 'recapper-config'}
           on:click={() => navigate('recapper-config')}
-          disabled={$isProcessing}
         >
           <Film size={15} />
           <span>Recap Video</span>
@@ -63,15 +59,30 @@
       </div>
     </div>
 
-    <!-- Zone 3 (Right): Auxiliary Navigation -->
+    <!-- Zone 3 (Right): Auxiliary Navigation & Background Queue Pill -->
     <div class="nav-zone-right">
+      {#if $isProcessing}
+        <button
+          type="button"
+          class="bg-queue-pill"
+          class:active={$currentView === 'processing'}
+          on:click={() => currentView.set('processing')}
+          title="Background task in progress — Click to view live operation"
+        >
+          <Loader2 size={13} class="animate-spin text-amber-400" />
+          <div class="queue-text">
+            <span class="queue-stage">{$progressState.stage || 'Processing'}</span>
+            <span class="queue-pct font-mono">{$progressState.percentage.toFixed(2)}%</span>
+          </div>
+        </button>
+      {/if}
+
       <div class="aux-nav-group">
         <button
           type="button"
           class="aux-nav-item"
           class:active={$currentView === 'home'}
           on:click={() => navigate('home')}
-          disabled={$isProcessing}
           title="Home"
         >
           <Home size={15} />
@@ -83,7 +94,6 @@
           class="aux-nav-item"
           class:active={$currentView === 'activity'}
           on:click={() => navigate('activity')}
-          disabled={$isProcessing}
           title="Activity & History"
         >
           <History size={15} />
@@ -98,7 +108,6 @@
           class="aux-nav-item"
           class:active={$currentView === 'settings'}
           on:click={() => navigate('settings')}
-          disabled={$isProcessing}
           title="Settings"
         >
           <Settings size={15} />
@@ -110,7 +119,6 @@
           class="aux-nav-item"
           class:active={$currentView === 'about'}
           on:click={() => navigate('about')}
-          disabled={$isProcessing}
           title="About & Privacy"
         >
           <Info size={15} />
@@ -263,6 +271,64 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .bg-queue-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: var(--radius-full);
+    color: #fbbf24;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    animation: queuePulse 2s infinite ease-in-out;
+  }
+
+  .bg-queue-pill:hover {
+    background: rgba(245, 158, 11, 0.22);
+    border-color: rgba(245, 158, 11, 0.7);
+    transform: translateY(-1px);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+  }
+
+  .bg-queue-pill.active {
+    background: rgba(245, 158, 11, 0.28);
+    border-color: #f59e0b;
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+  }
+
+  .queue-text {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    line-height: 1;
+  }
+
+  .queue-stage {
+    font-weight: 500;
+    color: #fef08a;
+  }
+
+  .queue-pct {
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  @keyframes queuePulse {
+    0%, 100% {
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+    50% {
+      border-color: rgba(245, 158, 11, 0.8);
+    }
   }
 
   .aux-nav-group {

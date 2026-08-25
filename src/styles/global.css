@@ -121,6 +121,10 @@ button, input, select, textarea {
   color: inherit;
 }
 
+input, select, textarea, pre, code {
+  user-select: text;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 8px;

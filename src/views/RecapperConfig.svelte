@@ -22,6 +22,10 @@
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Calendar from 'lucide-svelte/icons/calendar';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import Cloud from 'lucide-svelte/icons/cloud';
+  import Database from 'lucide-svelte/icons/database';
   import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
   import FontPicker from '$components/FontPicker.svelte';
@@ -212,7 +216,6 @@
     </button>
     <div class="header-titles">
       <h1 class="title-md font-bold">Recap Video Generator</h1>
-      <span class="badge badge-violet">9:16 Video</span>
     </div>
   </div>
 
@@ -289,10 +292,9 @@
             unit="px"
             presets={[
               { label: 'Off', value: 0 },
-              { label: 'Subtle', value: 4 },
-              { label: 'Medium', value: 10 },
-              { label: 'Strong', value: 20 },
-              { label: 'Heavy', value: 30 },
+              { label: 'Low', value: 4 },
+              { label: 'Med', value: 12 },
+              { label: 'High', value: 24 },
             ]}
             accentColor="violet"
           />
@@ -304,6 +306,9 @@
         <div class="overlay-section">
           <Toggle
             label="Display Date Stamp"
+            description="Overlays formatted capture timestamp onto recap slides"
+            tooltip="Renders the authentic post capture date with custom typography on each photo frame."
+            icon={Calendar}
             bind:checked={$recapperConfig.dateEnabled}
             accentColor="violet"
           />
@@ -351,32 +356,49 @@
                 </div>
               </div>
 
-              <div class="options-grid">
-                <div class="field-group">
-                  <label for="date-fmt-input" class="label">Custom Pattern</label>
-                  <input
-                    id="date-fmt-input"
-                    type="text"
-                    class="input-text font-mono"
-                    bind:this={customPatternInput}
-                    bind:value={$recapperConfig.dateFormat}
-                    placeholder="%d %B %Y"
-                  />
-                  <div class="token-preview">
-                    <Sparkles size={11} class="text-purple-400" />
-                    <span>Preview: </span>
-                    <strong class="text-purple-300 font-mono">{formatSampleDate($recapperConfig.dateFormat)}</strong>
-                  </div>
+              <div class="field-group">
+                <label for="date-fmt-input" class="label">Custom Pattern</label>
+                <input
+                  id="date-fmt-input"
+                  type="text"
+                  class="input-text font-mono"
+                  bind:this={customPatternInput}
+                  bind:value={$recapperConfig.dateFormat}
+                  placeholder="%d %B %Y"
+                />
+                <div class="token-preview">
+                  <Sparkles size={11} class="text-purple-400" />
+                  <span>Preview: </span>
+                  <strong class="text-purple-300 font-mono">{formatSampleDate($recapperConfig.dateFormat)}</strong>
                 </div>
+              </div>
 
-                <div class="field-group">
-                  <label for="date-pos-select" class="label">Screen Position</label>
-                  <select id="date-pos-select" class="input-select" bind:value={$recapperConfig.datePosition}>
-                    <option value="BottomCenter">Bottom Center (Default)</option>
-                    <option value="BottomLeft">Bottom Left</option>
-                    <option value="BottomRight">Bottom Right</option>
-                    <option value="TopRight">Top Right</option>
-                  </select>
+              <!-- Visual Screen Position Selector -->
+              <div class="field-group">
+                <span class="label">Screen Position</span>
+                <div class="pos-visual-grid">
+                  {#each [
+                    { id: 'BottomCenter', label: 'Bottom Center', desc: 'Default baseline' },
+                    { id: 'BottomLeft', label: 'Bottom Left', desc: 'Lower-left' },
+                    { id: 'BottomRight', label: 'Bottom Right', desc: 'Lower-right' },
+                    { id: 'TopRight', label: 'Top Right', desc: 'Header angle' },
+                  ] as pos}
+                    <button
+                      type="button"
+                      class="pos-card-btn"
+                      class:active={$recapperConfig.datePosition === pos.id}
+                      on:click={() => ($recapperConfig.datePosition = pos.id)}
+                    >
+                      <div class="pos-mini-screen">
+                        <div class="screen-pip-hint"></div>
+                        <div class="pos-screen-dot pos-dot-{pos.id.toLowerCase()}"></div>
+                      </div>
+                      <div class="pos-card-info">
+                        <span class="pos-card-title">{pos.label}</span>
+                        <span class="pos-card-desc">{pos.desc}</span>
+                      </div>
+                    </button>
+                  {/each}
                 </div>
               </div>
             </div>
@@ -389,28 +411,88 @@
         <div class="overlay-section">
           <Toggle
             label="Display Location"
+            description="Reverse geocodes GPS coordinates into readable city and country names"
+            tooltip="Looks up location coordinates from photo EXIF tags and displays formatted location text."
+            icon={MapPin}
             bind:checked={$recapperConfig.locationEnabled}
             accentColor="emerald"
           />
 
           {#if $recapperConfig.locationEnabled}
             <div class="sub-options-box">
-              <div class="options-grid">
-                <div class="field-group">
-                  <label for="geo-mode-select" class="label">Geocoding Service</label>
-                  <select id="geo-mode-select" class="input-select" bind:value={$recapperConfig.geocodingMode}>
-                    <option value="Online">Nominatim OpenStreetMap (Online)</option>
-                    <option value="Offline">Offline Reverse Geocoding DB</option>
-                  </select>
-                </div>
+              <!-- Visual Geocoding Engine Selector -->
+              <div class="field-group">
+                <span class="label">Geocoding Service Engine</span>
+                <div class="geo-service-grid">
+                  <button
+                    type="button"
+                    class="geo-service-btn"
+                    class:active={$recapperConfig.geocodingMode === 'Online'}
+                    on:click={() => ($recapperConfig.geocodingMode = 'Online')}
+                  >
+                    <div class="geo-icon-circle icon-cloud">
+                      <Cloud size={16} />
+                    </div>
+                    <div class="geo-btn-titles">
+                      <span class="geo-btn-title">Nominatim OpenStreetMap</span>
+                      <span class="geo-btn-sub">Global reverse geocoding API (Online)</span>
+                    </div>
+                  </button>
 
-                <div class="field-group align-center-toggle">
-                  <Toggle
-                    label="Place Location Above Date"
-                    checked={locationAboveDate}
-                    onChange={handleLocationPositionToggle}
-                    accentColor="cyan"
-                  />
+                  <button
+                    type="button"
+                    class="geo-service-btn"
+                    class:active={$recapperConfig.geocodingMode === 'Offline'}
+                    on:click={() => ($recapperConfig.geocodingMode = 'Offline')}
+                  >
+                    <div class="geo-icon-circle icon-db">
+                      <Database size={16} />
+                    </div>
+                    <div class="geo-btn-titles">
+                      <span class="geo-btn-title">Offline Reverse Database</span>
+                      <span class="geo-btn-sub">Local offline location database lookup</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <!-- Visual Stack Order Selector -->
+              <div class="field-group">
+                <span class="label">Location Stack Order</span>
+                <div class="stack-order-grid">
+                  <button
+                    type="button"
+                    class="stack-order-btn"
+                    class:active={$recapperConfig.locationPosition === 'BelowDate'}
+                    on:click={() => ($recapperConfig.locationPosition = 'BelowDate')}
+                  >
+                    <div class="stack-preview-box">
+                      <span class="stack-pill pill-date">25 August 2026</span>
+                      <span class="stack-pill pill-loc">📍 London, United Kingdom</span>
+                    </div>
+                    <div class="stack-btn-titles">
+                      <span class="stack-btn-title">Below Date (Default)</span>
+                      <span class="stack-btn-sub">Date on top, location underneath</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="stack-order-btn"
+                    class:active={$recapperConfig.locationPosition === 'AboveDate'}
+                    on:click={() => ($recapperConfig.locationPosition = 'AboveDate')}
+                  >
+                    <div class="stack-preview-box">
+                      <span class="stack-pill pill-loc">📍 London, United Kingdom</span>
+                      <span class="stack-pill pill-date">25 August 2026</span>
+                    </div>
+                    <div class="stack-btn-titles">
+                      <span class="stack-btn-title">Above Date</span>
+                      <span class="stack-btn-sub">Location on top, date underneath</span>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -520,19 +602,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Start Button -->
-      <div class="action-footer">
-        <button
-          type="button"
-          class="btn btn-accent-violet btn-lg"
-          class:btn-disabled-look={!isConfigValid}
-          on:click={handleStart}
-        >
-          <Play size={16} fill="currentColor" />
-          <span>Generate Recap Video &rarr;</span>
-        </button>
-      </div>
     </div>
 
     <!-- Right Column: Live Updating Preview Mockup -->
@@ -599,6 +668,19 @@
             </div>
           </div>
         </div>
+
+        <!-- Generate Video Action Button -->
+        <div class="action-footer preview-action-footer">
+          <button
+            type="button"
+            class="btn btn-accent-violet btn-lg w-full"
+            class:btn-disabled-look={!isConfigValid}
+            on:click={handleStart}
+          >
+            <Play size={16} fill="currentColor" />
+            <span>Generate Recap Video &rarr;</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -655,7 +737,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
-    align-items: center;
+    align-items: start;
   }
 
   .field-group {
@@ -913,6 +995,20 @@
     overflow-y: auto;
   }
 
+  .preview-action-footer {
+    display: flex;
+    width: 100%;
+    padding-top: 4px;
+  }
+
+  .preview-action-footer .w-full {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
   .preview-header {
     display: flex;
     justify-content: space-between;
@@ -1037,6 +1133,284 @@
   .live-location-text {
     font-weight: 500;
     opacity: 0.95;
+  }
+
+  /* Visual Screen Position Grid */
+  .pos-visual-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  @media (max-width: 600px) {
+    .pos-visual-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .pos-card-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: #09090d;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .pos-card-btn:hover {
+    background: #14141c;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .pos-card-btn.active {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.2);
+  }
+
+  .pos-mini-screen {
+    width: 32px;
+    height: 48px;
+    background: #181822;
+    border: 1.5px solid #2e2e3e;
+    border-radius: 4px;
+    position: relative;
+    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .screen-pip-hint {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 11px;
+    background: #3a3a4c;
+    border-radius: 2px;
+  }
+
+  .pos-screen-dot {
+    position: absolute;
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    background: #8b5cf6;
+    box-shadow: 0 0 6px #8b5cf6;
+  }
+
+  .pos-dot-bottomcenter {
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .pos-dot-bottomleft {
+    bottom: 4px;
+    left: 4px;
+    width: 10px;
+  }
+
+  .pos-dot-bottomright {
+    bottom: 4px;
+    right: 4px;
+    width: 10px;
+  }
+
+  .pos-dot-topright {
+    top: 4px;
+    right: 4px;
+    width: 10px;
+  }
+
+  .pos-card-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .pos-card-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: center;
+  }
+
+  .pos-card-desc {
+    font-size: 9.5px;
+    color: var(--text-muted);
+  }
+
+  /* Geocoding Service Grid */
+  .geo-service-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .geo-service-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .geo-service-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #09090d;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+  }
+
+  .geo-service-btn:hover {
+    background: #14141c;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .geo-service-btn.active {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: #10b981;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.15);
+  }
+
+  .geo-btn-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .geo-icon-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .icon-cloud {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  .icon-db {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+  }
+
+  .geo-btn-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .geo-btn-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .geo-btn-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Stack Order Grid */
+  .stack-order-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .stack-order-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stack-order-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #09090d;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+  }
+
+  .stack-order-btn:hover {
+    background: #14141c;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .stack-order-btn.active {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: #38bdf8;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
+  }
+
+  .stack-preview-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #161620;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+  }
+
+  .stack-pill {
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-align: center;
+  }
+
+  .pill-date {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    font-weight: 600;
+  }
+
+  .pill-loc {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    font-weight: 500;
+  }
+
+  .stack-btn-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stack-btn-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .stack-btn-sub {
+    font-size: 11px;
+    color: var(--text-muted);
   }
 
   /* Font Class Bindings */

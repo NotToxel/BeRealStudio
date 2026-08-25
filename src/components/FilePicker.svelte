@@ -68,7 +68,7 @@
         class:btn-missing={isMissing}
         on:click={() => handleBrowse(false)}
         {disabled}
-        title="Select BeReal .ZIP file"
+        title="Select BeReal .ZIP File"
       >
         <FileCode size={14} class="text-amber-400" />
         <span>ZIP</span>
@@ -79,7 +79,7 @@
         class:btn-missing={isMissing}
         on:click={() => handleBrowse(true)}
         {disabled}
-        title="Select unzipped BeReal export folder"
+        title="Select Unzipped BeReal Export Folder"
       >
         <FolderOpen size={14} class="text-sky-400" />
         <span>Folder</span>
