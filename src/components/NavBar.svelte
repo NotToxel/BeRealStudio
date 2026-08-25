@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { APP_DISPLAY_VERSION } from '$lib/version';
-  import { currentView, isProcessing, progressState, activeFeature, activityHistory, activeJobs } from '$lib/stores';
+  import { currentView, isProcessing, progressState, activeFeature, activityHistory, activeJobs, unreadActivityCount, currentArchive } from '$lib/stores';
+  import { isDev, loadAllDemoData, clearAllDemoData } from '$lib/devMode';
   import type { ViewMode } from '$lib/types';
   import Home from 'lucide-svelte/icons/house';
   import Images from 'lucide-svelte/icons/images';
@@ -10,13 +12,29 @@
   import Info from 'lucide-svelte/icons/info';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import FlaskConical from 'lucide-svelte/icons/flask-conical';
+
+  let showDevMenu = false;
 
   function navigate(mode: ViewMode) {
     currentView.set(mode);
   }
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (isDev && e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      if ($currentArchive) {
+        clearAllDemoData();
+      } else {
+        loadAllDemoData();
+      }
+    }
+  }
+
   $: runningJobs = $activeJobs.filter((j) => j.status === 'running');
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <header class="app-header">
   <div class="header-inner">
@@ -130,8 +148,8 @@
         >
           <History size={15} />
           <span class="aux-label">Activity</span>
-          {#if $activityHistory.length > 0}
-            <span class="nav-count-badge">{$activityHistory.length}</span>
+          {#if $unreadActivityCount > 0}
+            <span class="nav-count-badge">{$unreadActivityCount}</span>
           {/if}
         </button>
 
@@ -156,6 +174,25 @@
           <Info size={15} />
           <span class="aux-label">About</span>
         </button>
+
+        {#if isDev}
+          <button
+            type="button"
+            class="aux-nav-item dev-pill-btn"
+            class:active={$currentArchive !== null}
+            on:click={() => {
+              if ($currentArchive) {
+                clearAllDemoData();
+              } else {
+                loadAllDemoData();
+              }
+            }}
+            title="Dev Mode: Click or press Ctrl+Shift+D to inject/clear demo data"
+          >
+            <FlaskConical size={14} class="text-amber-400" />
+            <span class="aux-label font-mono">{$currentArchive ? 'Clear Demo' : 'Load Demo'}</span>
+          </button>
+        {/if}
       </div>
     </div>
   </div>
@@ -404,6 +441,23 @@
     font-size: 10px;
     font-family: var(--font-mono);
     font-weight: 700;
+  }
+
+  .dev-pill-btn {
+    border: 1px dashed rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+  }
+
+  .dev-pill-btn:hover {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.8);
+    color: #fbbf24;
+  }
+
+  .dev-pill-btn.active {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+    color: #ffffff;
   }
 
   .core-nav-btn:disabled,

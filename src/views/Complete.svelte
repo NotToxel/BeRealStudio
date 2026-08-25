@@ -9,7 +9,7 @@
     liveLogs,
     recordActivity,
   } from '$lib/stores';
-  import { exportDebugLog, openPath } from '$lib/tauri';
+  import { exportDebugLog, showInFolder } from '$lib/tauri';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
   import ExternalLink from 'lucide-svelte/icons/external-link';
@@ -43,7 +43,7 @@
     const out = $activeFeature === 'toolkit' ? $toolkitConfig.outputPath : $recapperConfig.outputPath;
     if (out) {
       try {
-        await openPath(out);
+        await showInFolder(out);
       } catch (e) {
         console.error('Failed to open output path:', e);
       }

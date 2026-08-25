@@ -18,6 +18,8 @@ export interface ActivityRecord {
   durationSecs: number;
   status: 'success' | 'warning' | 'error';
   itemCount: number;
+  memoriesCount?: number;
+  dateRange?: string;
   details?: string;
 }
 
@@ -206,6 +208,8 @@ export interface ActiveJob {
   inputPath: string;
   outputPath: string;
   startTime: number;
+  memoriesCount?: number;
+  dateRange?: string;
   stage: ProcessingStage;
   current: number;
   total: number;
@@ -240,4 +244,11 @@ export interface AppSettings {
   recapper: RecapperConfig;
   lastInputPath?: string;
   lastOutputPath?: string;
+}
+
+export interface AudioAnalysis {
+  duration: number;
+  sampleRate: number;
+  channels: number;
+  waveform: number[];
 }

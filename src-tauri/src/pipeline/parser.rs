@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
-    io::Read,
     path::{Path, PathBuf},
 };
 use zip::ZipArchive;
@@ -122,59 +121,50 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
         }
     };
 
-    // Read posts.json from zip
-    let mut posts_data = String::new();
-    if let Ok(mut entry) = archive.by_name(&posts_name) {
-        if let Err(e) = entry.read_to_string(&mut posts_data) {
-            validation_errors.push(format!("Failed to read 'posts.json' from ZIP: {}", e));
-        }
-    } else {
-        validation_errors.push("Failed to access 'posts.json' in ZIP archive.".to_string());
-    }
-
-    if !validation_errors.is_empty() {
-        return Ok(ArchiveInfo {
-            archive_type: "Zip".into(),
-            has_posts_json: true,
-            has_photos_dir,
-            has_user_json: user_entry_name.is_some(),
-            validation_errors,
-            warnings,
-            posts_json_path: posts_name,
-            media_base_path: zip_path.to_string_lossy().to_string(),
-            ..Default::default()
-        });
-    }
-
     // Parse user.json if present
     let has_user_json = user_entry_name.is_some();
     let mut user_name = None;
     let mut user_fullname = None;
     if let Some(ref user_name_entry) = user_entry_name {
-        if let Ok(mut entry) = archive.by_name(user_name_entry) {
-            let mut user_data = String::new();
-            if entry.read_to_string(&mut user_data).is_ok() {
-                if let Ok(user) = serde_json::from_str::<UserExportMeta>(&user_data) {
-                    user_name = user.username;
-                    user_fullname = user.fullname;
-                }
+        if let Ok(entry) = archive.by_name(user_name_entry) {
+            let reader = std::io::BufReader::new(entry);
+            if let Ok(user) = serde_json::from_reader::<_, UserExportMeta>(reader) {
+                user_name = user.username;
+                user_fullname = user.fullname;
             }
         }
     }
 
-    // Parse posts.json
-    let raw_posts: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&posts_data);
-    let raw_posts = match raw_posts {
-        Ok(p) => p,
+    // Stream parse posts.json directly from zip without loading full string into RAM
+    let raw_posts: Vec<serde_json::Value> = match archive.by_name(&posts_name) {
+        Ok(entry) => {
+            let reader = std::io::BufReader::with_capacity(128 * 1024, entry);
+            match serde_json::from_reader(reader) {
+                Ok(p) => p,
+                Err(e) => {
+                    return Ok(ArchiveInfo {
+                        archive_type: "Zip".into(),
+                        user_name: user_name.clone(),
+                        user_fullname,
+                        has_posts_json: true,
+                        has_photos_dir,
+                        has_user_json,
+                        validation_errors: vec![format!("'posts.json' in ZIP is not valid JSON or not an array: {}", e)],
+                        warnings,
+                        posts_json_path: posts_name,
+                        media_base_path: zip_path.to_string_lossy().to_string(),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
         Err(e) => {
             return Ok(ArchiveInfo {
                 archive_type: "Zip".into(),
-                user_name: user_name.clone(),
-                user_fullname,
                 has_posts_json: true,
                 has_photos_dir,
                 has_user_json,
-                validation_errors: vec![format!("'posts.json' is not valid JSON or not an array: {}", e)],
+                validation_errors: vec![format!("Failed to access 'posts.json' in ZIP: {}", e)],
                 warnings,
                 posts_json_path: posts_name,
                 media_base_path: zip_path.to_string_lossy().to_string(),

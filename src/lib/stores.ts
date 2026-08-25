@@ -65,6 +65,13 @@ export const defaultRecapperConfig: RecapperConfig = {
 // Navigation & Active Mode
 export const currentView = writable<ViewMode>('home');
 export const activeFeature = writable<'toolkit' | 'recapper'>('toolkit');
+export const unreadActivityCount = writable<number>(0);
+
+currentView.subscribe((view) => {
+  if (view === 'activity') {
+    unreadActivityCount.set(0);
+  }
+});
 
 // Config Stores
 export const toolkitConfig = writable<ToolkitConfig>({ ...defaultToolkitConfig });
@@ -93,12 +100,30 @@ export const processingResult = writable<ProcessingResult | null>(null);
 // ─── Parallel Multi-Job Active Queue ─────────────────────────────────────────
 export const activeJobs = writable<ActiveJob[]>([]);
 
+export function disambiguateOutputPath(basePath: string, activeJobsList: ActiveJob[]): string {
+  if (!basePath) return basePath;
+  const runningPaths = new Set(
+    activeJobsList
+      .filter((j) => j.status === 'running')
+      .map((j) => j.outputPath.replace(/\\/g, '/'))
+  );
+  let candidate = basePath;
+  let counter = 1;
+  while (runningPaths.has(candidate.replace(/\\/g, '/'))) {
+    candidate = `${basePath}_${counter}`;
+    counter++;
+  }
+  return candidate;
+}
+
 export function createActiveJob(
   params: {
     type: 'toolkit' | 'recapper';
     title: string;
     inputPath: string;
     outputPath: string;
+    memoriesCount?: number;
+    dateRange?: string;
   }
 ): ActiveJob {
   const newJob: ActiveJob = {
@@ -107,16 +132,19 @@ export function createActiveJob(
     title: params.title,
     inputPath: params.inputPath,
     outputPath: params.outputPath,
+    memoriesCount: params.memoriesCount,
+    dateRange: params.dateRange,
     startTime: Date.now(),
     stage: 'Scanning',
     current: 0,
-    total: 0,
+    total: params.memoriesCount || 0,
     percentage: 0,
     status: 'running',
     logs: [],
   };
 
   activeJobs.update((list) => [newJob, ...list]);
+  unreadActivityCount.update((n) => n + 1);
   return newJob;
 }
 
@@ -243,6 +271,7 @@ export function recordActivity(entry: Omit<ActivityRecord, 'id' | 'timestamp'>) 
     timestamp: new Date().toISOString(),
   };
   activityHistory.update((list) => [newRecord, ...list.slice(0, 49)]);
+  unreadActivityCount.update((n) => n + 1);
 }
 
 export function clearActivityHistory() {

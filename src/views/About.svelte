@@ -1,5 +1,6 @@
 <script lang="ts">
   import { APP_VERSION } from '$lib/version';
+  import { openUrl } from '$lib/tauri';
   import ShieldCheck from 'lucide-svelte/icons/shield-check';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Layers from 'lucide-svelte/icons/layers';
@@ -7,6 +8,18 @@
   import Award from 'lucide-svelte/icons/award';
   import ExternalLink from 'lucide-svelte/icons/external-link';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Star from 'lucide-svelte/icons/star';
+  import Bug from 'lucide-svelte/icons/bug';
+  import Heart from 'lucide-svelte/icons/heart';
+  import Code2 from 'lucide-svelte/icons/code-xml';
+
+  function openLink(url: string) {
+    try {
+      openUrl(url);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }
 </script>
 
 <div class="about-view">
@@ -23,6 +36,51 @@
   </div>
 
   <div class="sections-list">
+    <!-- 0. Author & Official Repository Card -->
+    <div class="card section-card author-highlight-card">
+      <div class="author-card-header">
+        <div class="author-info-left">
+          <div class="repo-badge-icon">
+            <svg class="github-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+          </div>
+          <div class="author-text">
+            <div class="repo-name-row">
+              <strong class="text-white text-sm font-bold">NotToxel / BeRealStudio</strong>
+              <span class="badge badge-yellow text-xs font-mono">v{APP_VERSION}</span>
+            </div>
+            <p class="text-secondary text-xs mt-0.5">
+              Authored &amp; maintained by <button type="button" class="author-inline-link" on:click={() => openLink('https://github.com/NotToxel')}>NotToxel</button> &bull; MIT Licensed
+            </p>
+          </div>
+        </div>
+
+        <div class="author-actions">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            on:click={() => openLink('https://github.com/NotToxel/BeRealStudio')}
+            title="Open Repository on GitHub"
+          >
+            <Star size={13} class="text-amber-400" />
+            <span>Star on GitHub</span>
+            <ExternalLink size={11} class="text-secondary" />
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            on:click={() => openLink('https://github.com/NotToxel/BeRealStudio/issues')}
+            title="Open Issue Tracker"
+          >
+            <Bug size={13} class="text-rose-400" />
+            <span>Report Issue</span>
+            <ExternalLink size={11} class="text-secondary" />
+          </button>
+        </div>
+      </div>
+    </div>
     <!-- 1. Privacy & Architecture -->
     <div class="card section-card">
       <div class="card-title-row">
@@ -206,6 +264,67 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .author-highlight-card {
+    background: linear-gradient(135deg, rgba(255, 230, 0, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%), #111116;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .author-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .author-info-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .repo-badge-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: #181822;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffe600;
+    flex-shrink: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .repo-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .author-inline-link {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #ffe600;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .author-inline-link:hover {
+    color: #fff266;
+  }
+
+  .author-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .card-title-row {

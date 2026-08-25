@@ -139,76 +139,72 @@ async fn run_recapper(
         }
     }
 
-    // ── Step 5: Render frames ─────────────────────────────────────────────────
-    emitter.info("Rendering frames...");
-    emitter.emit_progress(&ProgressEvent {
-        job_id: None,
-        stage: ProcessingStage::RenderingFrames,
-        current: 0,
-        total,
-        percentage: 20.0,
-        current_file: None,
-    });
-
-    let mut rendered_frames: Vec<(image::RgbImage, f64)> = Vec::with_capacity(total);
-
-    for (i, (img_path, duration)) in image_paths.iter().zip(durations.iter()).enumerate() {
-        if emitter.is_aborted() { break; }
-
-        // Get date string from filename or EXIF
-        let date_str = if config.date_enabled {
-            extract_date_from_filename(img_path)
-                .map(|dt| dt.format(&config.date_format).to_string())
-                .unwrap_or_default()
-        } else {
-            String::new()
-        };
-
-        let loc_str = &location_strings[i];
-
-        match frame_renderer::render_frame(img_path, &config, &date_str, loc_str) {
-            Ok(frame) => rendered_frames.push((frame, *duration)),
-            Err(e) => emitter.warn(format!("Frame render error for {}: {}", img_path.display(), e)),
-        }
-
-        let pct = 20.0 + (i as f32 / total as f32) * 50.0;
-        emitter.emit_progress(&ProgressEvent {
-        job_id: None,
-            stage: ProcessingStage::RenderingFrames,
-            current: i + 1,
-            total,
-            percentage: pct,
-            current_file: img_path.file_name().map(|n| n.to_string_lossy().to_string()),
-        });
-    }
-
-    if emitter.is_aborted() {
-        emitter.warn("Recapper cancelled.");
-        return Ok(make_result(total, &config.output_path, start.elapsed().as_secs_f64()));
-    }
-
-    // ── Step 6: Encode video ──────────────────────────────────────────────────
-    emitter.info("Encoding video...");
+    // ── Step 5 & 6: Zero-Copy Streaming Frame Rendering & FFmpeg Pipe ────────
+    emitter.info("Rendering frames and streaming directly to FFmpeg video encoder...");
     let out_path = Path::new(&config.output_path);
     if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    let n_frames = rendered_frames.len();
-    video_encoder::encode_slideshow(
-        &rendered_frames,
+    let fps = config.fps;
+    let total_video_frames: u64 = durations
+        .iter()
+        .map(|dur| (dur * fps as f64).round() as u64)
+        .sum();
+
+    let mut current_idx = 0usize;
+    let config_clone = config.clone();
+    let emitter_clone = emitter.clone();
+
+    video_encoder::encode_slideshow_streaming(
+        total_video_frames,
+        || {
+            if emitter_clone.is_aborted() || current_idx >= total {
+                return Ok(None);
+            }
+
+            let i = current_idx;
+            current_idx += 1;
+            let img_path = &image_paths[i];
+            let duration = durations[i];
+
+            let date_str = if config_clone.date_enabled {
+                extract_date_from_filename(img_path)
+                    .map(|dt| dt.format(&config_clone.date_format).to_string())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+
+            let loc_str = &location_strings[i];
+
+            match frame_renderer::render_frame(img_path, &config_clone, &date_str, loc_str) {
+                Ok(frame) => {
+                    let progress_pct = 20.0 + (i as f32 / total as f32) * 78.0;
+                    emitter_clone.emit_progress(&ProgressEvent {
+                        job_id: None,
+                        stage: ProcessingStage::RenderingFrames,
+                        current: i + 1,
+                        total,
+                        percentage: progress_pct,
+                        current_file: img_path.file_name().map(|n| n.to_string_lossy().to_string()),
+                    });
+                    Ok(Some((frame, duration)))
+                }
+                Err(e) => {
+                    emitter_clone.warn(format!("Frame render error for {}: {}", img_path.display(), e));
+                    // Fallback to empty/black frame to keep audio sync
+                    let (w, h) = config_clone.resolution;
+                    let blank = image::RgbImage::new(w, h);
+                    Ok(Some((blank, duration)))
+                }
+            }
+        },
         Path::new(&config.music_path),
         out_path,
         &config,
-        |pct| {
-            let _ = emitter.emit_progress(&ProgressEvent {
-                job_id: None,
-                stage: ProcessingStage::EncodingVideo,
-                current: (pct * n_frames as f32) as usize,
-                total: n_frames,
-                percentage: 70.0 + pct * 29.0,
-                current_file: None,
-            });
+        |_pct| {
+            // Streaming progress is emitted per frame batch
         },
     )?;
 

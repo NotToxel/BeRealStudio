@@ -1,25 +1,55 @@
 # BeReal Studio 📸 🎬
 
-**BeReal Studio** is a unified, high-performance, cross-platform desktop application built with **Tauri v2 (Rust)** and **Svelte** to import, process, fix metadata on, composite, and recap your personal BeReal GDPR data exports.
+<div align="center">
+  <h3>Unified, Local-First Desktop Suite for BeReal GDPR Data Exports</h3>
+  <p>Restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
+  <p>
+    <a href="https://github.com/NotToxel/BeRealStudio"><img src="https://img.shields.io/badge/GitHub-NotToxel%2FBeRealStudio-yellow?style=flat&logo=github" alt="GitHub Repo" /></a>
+    <img src="https://img.shields.io/badge/Version-1.4.0-blue?style=flat" alt="Version" />
+    <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
+    <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat" alt="Cross Platform" />
+  </p>
+</div>
 
 ---
 
-## Key Features
+## ⚡ Key Highlights & Features
 
 ### 📸 Photo Processing Suite
-- **Metadata Restoration & EXIF Synchronization:** Automatically reads `posts.json` timestamps and GPS coordinates, embedding `DateTimeOriginal`, `GPSLatitude`, `GPSLongitude`, and caption descriptions into EXIF/IPTC image headers without lossy re-encoding.
-- **Picture-in-Picture & Dual-Camera Compositing:** Recreates BeReal's authentic in-app look with rounded corners (60px radius) and crisp black borders (7px) overlaid at `(55, 55)`, with optional Side-by-Side and Reversed (secondary as background) layouts.
-- **Samsung / Google Motion Photos:** Muxes BTS (Behind-the-Scenes) video into standard JPEG containers via pure Rust binary tag generation (`SEFH`/`SEFT`) and GCamera XMP injection.
+- **Metadata Restoration & EXIF Synchronization:** Reads `posts.json` timestamps and GPS coordinates, embedding `DateTimeOriginal`, `GPSLatitude`, `GPSLongitude`, and caption descriptions into EXIF/IPTC image headers without lossy re-encoding.
+- **Picture-in-Picture & Dual-Camera Compositing:** Recreates BeReal's authentic in-app look with smooth rounded corners (60px radius) and crisp black borders (7px) overlaid at `(55, 55)`, with optional Side-by-Side and Reversed (secondary as background) layouts.
+- **Reverse-Angled Dual Camera Export:** 3-way perspective selector lets you export **Standard Only**, **Reversed Only** (selfie as full-bleed canvas with landscape lens inset), or **Both Angles** concurrently.
+- **Samsung & Google Motion Photos:** Muxes BTS (Behind-the-Scenes) video into standard JPEG containers via pure Rust binary tag generation (`SEFH`/`SEFT`) and GCamera XMP injection.
 - **Format Flexibility:** Convert to JPEG (with quality control 50–100%), preserve WebP, or export to lossless PNG.
-- **Date Range Filtering:** Visual monthly density histogram with quick presets (Last 30 Days, 6 Months, 1 Year, All Time) to filter specific batches.
-- **Parallel Processing:** Multi-threaded throughput powered by **Rayon**, delivering 5–10× speedups over sequential scripts.
+- **Visual Date Range Filter:** Interactive monthly density curve histogram with range sliders to select and batch-process specific periods.
+- **Multi-Core Rayon Concurrency:** Parallel image conversion and compositing utilizing all available CPU threads for 5–10× throughput gains.
 
-### 🎬 BeReal Recapper Video Generator
-- **Music Synchronization:** Decodes audio tracks (MP3, WAV, M4A, FLAC, OGG) using **Symphonia** to accurately pace image transitions.
-- **Speed Transitions:** Quadratic speed curve ramp (slower start and finale, fast middle) or even pacing with configurable start/end padding.
-- **Reverse Geocoding & Rules Engine:** Resolves GPS coordinates to city, neighborhood, or state via OpenStreetMap's Nominatim API (with in-memory cache) or optional offline datasets, with a configurable country-by-country formatting engine.
+### 🎬 Recap Video Generator
+- **Zero-Copy Frame Streaming:** Renders frames directly to raw RGB buffers piped directly into FFmpeg `stdin`, keeping peak memory usage at ~30MB even for large 4K video exports.
+- **Symphonia Audio Decoding & Waveform Visualization:** Pure Rust multi-format audio decoding (MP3, WAV, M4A, AAC, FLAC, OGG) with real-time 100+ bin peak amplitude waveform visualization.
+- **Dynamic Timing Curves:** Quadratic ramp (slower opening and finale, dynamic middle), even pacing, accelerate, decelerate, or rhythmic wave pacing.
+- **Offline & Online Geocoding Engine:** Resolves coordinates using Nominatim API or 3 downloadable offline GeoNames tiers (Lite 25k cities, Standard 55k towns, Ultra Detailed 140k+ villages) with configurable country formatting rules.
 - **Custom Visual Overlays:** System font enumeration, customizable date stamps, text shadow effects, and multiple resolution presets (9:16 vertical, 1080p, 4K).
-- **Direct FFmpeg Pipe:** Pure Rust frame rendering streamed directly into FFmpeg's `stdin` for fast H.264/AAC MP4 video generation.
+
+### ⚡ Architecture & Efficiency
+- **Streaming ZIP Parser:** Extracts and parses massive multi-gigabyte BeReal GDPR archives with buffered streams, scanning 120+ posts in under 20ms.
+- **Multi-Job Parallel Queue:** Run photo batch exports and video renders simultaneously in the background without UI blocking.
+- **Native File Explorer Integration:** Cross-platform `show_in_folder` command accurately reveals output files and folders in Windows Explorer, macOS Finder, or Linux file managers.
+- **Developer Demo Mode:** Press `Ctrl+Shift+D` or toggle **Dev Mode** in development to instantly hydrate mock GDPR archives, parallel jobs, waveforms, and activity history for rapid UI testing.
+
+---
+
+## 📊 Performance Benchmarks
+
+Automated end-to-end integration benchmarks measured with synthetic BeReal GDPR archives (`cargo test --test benchmark_suite`):
+
+| Operation | Scale / Dataset | Measured Throughput | Peak RAM |
+|:---|:---|:---|:---|
+| **Archive Scan & JSON Parse** | 50 Posts | `17.13 ms` ⚡ | < 10 MB |
+| **Large Archive Scan & Histogram** | 120 Posts (Full Year) | `19.97 ms` ⚡ | < 12 MB |
+| **Side-by-Side Compositing** | 1080p Dual Lenses | `139.94 ms / image` | ~25 MB |
+| **Picture-in-Picture Compositing** | 1080p + 60px Radius Lens | `359.21 ms / image` | ~30 MB |
+| **Zero-Copy Recap Video Stream** | 1080x1920 @ 30 FPS (H.264) | `~45 FPS direct pipe` | **~30 MB (Flat)** |
 
 ---
 
@@ -37,13 +67,14 @@
 ---
 
 ## 🛠️ Prerequisites
- 
+
 1. **Rust Toolchain:**
    - Install via [rustup.rs](https://rustup.rs) (Rust 1.78+ recommended).
-2. **Bun (Fast All-in-One JavaScript Runtime & Package Manager):**
-   - Install via `powershell -c "irm bun.sh/install.ps1 | iex"` or [bun.sh](https://bun.sh).
-3. **FFmpeg (For Video Features):**
-   - Required for video PIP combining and Recap slideshow rendering.
+2. **Package Manager & JavaScript Runtime:**
+   - **Bun (Recommended for ultra-fast startup):** Install via [bun.sh](https://bun.sh) (`powershell -c "irm bun.sh/install.ps1 | iex"`).
+   - **NPM / PNPM / Yarn (Fully Supported):** Standard Node.js v18+ environment works out-of-the-box.
+3. **FFmpeg (For Recap Video & Motion Photos):**
+   - Required for video slideshow encoding and dual-video PIP overlays.
    - **Windows:** `winget install Gyan.FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org/download.html).
    - **macOS:** `brew install ffmpeg`
    - **Linux:** `sudo apt install ffmpeg`
@@ -52,14 +83,23 @@
 
 ## 🚀 Running Locally
 
-```bash
-# Navigate to project directory
-cd bereal-studio
+You can use **Bun** (recommended) or **NPM / PNPM / Yarn**:
 
+### Option A: Using Bun (Fastest)
+```bash
+# Install dependencies
+bun install
+
+# Start local desktop development server
+bun run tauri dev
+```
+
+### Option B: Using NPM
+```bash
 # Install dependencies
 npm install
 
-# Run frontend + Tauri desktop app in dev mode
+# Start local desktop development server
 npm run tauri dev
 ```
 
@@ -67,88 +107,115 @@ npm run tauri dev
 
 ## 📦 Building & Packaging
 
-To compile a self-contained release executable and installer for your current operating system:
+To compile a self-contained release executable and installer for your operating system:
 
 ```bash
-# Build production bundle
+# With Bun
+bun run tauri build
+
+# With NPM
 npm run tauri build
 ```
 
 ### Build Artifact Locations:
-- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_0.1.0_x64_en-US.msi`
-- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_0.1.0_x64.dmg`
-- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_0.1.0_amd64.deb` or `appimage`
+- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_1.3.1_x64_en-US.msi`
+- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_1.3.1_x64.dmg`
+- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_1.3.1_amd64.deb` or `appimage`
+
+---
+
+## 🧪 Testing & Verification
+
+```bash
+# Run Svelte & TypeScript type checks
+bun run check
+# or: npm run check
+
+# Run Rust unit tests and benchmark suite
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
 ---
 
 ## 🏗️ Project Architecture
 
 ```
-bereal-studio/
+BeRealStudio/
+├── src/                                    # Frontend (Svelte 5 + SvelteKit SPA + TypeScript)
+│   ├── app.html                            # Root HTML & Inter typography
+│   ├── styles/global.css                   # Custom dark design system tokens
+│   ├── lib/
+│   │   ├── types.ts                        # TypeScript data models & IPC interfaces
+│   │   ├── tauri.ts                        # Typed Tauri IPC bridge & event subscribers
+│   │   ├── stores.ts                       # Reactive stores & parallel multi-job queue
+│   │   ├── devMode.ts                      # Demo data generator & developer mode
+│   │   └── fonts.ts                        # Curated built-in font definitions
+│   ├── components/                         # Reusable UI Components
+│   │   ├── NavBar.svelte                   # Global top navigation with Activity badge
+│   │   ├── Toggle.svelte                   # Animated on/off switch
+│   │   ├── Slider.svelte                   # Value range slider with value pill
+│   │   ├── Stepper.svelte                  # Numeric stepper input
+│   │   ├── FilePicker.svelte               # Native folder & file dialog wrapper
+│   │   ├── DateRangePicker.svelte          # Dual date pickers with monthly density curve
+│   │   ├── SpeedCurvePreview.svelte        # Visual speed curve & audio waveform canvas
+│   │   ├── Modal.svelte                    # Accessible modal dialog
+│   │   ├── LogConsole.svelte               # Color-coded live terminal console
+│   │   ├── ErrorModal.svelte               # Categorized error overlay
+│   │   └── RuleEditor.svelte               # Reverse geocoding rules editor
+│   ├── views/                              # Application Primary Views
+│   │   ├── Home.svelte                     # Main dashboard with hero & feature cards
+│   │   ├── ToolkitConfig.svelte            # Photo processing configuration view
+│   │   ├── RecapperConfig.svelte           # Recap video configuration view with 9:16 preview
+│   │   ├── Activity.svelte                 # Parallel active operations & generation history
+│   │   ├── Processing.svelte               # Real-time progress & live streaming log view
+│   │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
+│   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & offline GeoDB
+│   │   └── About.svelte                    # Privacy manifesto, authoring & open source credits
+│   └── routes/+page.svelte                 # SPA root page router
+│
 ├── src-tauri/                              # Rust Backend (Tauri v2)
 │   ├── Cargo.toml                          # Native dependencies (image, img-parts, symphonia, rayon, etc.)
-│   ├── tauri.conf.json                     # Tauri configuration & capabilities
+│   ├── tauri.conf.json                     # Desktop window & plugin configuration
+│   ├── capabilities/default.json           # Tauri v2 security capabilities
+│   ├── tests/
+│   │   └── benchmark_suite.rs              # End-to-end performance benchmarking harness
 │   └── src/
-│       ├── main.rs                         # Desktop binary entry
-│       ├── lib.rs                          # Tauri builder & IPC command registration
-│       ├── state.rs                        # Global app state & live ProgressEmitter
+│       ├── main.rs & lib.rs                # Tauri entry & command registration
+│       ├── state.rs                        # Global state, ProgressEmitter & log buffer
 │       ├── commands/                       # IPC Command Handlers
-│       │   ├── archive.rs                  # scan_archive, extract_zip
-│       │   ├── toolkit.rs                  # start_toolkit, cancel_toolkit
+│       │   ├── archive.rs                  # scan_archive, extract_zip (streaming)
+│       │   ├── toolkit.rs                  # start_toolkit, cancel_toolkit (Rayon multi-core)
 │       │   ├── recapper.rs                 # start_recapper, cancel_recapper
-│       │   ├── settings.rs                 # load_settings, save_settings
-│       │   ├── system.rs                   # check_ffmpeg, list_system_fonts
+│       │   ├── settings.rs                 # load_settings, save_settings, reset_settings
+│       │   ├── system.rs                   # show_in_folder, check_ffmpeg, offline geodb, analyze_audio
 │       │   └── debug.rs                    # export_debug_log, get_debug_logs
-│       ├── pipeline/                       # Photo Processing Engine
-│       │   ├── parser.rs                   # posts.json parsing & histogram computation
-│       │   ├── image_ops.rs                # WebP/JPEG/PNG conversion & PIP/SbS compositing
-│       │   ├── exif_writer.rs              # Zero-copy EXIF & IPTC JPEG segment writing
-│       │   ├── motion_photo.rs             # Samsung SEFH/SEFT binary muxer & XMP injection
+│       ├── pipeline/                       # Photo Processing Logic
+│       │   ├── parser.rs                   # Streaming JSON parsing & monthly histogram
+│       │   ├── image_ops.rs                # Format conversion, PIP & Side-by-Side compositing
+│       │   ├── exif_writer.rs              # Lossless EXIF & IPTC JPEG segment injection
+│       │   ├── motion_photo.rs             # Samsung SEFH/SEFT binary muxer & GCamera XMP
 │       │   ├── video_ops.rs                # FFmpeg dual-video PIP overlay
 │       │   ├── date_filter.rs              # Range filtering & density distribution
 │       │   └── cleanup.rs                  # Intermediate artifact cleanup
 │       └── recapper/                       # Recap Video Engine
-│           ├── audio.rs                    # Symphonia audio decoding & duration
+│           ├── audio.rs                    # Symphonia audio decoding & waveform analysis
 │           ├── timing.rs                   # Quadratic ramp / even timing curves
-│           ├── geocoder.rs                 # Nominatim reverse geocoding with cache
+│           ├── geocoder.rs                 # Nominatim reverse geocoding & offline GeoDB
 │           ├── location_rules.rs           # Country-specific location formatting engine
-│           ├── font_resolver.rs            # Cross-platform system font enumeration
+│           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
-│           └── video_encoder.rs            # Raw RGB frame piping to FFmpeg stdin
+│           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
 │
-└── src/                                    # Frontend (SvelteKit SPA + TypeScript)
-    ├── app.html                            # Root HTML & Inter font loading
-    ├── styles/global.css                   # Custom dark design system
-    ├── lib/
-    │   ├── types.ts                        # TypeScript interfaces
-    │   ├── tauri.ts                        # Tauri IPC bridge & typed event listeners
-    │   └── stores.ts                       # Svelte reactive stores
-    ├── components/
-    │   ├── Toggle.svelte                   # Clean on/off switch
-    │   ├── Slider.svelte                   # Value range slider
-    │   ├── FilePicker.svelte               # Native folder & file dialog wrapper
-    │   ├── DateRangePicker.svelte          # Dual date pickers with monthly density histogram
-    │   ├── ProgressBar.svelte              # Streaming progress indicator
-    │   ├── LogConsole.svelte               # Color-coded live terminal log
-    │   ├── ErrorModal.svelte               # Categorized error overlay
-    │   ├── FontPicker.svelte               # System font selector
-    │   └── RuleEditor.svelte               # Geocoded location rules editor
-    ├── views/
-    │   ├── Home.svelte                     # Main dashboard with dual feature cards
-    │   ├── ToolkitConfig.svelte            # Photo processing configuration view
-    │   ├── RecapperConfig.svelte           # Recap video configuration view with live preview
-    │   ├── Processing.svelte               # Real-time progress & live streaming log view
-    │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
-    │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & log clearing
-    │   └── About.svelte                    # Privacy manifesto, GDPR guide & open-source credits
-    └── routes/+page.svelte                 # Router & persistent settings manager
+└── package.json                            # App manifest & dependencies (v1.4.0)
 ```
 
 ---
 
 ## 💖 Credits & Open Source Lineage
 
-BeReal Studio unifies and modernizes the core capabilities of two popular open-source projects into a single, high-performance desktop application:
+**BeReal Studio** is authored and maintained by **[NotToxel](https://github.com/NotToxel)** ([GitHub Repository](https://github.com/NotToxel/BeRealStudio)).
+
+It unifies, rewrites, and modernizes the core capabilities of two pioneer open-source projects into a single, high-performance desktop application:
 
 - **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator and reverse-geocoding rules engine.
 - **[BeReal-GDPR-Photo-Toolkit](https://github.com/hatobi/bereal-gdpr-photo-toolkit)** *(by [@hatobi](https://github.com/hatobi))* — Pioneer of BeReal GDPR archive extraction, EXIF metadata restoration, and Picture-in-Picture photo compositing.
@@ -157,4 +224,4 @@ BeReal Studio unifies and modernizes the core capabilities of two popular open-s
 
 ## 📜 License
 
-MIT License &copy; 2026 BeReal Studio Contributors. Free and open-source.
+MIT License &copy; 2026 NotToxel and BeReal Studio Contributors. Free and open-source.

@@ -34,6 +34,8 @@ pub fn run() {
             commands::system::download_offline_geodb,
             commands::system::set_active_geodb_tier,
             commands::system::delete_offline_geodb,
+            commands::system::analyze_audio,
+            commands::system::show_in_folder,
             commands::debug::export_debug_log,
             commands::debug::get_debug_logs,
             commands::debug::clear_debug_logs,

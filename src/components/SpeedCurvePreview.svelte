@@ -7,6 +7,7 @@
   export let count: number = 15;
   export let startPadding: number = 0;
   export let endPadding: number = 0;
+  export let waveform: number[] | undefined = undefined;
 
   // ─── Curve math (mirrors timing.rs exactly) ──────────────────────────────────
 
@@ -178,6 +179,18 @@
     </div>
 
     <div class="timeline-track">
+      <!-- Background Audio Waveform Layer -->
+      {#if waveform && waveform.length > 0}
+        <div class="audio-waveform-layer" title="Live audio waveform envelope">
+          {#each waveform as peak}
+            <div
+              class="waveform-bar"
+              style="height: {Math.max(peak * 24, 2)}px;"
+            ></div>
+          {/each}
+        </div>
+      {/if}
+
       <!-- Start Padding Hold Block -->
       {#if startPadding > 0}
         <div
@@ -328,6 +341,27 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     overflow: hidden;
+  }
+
+  .audio-waveform-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+    gap: 1.5px;
+    opacity: 0.28;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .waveform-bar {
+    flex: 1;
+    min-width: 1.5px;
+    background: linear-gradient(180deg, #a855f7 0%, #38bdf8 100%);
+    border-radius: 1px;
+    transition: height 0.2s ease;
   }
 
   .padding-block {

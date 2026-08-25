@@ -9,6 +9,8 @@
     progressState,
     liveLogs,
     activeError,
+    activeJobs,
+    disambiguateOutputPath,
     createActiveJob,
     updateActiveJobProgress,
     appendActiveJobLog,
@@ -47,14 +49,52 @@
   import MessageSquare from 'lucide-svelte/icons/message-square';
   import Clapperboard from 'lucide-svelte/icons/clapperboard';
   import Film from 'lucide-svelte/icons/film';
-  import FilePicker from '$components/FilePicker.svelte';
   import Toggle from '$components/Toggle.svelte';
+  import Slider from '$components/Slider.svelte';
   import Stepper from '$components/Stepper.svelte';
+  import FilePicker from '$components/FilePicker.svelte';
   import DateRangePicker from '$components/DateRangePicker.svelte';
 
   let scanning = false;
-  let previewTab: 'standard' | 'reversed' = 'standard';
   let showMissingDetails = false;
+  let showJsonViewer = false;
+  let selectedMemoriesCount = 0;
+  let previewTab: 'standard' | 'reversed' | 'sidebyside' = 'standard';
+
+  $: isCompositing = $toolkitConfig.createCombined || $toolkitConfig.createReversed;
+
+  $: compositePerspective = (() => {
+    if ($toolkitConfig.createCombined && $toolkitConfig.createReversed) return 'both';
+    if ($toolkitConfig.createReversed && !$toolkitConfig.createCombined) return 'reversed_only';
+    return 'standard';
+  })();
+
+  function setPerspective(mode: 'standard' | 'reversed_only' | 'both') {
+    if (mode === 'standard') {
+      $toolkitConfig.createCombined = true;
+      $toolkitConfig.createReversed = false;
+      previewTab = 'standard';
+    } else if (mode === 'reversed_only') {
+      $toolkitConfig.createCombined = false;
+      $toolkitConfig.createReversed = true;
+      previewTab = 'reversed';
+    } else if (mode === 'both') {
+      $toolkitConfig.createCombined = true;
+      $toolkitConfig.createReversed = true;
+      previewTab = 'standard';
+    }
+  }
+
+  function handleCompositingToggle(enabled: boolean) {
+    if (enabled) {
+      $toolkitConfig.createCombined = true;
+      $toolkitConfig.createReversed = false;
+      previewTab = 'standard';
+    } else {
+      $toolkitConfig.createCombined = false;
+      $toolkitConfig.createReversed = false;
+    }
+  }
 
   function formatDisplayDate(dStr?: string): string {
     if (!dStr) return '—';
@@ -65,6 +105,30 @@
     } catch {
       return dStr;
     }
+  }
+
+  $: dateRangeLabel = (() => {
+    if ($toolkitConfig.dateRangeStart && $toolkitConfig.dateRangeEnd) {
+      return `${formatDisplayDate($toolkitConfig.dateRangeStart)} – ${formatDisplayDate($toolkitConfig.dateRangeEnd)}`;
+    } else if ($toolkitConfig.dateRangeStart) {
+      return `From ${formatDisplayDate($toolkitConfig.dateRangeStart)}`;
+    } else if ($toolkitConfig.dateRangeEnd) {
+      return `Until ${formatDisplayDate($toolkitConfig.dateRangeEnd)}`;
+    }
+    return 'All Dates';
+  })();
+
+  function getSensibleOutputPath(inputPath: string): string {
+    const clean = inputPath.replace(/\\/g, '/');
+    const lastSlash = clean.lastIndexOf('/');
+    const parentDir = lastSlash !== -1 ? inputPath.slice(0, lastSlash) : '';
+    const sep = inputPath.includes('\\') ? '\\' : '/';
+    if (parentDir) {
+      return `${parentDir}${sep}BeReal_Photos`;
+    }
+    return inputPath.endsWith('.zip')
+      ? inputPath.replace(/\.zip$/i, '_processed')
+      : `${inputPath}_processed`;
   }
 
   async function handleArchiveChange(path: string) {
@@ -81,9 +145,7 @@
       archiveMetadata.set(meta);
 
       if (!$toolkitConfig.outputPath) {
-        $toolkitConfig.outputPath = path.endsWith('.zip')
-          ? path.replace(/\.zip$/i, '_processed')
-          : `${path}_processed`;
+        $toolkitConfig.outputPath = getSensibleOutputPath(path);
       }
     } catch (e: any) {
       archiveMetadata.set(null);
@@ -134,12 +196,18 @@
       return;
     }
 
+    const targetCount = selectedMemoriesCount || $archiveMetadata?.entryCount || 0;
+    const finalOutputPath = disambiguateOutputPath($toolkitConfig.outputPath, $activeJobs);
+    $toolkitConfig.outputPath = finalOutputPath;
+
     // Create unique Active Job for parallel execution
     const job = createActiveJob({
       type: 'toolkit',
-      title: `Photo Processing (${$archiveMetadata?.entryCount || 0} posts)`,
+      title: `Photo Processing (${targetCount} Memories)`,
       inputPath: $toolkitConfig.inputPath,
-      outputPath: $toolkitConfig.outputPath,
+      outputPath: finalOutputPath,
+      memoriesCount: targetCount,
+      dateRange: dateRangeLabel,
     });
 
     liveLogs.set([]);
@@ -147,7 +215,7 @@
       jobId: job.id,
       stage: 'Scanning',
       current: 0,
-      total: $archiveMetadata?.entryCount || 0,
+      total: targetCount,
       percentage: 0,
     });
     isProcessing.set(true);
@@ -168,12 +236,14 @@
         recordActivity({
           type: 'toolkit',
           title: `Photo Processing (${res.entriesProcessed} Memories)`,
-          outputPath: $toolkitConfig.outputPath,
+          outputPath: finalOutputPath,
           inputPath: $toolkitConfig.inputPath,
           durationSecs: res.durationSecs,
           status: 'success',
           itemCount: res.filesConverted,
-          details: `Processed in ${res.durationSecs.toFixed(1)}s`,
+          memoriesCount: res.entriesProcessed,
+          dateRange: dateRangeLabel,
+          details: `${dateRangeLabel} • Processed in ${res.durationSecs.toFixed(1)}s`,
         });
       })
       .catch((e: any) => {
@@ -451,6 +521,7 @@
           bind:startDate={$toolkitConfig.dateRangeStart}
           bind:endDate={$toolkitConfig.dateRangeEnd}
           totalCount={$archiveMetadata.entryCount}
+          bind:selectedCount={selectedMemoriesCount}
         />
       {/if}
 
@@ -547,11 +618,12 @@
           description="Merges primary and selfie cameras into unified memory photos"
           tooltip="Combines both camera views into single composite photos using Picture-in-Picture or Side-by-Side layout."
           icon={Layers}
-          bind:checked={$toolkitConfig.createCombined}
+          checked={isCompositing}
+          onChange={handleCompositingToggle}
           accentColor="yellow"
         />
 
-        {#if $toolkitConfig.createCombined}
+        {#if isCompositing}
           <div class="sub-options-box">
             <div class="field-group">
               <span class="label">Dual-Camera Combination Mode</span>
@@ -592,14 +664,59 @@
 
             <div class="divider"></div>
 
-            <Toggle
-              label="Generate Reversed Angles"
-              description="Exports secondary-perspective memories with swapped cameras"
-              tooltip="Exports additional memories where the selfie camera is the background canvas and the main camera is the overlay."
-              icon={Repeat}
-              bind:checked={$toolkitConfig.createReversed}
-              accentColor="violet"
-            />
+            <div class="field-group">
+              <div class="field-label-row">
+                <span class="label">Perspective Output</span>
+                <span class="badge badge-yellow text-xs font-mono">
+                  {compositePerspective === 'reversed_only'
+                    ? 'Reversed Only'
+                    : compositePerspective === 'both'
+                    ? 'Both Perspectives'
+                    : 'Standard Only'}
+                </span>
+              </div>
+
+              <div class="perspective-segmented">
+                <button
+                  type="button"
+                  class="perspective-btn"
+                  class:active={compositePerspective === 'standard'}
+                  on:click={() => setPerspective('standard')}
+                >
+                  <div class="persp-head">
+                    <Camera size={14} class="text-sky-400" />
+                    <span class="persp-title">Standard Only</span>
+                  </div>
+                  <span class="persp-desc">Main canvas + selfie inset</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="perspective-btn active-rev"
+                  class:active={compositePerspective === 'reversed_only'}
+                  on:click={() => setPerspective('reversed_only')}
+                >
+                  <div class="persp-head">
+                    <Repeat size={14} class="text-purple-400" />
+                    <span class="persp-title">Reversed Only</span>
+                  </div>
+                  <span class="persp-desc">Selfie canvas + main inset</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="perspective-btn active-both"
+                  class:active={compositePerspective === 'both'}
+                  on:click={() => setPerspective('both')}
+                >
+                  <div class="persp-head">
+                    <Sparkles size={14} class="text-yellow-400" />
+                    <span class="persp-title">Both Angles</span>
+                  </div>
+                  <span class="persp-desc">Exports standard &amp; reversed</span>
+                </button>
+              </div>
+            </div>
           </div>
         {/if}
       </div>
@@ -612,7 +729,7 @@
           <div class="title-group">
             <span class="preview-dot"></span>
             <span class="title-sm font-semibold">
-              {$toolkitConfig.createCombined ? 'Compositing Preview' : 'Metadata Preview'}
+              {isCompositing ? 'Compositing Preview' : 'Metadata Preview'}
             </span>
           </div>
           <span class="badge badge-yellow format-badge">
@@ -624,9 +741,9 @@
           </span>
         </div>
 
-        {#if $toolkitConfig.createCombined}
+        {#if isCompositing}
           <!-- Preview View Mode Selector (Standard vs Reversed) -->
-          {#if $toolkitConfig.createReversed}
+          {#if compositePerspective === 'both'}
             <div class="preview-mode-tabs">
               <button
                 type="button"
@@ -646,6 +763,11 @@
                 Reversed Output
               </button>
             </div>
+          {:else if compositePerspective === 'reversed_only'}
+            <div class="preview-mode-single-banner">
+              <Repeat size={12} class="text-purple-400" />
+              <span>Reversed Angle Preview (Selfie Canvas)</span>
+            </div>
           {/if}
 
           <!-- Animated Morphing Canvas Frame -->
@@ -658,10 +780,10 @@
               <!-- Primary Camera Layer (Environment / Landscape) -->
               <div
                 class="cam-layer layer-primary"
-                class:is-swapped={previewTab === 'reversed'}
+                class:is-swapped={previewTab === 'reversed' || compositePerspective === 'reversed_only'}
               >
-                <div class="camera-badge" title={previewTab === 'reversed' ? 'Person Silhouette (Selfie)' : 'Landscape & Environment (Main Camera)'}>
-                  {#if previewTab === 'reversed'}
+                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Person Silhouette (Selfie)' : 'Landscape & Environment (Main Camera)'}>
+                  {#if previewTab === 'reversed' || compositePerspective === 'reversed_only'}
                     <User size={13} class="badge-icon text-purple-300" />
                   {:else}
                     <Mountain size={13} class="badge-icon text-sky-300" />
@@ -672,11 +794,11 @@
               <!-- Secondary / Selfie Camera Layer (Person Silhouette) -->
               <div
                 class="cam-layer layer-secondary"
-                class:is-swapped={previewTab === 'reversed'}
+                class:is-swapped={previewTab === 'reversed' || compositePerspective === 'reversed_only'}
               >
                 <div class="pip-lens-circle"></div>
-                <div class="camera-badge" title={previewTab === 'reversed' ? 'Landscape & Environment (Main Camera)' : 'Person Silhouette (Selfie)'}>
-                  {#if previewTab === 'reversed'}
+                <div class="camera-badge" title={previewTab === 'reversed' || compositePerspective === 'reversed_only' ? 'Landscape & Environment (Main Camera)' : 'Person Silhouette (Selfie)'}>
+                  {#if previewTab === 'reversed' || compositePerspective === 'reversed_only'}
                     <Mountain size={13} class="badge-icon text-sky-300" />
                   {:else}
                     <User size={13} class="badge-icon text-purple-300" />
@@ -715,10 +837,14 @@
           <div class="info-row">
             <span class="info-label">Active Output:</span>
             <strong class="info-val font-mono text-yellow-400">
-              {#if $toolkitConfig.createCombined}
-                {$toolkitConfig.combineMode === 'PictureInPicture'
-                  ? (previewTab === 'reversed' ? 'combined_reversed/' : 'combined/')
-                  : (previewTab === 'reversed' ? 'side_by_side_reversed/' : 'side_by_side/')}
+              {#if isCompositing}
+                {#if compositePerspective === 'reversed_only'}
+                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined_reversed/' : 'side_by_side_reversed/'}
+                {:else if compositePerspective === 'both'}
+                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined/ & combined_reversed/' : 'side_by_side/ & side_by_side_reversed/'}
+                {:else}
+                  {$toolkitConfig.combineMode === 'PictureInPicture' ? 'combined/' : 'side_by_side/'}
+                {/if}
               {:else}
                 primary/ &amp; secondary/ (Standalone)
               {/if}
@@ -728,7 +854,15 @@
           <div class="info-row">
             <span class="info-label">Mode:</span>
             <span class="text-secondary text-xs">
-              {$toolkitConfig.createCombined ? 'Dual-Camera Compositing' : 'EXIF & Format Restoration Only'}
+              {#if !isCompositing}
+                EXIF &amp; Format Restoration Only
+              {:else if compositePerspective === 'reversed_only'}
+                Dual-Camera (Reversed Angle Only)
+              {:else if compositePerspective === 'both'}
+                Dual-Camera (Standard + Reversed Sets)
+              {:else}
+                Dual-Camera (Standard Perspective)
+              {/if}
             </span>
           </div>
 
@@ -746,7 +880,12 @@
             </div>
           {/if}
 
-          {#if $toolkitConfig.createCombined && $toolkitConfig.createReversed}
+          {#if isCompositing && compositePerspective === 'reversed_only'}
+            <div class="feature-tag tag-violet">
+              <Repeat size={12} />
+              <span>Reversed Perspectives Only</span>
+            </div>
+          {:else if isCompositing && compositePerspective === 'both'}
             <div class="feature-tag tag-violet">
               <Repeat size={12} />
               <span>Reversed Dual Angles Exported</span>
@@ -1326,6 +1465,20 @@
     gap: 2px;
   }
 
+  .preview-mode-single-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 600;
+    color: #d8b4fe;
+  }
+
   .tab-btn {
     flex: 1;
     display: flex;
@@ -1356,6 +1509,68 @@
     background: rgba(139, 92, 246, 0.2);
     color: #c084fc;
     border: 1px solid rgba(139, 92, 246, 0.4);
+  }
+
+  /* ── Perspective Segmented Selector ── */
+  .perspective-segmented {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .perspective-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 10px;
+    background: #0e0e13;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+    gap: 3px;
+  }
+
+  .perspective-btn:hover {
+    background: #15151e;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .perspective-btn.active {
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.1);
+  }
+
+  .perspective-btn.active-rev.active {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.45);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);
+  }
+
+  .perspective-btn.active-both.active {
+    background: rgba(255, 230, 0, 0.08);
+    border-color: rgba(255, 230, 0, 0.4);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.12);
+  }
+
+  .persp-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .persp-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .persp-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.25;
   }
 
   .mockup-frame {

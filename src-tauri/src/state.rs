@@ -80,6 +80,7 @@ impl AppState {
 
 // ─── Progress Emitter ─────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct ProgressEmitter {
     pub app: AppHandle,
     pub log_buffer: Arc<Mutex<Vec<LogEvent>>>,

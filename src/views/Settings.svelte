@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
+  import Modal from '$components/Modal.svelte';
   import { APP_VERSION } from '$lib/version';
   import {
     toolkitConfig,
@@ -500,39 +500,28 @@
     </div>
   </div>
 
-  {#if showResetModal}
-    <div
-      class="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      tabindex="-1"
-      transition:fade={{ duration: 160 }}
-      on:click={() => (showResetModal = false)}
-      on:keydown={(e) => e.key === 'Escape' && (showResetModal = false)}
-    >
-      <div
-        class="modal-card"
-        transition:scale={{ duration: 200, start: 0.94 }}
-      >
-        <div class="modal-head">
-          <AlertTriangle size={20} class="text-rose-400" />
-          <h3 class="title-sm font-bold text-white">Reset All Settings?</h3>
-        </div>
-        <p class="text-secondary text-xs">
-          This will restore all Photo Processing and Recap Video preferences, formatting rules, quality thresholds, and directory paths to factory defaults.
-        </p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showResetModal = false)}>
-            Cancel
-          </button>
-          <button type="button" class="btn btn-danger btn-sm" on:click={handleConfirmReset}>
-            <RotateCcw size={13} />
-            <span>Confirm Reset</span>
-          </button>
-        </div>
+  <Modal bind:open={showResetModal} title="Reset All Settings?" maxWidth="440px">
+    <svelte:fragment slot="title">
+      <div class="modal-head">
+        <AlertTriangle size={20} class="text-rose-400" />
+        <h3 class="title-sm font-bold text-white">Reset All Settings?</h3>
       </div>
-    </div>
-  {/if}
+    </svelte:fragment>
+
+    <p class="text-secondary text-xs">
+      This will restore all Photo Processing and Recap Video preferences, formatting rules, quality thresholds, and directory paths to factory defaults.
+    </p>
+
+    <svelte:fragment slot="footer">
+      <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showResetModal = false)}>
+        Cancel
+      </button>
+      <button type="button" class="btn btn-danger btn-sm" on:click={handleConfirmReset}>
+        <RotateCcw size={13} />
+        <span>Confirm Reset</span>
+      </button>
+    </svelte:fragment>
+  </Modal>
 </div>
 
 <style>

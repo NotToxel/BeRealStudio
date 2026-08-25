@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { openPath } from '@tauri-apps/plugin-opener';
-export { openPath };
+import { openPath, openUrl } from '@tauri-apps/plugin-opener';
+export { openPath, openUrl };
 import type {
   ArchiveInfo,
   ToolkitConfig,
@@ -14,6 +14,7 @@ import type {
   LogEvent,
   OfflineGeoDbStatus,
   DownloadProgressEvent,
+  AudioAnalysis,
 } from './types';
 
 // Archive & Scanning
@@ -135,8 +136,17 @@ export async function saveFilePicker(
   return typeof selected === 'string' ? selected : null;
 }
 
+export async function showInFolder(path: string): Promise<void> {
+  try {
+    await invoke('show_in_folder', { path });
+  } catch (e) {
+    console.warn('Native show_in_folder fallback to openPath:', e);
+    await openPath(path);
+  }
+}
+
 export async function revealInFolder(path: string): Promise<void> {
-  await openPath(path);
+  await showInFolder(path);
 }
 
 
@@ -157,47 +167,59 @@ export async function deleteOfflineGeoDb(tier?: string): Promise<OfflineGeoDbSta
   return await invoke<OfflineGeoDbStatus>('delete_offline_geodb', { tier });
 }
 
+export async function analyzeAudio(path: string, buckets: number = 120): Promise<AudioAnalysis> {
+  return await invoke<AudioAnalysis>('analyze_audio', { path, buckets });
+}
+
+// Generic Typed Event Subscription Wrapper
+export async function subscribeToEvent<T>(
+  event: string,
+  cb: (payload: T) => void
+): Promise<UnlistenFn> {
+  return await listen<T>(event, (e) => cb(e.payload));
+}
+
 // Event Subscriptions
 export async function onToolkitProgress(
   cb: (event: ProgressEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<ProgressEvent>('toolkit-progress', (e) => cb(e.payload));
+  return await subscribeToEvent<ProgressEvent>('toolkit-progress', cb);
 }
 
 export async function onToolkitLog(
   cb: (event: LogEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<LogEvent>('toolkit-log', (e) => cb(e.payload));
+  return await subscribeToEvent<LogEvent>('toolkit-log', cb);
 }
 
 export async function onRecapperProgress(
   cb: (event: ProgressEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<ProgressEvent>('recapper-progress', (e) => cb(e.payload));
+  return await subscribeToEvent<ProgressEvent>('recapper-progress', cb);
 }
 
 export async function onRecapperLog(
   cb: (event: LogEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<LogEvent>('recapper-log', (e) => cb(e.payload));
+  return await subscribeToEvent<LogEvent>('recapper-log', cb);
 }
 
 export async function onJobProgress(
   jobId: string,
   cb: (event: ProgressEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<ProgressEvent>(`job-progress-${jobId}`, (e) => cb(e.payload));
+  return await subscribeToEvent<ProgressEvent>(`job-progress-${jobId}`, cb);
 }
 
 export async function onJobLog(
   jobId: string,
   cb: (event: LogEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<LogEvent>(`job-log-${jobId}`, (e) => cb(e.payload));
+  return await subscribeToEvent<LogEvent>(`job-log-${jobId}`, cb);
 }
 
 export async function onDownloadProgress(
   cb: (event: DownloadProgressEvent) => void
 ): Promise<UnlistenFn> {
-  return await listen<DownloadProgressEvent>('download-progress', (e) => cb(e.payload));
+  return await subscribeToEvent<DownloadProgressEvent>('download-progress', cb);
 }

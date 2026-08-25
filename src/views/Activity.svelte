@@ -12,7 +12,7 @@
     progressState,
     activeFeature,
   } from '$lib/stores';
-  import { openPath, cancelJob, cancelToolkit, cancelRecapper } from '$lib/tauri';
+  import { showInFolder, cancelJob, cancelToolkit, cancelRecapper } from '$lib/tauri';
   import type { ActiveJob } from '$lib/types';
   import History from 'lucide-svelte/icons/history';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
@@ -20,6 +20,7 @@
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Film from 'lucide-svelte/icons/film';
   import Camera from 'lucide-svelte/icons/camera';
+  import Calendar from 'lucide-svelte/icons/calendar';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import CheckCircle from 'lucide-svelte/icons/circle-check';
   import Clock from 'lucide-svelte/icons/clock';
@@ -74,7 +75,7 @@
   async function handleOpen(path: string) {
     if (!path) return;
     try {
-      await openPath(path);
+      await showInFolder(path);
     } catch (e) {
       alert(`Could not open path:\n${path}\n\nError: ${e}`);
     }
@@ -190,6 +191,16 @@
                     <span class="badge badge-{job.type === 'toolkit' ? 'yellow' : 'violet'} font-mono">
                       {job.stage}
                     </span>
+                    {#if job.memoriesCount}
+                      <span class="badge badge-yellow font-mono text-xs">
+                        <Camera size={11} /> {job.memoriesCount} Memories
+                      </span>
+                    {/if}
+                    {#if job.dateRange}
+                      <span class="badge badge-neutral font-mono text-xs">
+                        <Calendar size={11} /> {job.dateRange}
+                      </span>
+                    {/if}
                   </div>
                   <div class="job-meta-row text-xs text-muted">
                     <span>Started {getRelativeTime(job.startTime)}</span>
@@ -408,7 +419,19 @@
                 {/if}
               </div>
               <div class="type-titles">
-                <span class="activity-title font-semibold text-white">{item.title}</span>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="activity-title font-semibold text-white">{item.title}</span>
+                  {#if item.memoriesCount}
+                    <span class="badge badge-yellow font-mono text-xs">
+                      <Camera size={11} /> {item.memoriesCount} Memories
+                    </span>
+                  {/if}
+                  {#if item.dateRange}
+                    <span class="badge badge-neutral font-mono text-xs">
+                      <Calendar size={11} /> {item.dateRange}
+                    </span>
+                  {/if}
+                </div>
                 <div class="time-row">
                   <Clock size={11} class="text-muted" />
                   <span class="time-text text-muted">{formatTime(item.timestamp)}</span>

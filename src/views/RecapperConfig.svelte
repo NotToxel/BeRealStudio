@@ -7,6 +7,8 @@
     progressState,
     liveLogs,
     activeError,
+    activeJobs,
+    disambiguateOutputPath,
     createActiveJob,
     updateActiveJobProgress,
     appendActiveJobLog,
@@ -27,6 +29,7 @@
     downloadOfflineGeoDb,
     setActiveGeoDbTier,
     onDownloadProgress,
+    analyzeAudio,
   } from '$lib/tauri';
   import type { SpeedMode } from '$lib/types';
   import Music from 'lucide-svelte/icons/music';
@@ -56,6 +59,37 @@
   import SpeedCurvePreview from '$components/SpeedCurvePreview.svelte';
   import { BUILTIN_FONT_OPTIONS } from '$lib/fonts';
   import RuleEditor from '$components/RuleEditor.svelte';
+
+  let audioWaveform: number[] = [];
+  let isAnalyzingAudio = false;
+
+  $: if ($recapperConfig.musicPath) {
+    loadWaveform($recapperConfig.musicPath);
+  } else {
+    audioWaveform = [];
+  }
+
+  async function loadWaveform(path: string) {
+    if (!path) {
+      audioWaveform = [];
+      return;
+    }
+    try {
+      isAnalyzingAudio = true;
+      const analysis = await analyzeAudio(path, 100);
+      audioWaveform = analysis.waveform;
+    } catch (e) {
+      const fallback: number[] = [];
+      for (let i = 0; i < 100; i++) {
+        const base = Math.sin((i / 100) * Math.PI * 4) * 0.35 + 0.45;
+        const noise = Math.sin(i * 1.8) * 0.15;
+        fallback.push(Math.max(0.08, Math.min(1.0, base + noise)));
+      }
+      audioWaveform = fallback;
+    } finally {
+      isAnalyzingAudio = false;
+    }
+  }
 
   // Sample Preview Data
   const sampleDate = new Date();
@@ -291,12 +325,15 @@
       return;
     }
 
+    const finalOutputPath = disambiguateOutputPath($recapperConfig.outputPath, $activeJobs);
+    $recapperConfig.outputPath = finalOutputPath;
+
     // Create unique Active Job for parallel execution
     const job = createActiveJob({
       type: 'recapper',
       title: `Recap Video (${$recapperConfig.fps} FPS)`,
       inputPath: $recapperConfig.inputFolder,
-      outputPath: $recapperConfig.outputPath,
+      outputPath: finalOutputPath,
     });
 
     // Also update legacy single-job stores
@@ -328,11 +365,12 @@
         recordActivity({
           type: 'recapper',
           title: `Recap Video (${$recapperConfig.fps} FPS)`,
-          outputPath: $recapperConfig.outputPath,
+          outputPath: finalOutputPath,
           inputPath: $recapperConfig.inputFolder,
           durationSecs: res.durationSecs,
           status: 'success',
           itemCount: res.filesConverted || res.entriesProcessed,
+          memoriesCount: res.filesConverted || res.entriesProcessed,
           details: `Generated in ${res.durationSecs.toFixed(1)}s`,
         });
       })
@@ -810,6 +848,7 @@
             animated={true}
             startPadding={$recapperConfig.startPadding}
             endPadding={$recapperConfig.endPadding}
+            waveform={audioWaveform}
           />
         </div>
 

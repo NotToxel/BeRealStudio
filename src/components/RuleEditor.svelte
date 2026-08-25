@@ -1,7 +1,7 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import type { LocationRule } from '$lib/types';
-  import { openPath } from '$lib/tauri';
+  import { openUrl } from '$lib/tauri';
   import Plus from 'lucide-svelte/icons/plus';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -66,7 +66,7 @@
 
   async function openIsoGuide() {
     try {
-      await openPath('https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2');
+      await openUrl('https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2');
     } catch {
       window.open('https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2', '_blank');
     }

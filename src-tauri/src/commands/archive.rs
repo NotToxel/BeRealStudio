@@ -37,8 +37,9 @@ pub async fn extract_zip(zip_path: String, dest_dir: String) -> Result<String, S
             if let Some(parent) = outpath.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
-            let mut out = std::fs::File::create(&outpath).map_err(|e| e.to_string())?;
-            std::io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
+            let out = std::fs::File::create(&outpath).map_err(|e| e.to_string())?;
+            let mut writer = std::io::BufWriter::with_capacity(64 * 1024, out);
+            std::io::copy(&mut entry, &mut writer).map_err(|e| e.to_string())?;
         }
     }
 
