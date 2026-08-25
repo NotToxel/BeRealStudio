@@ -152,7 +152,10 @@ jobs:
 
       - name: Build Tauri Desktop Application (Unix)
         if: runner.os != 'Windows'
-        run: bun run tauri build --verbose 2>&1 | tee tauri-build.log
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run tauri build --verbose 2>&1 | tee tauri-build.log
 
       - name: Build Tauri Desktop Application (Windows)
         if: runner.os == 'Windows'
