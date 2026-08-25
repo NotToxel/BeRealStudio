@@ -155,7 +155,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo build --release --manifest-path src-tauri/Cargo.toml 2>&1 | tee cargo-build.log || (echo "=== CARGO ERROR TAIL ===" && tail -n 80 cargo-build.log && exit 1)
+          cargo build --release --manifest-path src-tauri/Cargo.toml 2>&1 | tee cargo-build.log || (echo "### Cargo Build Failure on ${{ matrix.platform }}" >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && tail -n 80 cargo-build.log >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && exit 1)
 
       - name: Build Tauri Desktop Application (Unix)
         if: runner.os != 'Windows'
@@ -178,7 +178,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ matrix.platform }}
-          path: tauri-build.log
+          path: |
+            tauri-build.log
+            cargo-build.log
           if-no-files-found: ignore
 
       - name: Stage Release Artifacts
