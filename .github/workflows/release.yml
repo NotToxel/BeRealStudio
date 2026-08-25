@@ -177,6 +177,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ needs.create-release.outputs.tag_name || 'v2.0.0' }}"
+          TAG="${{ needs.create-release.outputs.tag_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "true" ]; then
+            TAG="v2.0.0"
+          fi
           echo "Uploading desktop binaries to release $TAG..."
-          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" \) -exec gh release upload "$TAG" {} --clobber +
+          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.exe" -o -name "*.msi" \) | while read -r file; do
+            echo "Uploading $file to release $TAG..."
+            gh release upload "$TAG" "$file" --clobber
+          done
