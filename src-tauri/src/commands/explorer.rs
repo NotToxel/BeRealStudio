@@ -314,8 +314,24 @@ fn load_explorer_memories_inner(
             let time_formatted = local_dt.format("%H:%M").to_string();
 
             let retake_counter = post.retake_counter.unwrap_or(0);
-            let is_late = false;
-            let late_duration = None;
+            let (is_late, late_duration) = if let Some(sec) = post.late_in_seconds {
+                if sec > 120 {
+                    let mins = sec / 60;
+                    let hrs = mins / 60;
+                    let dur_str = if hrs > 0 {
+                        format!("{}h late", hrs)
+                    } else {
+                        format!("{}m late", mins)
+                    };
+                    (true, Some(dur_str))
+                } else {
+                    (false, None)
+                }
+            } else if let Some(late_bool) = post.is_late {
+                (late_bool, if late_bool { Some("Late".to_string()) } else { None })
+            } else {
+                (false, None)
+            };
 
             ExplorerMemory {
                 id: format!("bereal-{}", idx),

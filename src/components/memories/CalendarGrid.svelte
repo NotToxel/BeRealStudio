@@ -132,10 +132,12 @@
       {@const dayPosts = $memoriesByDate.get(dateStr) || []}
       {@const hasPost = dayPosts.length > 0}
       {@const primaryPost = hasPost ? dayPosts[0] : null}
+      {@const isOnTime = hasPost && primaryPost ? !primaryPost.isLate : false}
 
       <div
         class="day-cell"
         class:has-memory={hasPost}
+        class:is-on-time={isOnTime}
         role="button"
         tabindex={hasPost ? 0 : -1}
         on:click={() => hasPost && handleDayClick(dayNum)}
@@ -150,10 +152,16 @@
               isVideo={primaryPost.isVideo}
               alt="BeReal {primaryPost.dateFormatted}"
               dayNumberOverlay={String(dayNum)}
-              badgeText={dayPosts.length > 1 ? `(${dayPosts.length})` : primaryPost.retakeCounter > 0 ? `(${primaryPost.retakeCounter})` : ''}
               size="sm"
               interactive={false}
             />
+
+            <!-- Top-right corner BeReal count badge (white background, black text) -->
+            {#if dayPosts.length > 1}
+              <div class="day-count-badge" title="{dayPosts.length} BeReals on this day">
+                {dayPosts.length}
+              </div>
+            {/if}
           </div>
         {:else}
           <div class="empty-day-box">
@@ -279,7 +287,14 @@
 
   .day-cell.has-memory {
     cursor: pointer;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  /* Medium-thick white outline for On-Time BeReals */
+  .day-cell.has-memory.is-on-time {
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
   }
 
   .day-cell.has-memory:hover {
@@ -289,8 +304,30 @@
   }
 
   .active-day-card {
+    position: relative;
     width: 100%;
     height: 100%;
+  }
+
+  /* Top Right White Pill Badge with Black Text */
+  .day-count-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: #ffffff;
+    color: #000000;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    z-index: 10;
   }
 
   .empty-day-box {

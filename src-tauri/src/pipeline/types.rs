@@ -16,6 +16,9 @@ pub struct BeRealPost {
     pub caption: Option<String>,
     pub retake_counter: Option<u32>,
     pub visibility: Option<Vec<String>>,
+    pub late_in_seconds: Option<i64>,
+    pub is_late: Option<bool>,
+    pub notification_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
