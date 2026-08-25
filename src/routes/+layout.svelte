@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../styles/global.css';
+  import { currentView } from '$lib/stores';
   import TitleBar from '$components/TitleBar.svelte';
   import NavBar from '$components/NavBar.svelte';
   import ErrorModal from '$components/ErrorModal.svelte';
@@ -8,7 +9,7 @@
 <div class="app-container">
   <TitleBar />
   <NavBar />
-  <main class="main-content">
+  <main class="main-content" class:is-memories-view={$currentView === 'memories'}>
     <slot />
   </main>
 </div>

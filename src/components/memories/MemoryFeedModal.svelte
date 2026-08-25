@@ -213,7 +213,7 @@
   .feed-modal-shell {
     position: relative;
     width: 100%;
-    max-width: 500px;
+    max-width: 580px;
     height: 96vh;
     display: flex;
     flex-direction: column;
@@ -223,6 +223,12 @@
     overflow: hidden;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95);
     animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (min-width: 1200px) {
+    .feed-modal-shell {
+      max-width: 620px;
+    }
   }
 
   @keyframes scaleIn {
