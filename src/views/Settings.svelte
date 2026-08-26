@@ -837,7 +837,7 @@
       </div>
     </div>
 
-    <!-- 4. Memory Media Audio & Video Playback Settings -->
+    <!-- 4. Memory Audio & Video Playback Settings Overhaul -->
     <div class="card section-card">
       <div class="head-title">
         <VolumeIcon size={18} className="text-sky-400" />
@@ -845,34 +845,131 @@
       </div>
 
       <p class="text-secondary text-desc">
-        Configure whether video files and BTS (Behind-The-Scenes) micro-videos start muted by default, and adjust default playback volume.
+        Configure default autoplay sound behavior and volume faders for BeReal videos and BTS (Behind-The-Scenes) micro-clips in the memories viewer.
       </p>
 
-      <div class="setting-item">
-        <div class="setting-text">
-          <span class="setting-label">Start Media Muted by Default</span>
-          <span class="setting-hint">When enabled, videos and BTS clips will start muted until unmuted manually.</span>
-        </div>
-        <Toggle
-          checked={$globalAudioSettings.defaultMuted}
-          on:change={(e) => ($globalAudioSettings.defaultMuted = e.detail)}
-        />
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-text">
-          <span class="setting-label">Default Playback Volume ({Math.round($globalAudioSettings.volume * 100)}%)</span>
-          <span class="setting-hint">Controls the master audio volume level for in-app video and BTS playback.</span>
-        </div>
-        <div class="slider-control-row">
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            class="range-slider"
-            bind:value={$globalAudioSettings.volume}
+      <div class="settings-grid-2col">
+        <!-- Column 1: Autoplay Sound Mode -->
+        <div class="setting-item-box">
+          <Toggle
+            label="Mute Video Autoplay"
+            description="Start videos and BTS micro-clips in silent mode when hovered"
+            icon={VolumeIcon}
+            accentColor="cyan"
+            bind:checked={$globalAudioSettings.defaultMuted}
           />
+
+          <div class="format-choice-list mt-3">
+            <label class="format-choice-card" class:selected={$globalAudioSettings.defaultMuted}>
+              <input
+                type="radio"
+                name="muteMode"
+                value={true}
+                checked={$globalAudioSettings.defaultMuted}
+                on:change={() => ($globalAudioSettings.defaultMuted = true)}
+              />
+              <div class="choice-text">
+                <span class="choice-title">Always Muted (Recommended)</span>
+                <span class="choice-sample">Videos play quietly on hover with a click-to-unmute audio pill</span>
+              </div>
+            </label>
+
+            <label class="format-choice-card" class:selected={!$globalAudioSettings.defaultMuted}>
+              <input
+                type="radio"
+                name="muteMode"
+                value={false}
+                checked={!$globalAudioSettings.defaultMuted}
+                on:change={() => ($globalAudioSettings.defaultMuted = false)}
+              />
+              <div class="choice-text">
+                <span class="choice-title">Unmuted on Hover</span>
+                <span class="choice-sample">Automatically plays full audio as soon as your cursor hovers over the card</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Column 2: Master Volume with Vertical Fader -->
+        <div class="setting-item-box volume-fader-box">
+          <div class="volume-card-header">
+            <div class="volume-title-group">
+              <span class="volume-title">Master Playback Volume</span>
+              <span class="volume-subtitle">Adjust output gain for all video files &amp; BTS audio</span>
+            </div>
+            <span class="volume-level-badge font-mono">
+              {Math.round($globalAudioSettings.volume * 100)}%
+            </span>
+          </div>
+
+          <div class="vertical-fader-container">
+            <!-- Vertical Range Slider -->
+            <div class="vertical-slider-track-wrap">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                orient="vertical"
+                class="vertical-range-fader"
+                bind:value={$globalAudioSettings.volume}
+                aria-label="Master audio volume level"
+              />
+            </div>
+
+            <!-- Visual Scale Labels & Quick Jump Buttons -->
+            <div class="fader-scale-column">
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.95}
+                on:click={() => ($globalAudioSettings.volume = 1.0)}
+              >
+                <span>100%</span>
+                <span class="level-desc">Max Volume</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.75 && $globalAudioSettings.volume < 0.95}
+                on:click={() => ($globalAudioSettings.volume = 0.8)}
+              >
+                <span>80%</span>
+                <span class="level-desc">Default</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.45 && $globalAudioSettings.volume < 0.75}
+                on:click={() => ($globalAudioSettings.volume = 0.5)}
+              >
+                <span>50%</span>
+                <span class="level-desc">Half</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume > 0.05 && $globalAudioSettings.volume < 0.45}
+                on:click={() => ($globalAudioSettings.volume = 0.25)}
+              >
+                <span>25%</span>
+                <span class="level-desc">Quiet</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn fader-mute-btn"
+                class:active={$globalAudioSettings.volume <= 0.05}
+                on:click={() => ($globalAudioSettings.volume = 0.0)}
+              >
+                <span>0%</span>
+                <span class="level-desc">Mute</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1334,6 +1431,162 @@
 
   .preview-time {
     color: #a1a1aa;
+  }
+
+  /* Audio & Video Playback Section Overhaul */
+  .volume-fader-box {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: #0d0d12;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+  }
+
+  .volume-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .volume-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .volume-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .volume-subtitle {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .volume-level-badge {
+    font-size: 13px;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    letter-spacing: -0.02em;
+  }
+
+  .vertical-fader-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 6px 6px 6px;
+    min-height: 180px;
+  }
+
+  .vertical-slider-track-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 170px;
+    width: 44px;
+    background: #14141d;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
+    padding: 12px 0;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  .vertical-range-fader {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 8px;
+    height: 140px;
+    appearance: none;
+    background: #0a0a0f;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .vertical-range-fader::-webkit-slider-runnable-track {
+    width: 8px;
+    height: 140px;
+    background: linear-gradient(to top, rgba(56, 189, 248, 0.2), #38bdf8);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .vertical-range-fader::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.8), 0 2px 6px rgba(0, 0, 0, 0.8);
+    cursor: grab;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    margin-left: -8px;
+  }
+
+  .vertical-range-fader::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.15);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 1), 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  .fader-scale-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 170px;
+    flex: 1;
+    gap: 4px;
+  }
+
+  .fader-level-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #12121a;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .fader-level-btn:hover {
+    background: #181824;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+  }
+
+  .fader-level-btn.active {
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    font-weight: 700;
+  }
+
+  .fader-level-btn .level-desc {
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .fader-level-btn.active .level-desc {
+    color: #7dd3fc;
   }
 
   /* Modal Backdrop */
