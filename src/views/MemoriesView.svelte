@@ -48,7 +48,7 @@
   <div class="view-header-bar">
     <div class="header-left">
       <div class="view-title-pill">
-        <Sparkles size={16} class="text-amber-400" />
+        <Sparkles size={16} class="text-sky-400" />
         <span class="title-text">Memories Explorer</span>
       </div>
 
@@ -97,7 +97,7 @@
     <div class="loading-state-card card">
       <div class="loading-content-box">
         <div class="loading-spinner-row">
-          <Loader2 size={32} class="animate-spin text-amber-400" />
+          <Loader2 size={32} class="animate-spin text-sky-400" />
           <div class="loading-text-group">
             <h3 class="loading-title">Loading Your BeReal Memories...</h3>
             <p class="loading-subtitle">{$memoriesLoadProgress.stage}</p>
@@ -119,7 +119,7 @@
     <div class="connect-archive-card card">
       <div class="connect-head">
         <div class="connect-icon-wrap">
-          <Images size={28} class="text-amber-400" />
+          <Images size={28} class="text-sky-400" />
         </div>
         <div class="connect-text">
           <h2 class="title-md">Connect Your BeReal Archive</h2>
@@ -148,7 +148,7 @@
         {#if selectedPathInput && selectedPathInput !== $lastScannedArchivePath}
           <button
             type="button"
-            class="btn btn-accent-yellow btn-md mt-3"
+            class="btn btn-accent-blue btn-md mt-3"
             on:click={() => handleLoadArchive(selectedPathInput)}
           >
             Load Selected Archive
@@ -331,8 +331,8 @@
     width: 52px;
     height: 52px;
     border-radius: var(--radius-md);
-    background: rgba(255, 230, 0, 0.1);
-    border: 1px solid rgba(255, 230, 0, 0.25);
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -404,9 +404,9 @@
   .loading-pct-badge {
     font-size: 13px;
     font-weight: 800;
-    color: #ffe600;
-    background: rgba(255, 230, 0, 0.12);
-    border: 1px solid rgba(255, 230, 0, 0.25);
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
     padding: 4px 10px;
     border-radius: var(--radius-full);
   }
@@ -422,9 +422,9 @@
 
   .loading-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #f59e0b, #ffe600);
+    background: linear-gradient(90deg, #0284c7, #38bdf8);
     border-radius: 999px;
-    box-shadow: 0 0 12px rgba(255, 230, 0, 0.5);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
     transition: width 0.22s ease-out;
   }
 </style>
