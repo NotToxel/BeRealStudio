@@ -58,12 +58,14 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BeRealPost {
+    #[serde(alias = "backImage", alias = "back_image", alias = "mainImage", alias = "main_image")]
     pub primary: Option<MediaAsset>,
     pub primary_placeholder: Option<MediaAsset>,
+    #[serde(alias = "frontImage", alias = "front_image", alias = "selfieImage", alias = "selfie_image")]
     pub secondary: Option<MediaAsset>,
     pub secondary_placeholder: Option<MediaAsset>,
     pub bts_media: Option<MediaAsset>,
-    #[serde(alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate", alias = "creation_date", alias = "createdAt", alias = "created_at", alias = "date")]
+    #[serde(alias = "takenTime", alias = "taken_time", alias = "takenAt", alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate", alias = "creation_date", alias = "createdAt", alias = "created_at", alias = "date")]
     pub taken_at: String,
     pub location: Option<Location>,
     pub caption: Option<String>,
