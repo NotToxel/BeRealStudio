@@ -1,7 +1,6 @@
 <script lang="ts">
   import { tick, onMount, onDestroy } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
+  import { fade } from 'svelte/transition';
   import {
     activeFeedMemory,
     closeFeed,
@@ -22,58 +21,90 @@
   import Download from 'lucide-svelte/icons/download';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
-  import ChevronLeft from 'lucide-svelte/icons/chevron-left';
-  import ChevronRight from 'lucide-svelte/icons/chevron-right';
 
+  let scrollContainer: HTMLElement | null = null;
   let activeIndex = 0;
-  let lastMemoryId = '';
+  let hasScrolledToInitial = false;
+  let initialTargetId = '';
+  let scrollTimeout: any = null;
 
-  // Sync activeIndex whenever activeFeedMemory changes
-  $: if ($activeFeedMemory && $activeFeedMemory.id !== lastMemoryId) {
-    lastMemoryId = $activeFeedMemory.id;
+  $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
+
+  // When activeFeedMemory opens, record target ID and trigger scroll after DOM mounts
+  $: if ($activeFeedMemory && $activeFeedMemory.id !== initialTargetId) {
+    initialTargetId = $activeFeedMemory.id;
+    hasScrolledToInitial = false;
     const foundIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
     if (foundIdx !== -1) {
       activeIndex = foundIdx;
     }
+    scrollToInitialMemory();
   }
 
-  $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
+  async function scrollToInitialMemory() {
+    await tick();
+    if (!initialTargetId || !scrollContainer) return;
+    const el = document.getElementById(`feed-card-${initialTargetId}`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+      hasScrolledToInitial = true;
+    }
+  }
 
-  function goToIndex(idx: number) {
-    if (idx < 0 || idx >= $filteredMemories.length) return;
-    activeIndex = idx;
-    const target = $filteredMemories[idx];
-    if (target) {
-      lastMemoryId = target.id;
-      activeFeedMemory.set(target);
+  function handleScroll() {
+    if (!scrollContainer || !hasScrolledToInitial) return;
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      updateActiveIndexFromScroll();
+    }, 40);
+  }
+
+  function updateActiveIndexFromScroll() {
+    if (!scrollContainer) return;
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+
+    let closestIdx = activeIndex;
+    let minDistance = Infinity;
+
+    for (let i = 0; i < $filteredMemories.length; i++) {
+      const mem = $filteredMemories[i];
+      const el = document.getElementById(`feed-card-${mem.id}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const cardCenterY = rect.top + rect.height / 2;
+        const dist = Math.abs(centerY - cardCenterY);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIdx = i;
+        }
+      }
+    }
+
+    if (closestIdx !== activeIndex) {
+      activeIndex = closestIdx;
+    }
+  }
+
+  function scrollToIndex(idx: number, smooth: boolean = true) {
+    if (idx < 0 || idx >= $filteredMemories.length || !scrollContainer) return;
+    const mem = $filteredMemories[idx];
+    const el = document.getElementById(`feed-card-${mem.id}`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'instant' as ScrollBehavior });
+      activeIndex = idx;
     }
   }
 
   function handlePrev() {
     if (activeIndex > 0) {
-      goToIndex(activeIndex - 1);
+      scrollToIndex(activeIndex - 1);
     }
   }
 
   function handleNext() {
     if (activeIndex < $filteredMemories.length - 1) {
-      goToIndex(activeIndex + 1);
-    }
-  }
-
-  let wheelCooldown = false;
-  function handleWheel(e: WheelEvent) {
-    if (wheelCooldown) return;
-    if (Math.abs(e.deltaY) > 28) {
-      wheelCooldown = true;
-      if (e.deltaY > 0) {
-        handleNext();
-      } else {
-        handlePrev();
-      }
-      setTimeout(() => {
-        wheelCooldown = false;
-      }, 260);
+      scrollToIndex(activeIndex + 1);
     }
   }
 
@@ -81,10 +112,10 @@
     if (!$activeFeedMemory) return;
     if (e.key === 'Escape') {
       closeFeed();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k') {
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
       e.preventDefault();
       handlePrev();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j' || e.key === ' ') {
+    } else if (e.key === 'ArrowDown' || e.key === 'j' || e.key === ' ') {
       e.preventDefault();
       handleNext();
     }
@@ -131,10 +162,12 @@
     }
   }
 
+  onDestroy(() => {
+    clearTimeout(scrollTimeout);
+  });
+
   $: userName = $explorerData?.userName || 'toxel';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
-  $: locText = currentMemory ? formatMemoryLocation(currentMemory, $memoryHeaderSettings) : '';
-  $: timeText = currentMemory ? formatMemoryTimeTag(currentMemory, $memoryHeaderSettings) : '';
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -142,46 +175,18 @@
 {#if $activeFeedMemory && currentMemory}
   <div
     class="feed-modal-backdrop"
-    transition:fade={{ duration: 180 }}
+    transition:fade={{ duration: 160 }}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     on:click={(e) => e.target === e.currentTarget && closeFeed()}
     on:keydown={(e) => e.key === 'Escape' && closeFeed()}
-    on:wheel={handleWheel}
   >
-    <!-- Left / Prev Desktop Floating Button -->
-    {#if activeIndex > 0}
-      <button
-        type="button"
-        class="floating-nav-btn nav-left"
-        on:click={handlePrev}
-        title="Previous Memory (← or ↑)"
-        aria-label="Previous Memory"
-      >
-        <ChevronLeft size={24} />
-      </button>
-    {/if}
-
-    <!-- Right / Next Desktop Floating Button -->
-    {#if activeIndex < $filteredMemories.length - 1}
-      <button
-        type="button"
-        class="floating-nav-btn nav-right"
-        on:click={handleNext}
-        title="Next Memory (→ or ↓)"
-        aria-label="Next Memory"
-      >
-        <ChevronRight size={24} />
-      </button>
-    {/if}
-
     <div
       class="feed-modal-shell"
-      transition:scale={{ start: 0.95, duration: 200, opacity: 0, easing: cubicOut }}
       role="document"
     >
-      <!-- Top Bar -->
+      <!-- Sticky Top Header -->
       <div class="feed-top-bar">
         <button
           type="button"
@@ -213,89 +218,96 @@
         </div>
       </div>
 
-      <!-- Feed Content Stage -->
-      <div class="feed-stage-viewport">
-        <article class="feed-card">
-          <!-- Post Header -->
-          <div class="post-header-row">
-            <div class="user-avatar-wrap">
-              {#if profilePic}
-                <img src={profilePic} alt={userName} class="user-avatar-img" />
-              {:else}
-                <div class="user-avatar-placeholder">
-                  <span>{userName.charAt(0).toUpperCase()}</span>
-                </div>
-              {/if}
-            </div>
+      <!-- Natural Continuous Infinite Scroll Feed Viewport -->
+      <div
+        bind:this={scrollContainer}
+        class="feed-scroll-viewport custom-thick-scrollbar"
+        on:scroll={handleScroll}
+      >
+        <div class="feed-cards-container">
+          {#each $filteredMemories as memory (memory.id)}
+            {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
+            {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
 
-            <div class="user-meta-column">
-              <div class="user-name-row">
-                <span class="user-name">{userName}</span>
+            <article id="feed-card-{memory.id}" class="feed-post-card">
+              <!-- Post Header -->
+              <div class="post-header-row">
+                <div class="user-avatar-wrap">
+                  {#if profilePic}
+                    <img src={profilePic} alt={userName} class="user-avatar-img" />
+                  {:else}
+                    <div class="user-avatar-placeholder">
+                      <span>{userName.charAt(0).toUpperCase()}</span>
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="user-meta-column">
+                  <div class="user-name-row">
+                    <span class="user-name">{userName}</span>
+                  </div>
+
+                  {#if locText || timeText}
+                    <div class="user-subtitle-row">
+                      {#if locText}
+                        <span class="location-text">{locText}</span>
+                      {/if}
+                      {#if locText && timeText}
+                        <span class="subtitle-bullet">•</span>
+                      {/if}
+                      {#if timeText}
+                        <span class="time-text">{timeText}</span>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
               </div>
 
-              {#if locText || timeText}
-                <div class="user-subtitle-row">
-                  {#if locText}
-                    <span class="location-text">{locText}</span>
-                  {/if}
-                  {#if locText && timeText}
-                    <span class="subtitle-bullet">•</span>
-                  {/if}
-                  {#if timeText}
-                    <span class="time-text">{timeText}</span>
-                  {/if}
+              <!-- Caption -->
+              {#if memory.caption}
+                <div class="post-header-caption-wrap">
+                  <p class="post-header-caption-text">{memory.caption}</p>
                 </div>
               {/if}
-            </div>
-          </div>
 
-          <!-- Caption -->
-          {#if currentMemory.caption}
-            <div class="post-header-caption-wrap">
-              <p class="post-header-caption-text">{currentMemory.caption}</p>
-            </div>
-          {/if}
+              <!-- Dual Camera Frame (Full size) -->
+              <div class="dual-frame-wrapper">
+                <DualCameraFrame
+                  primarySrc={memory.primaryPath}
+                  secondarySrc={memory.secondaryPath}
+                  btsSrc={memory.btsPath}
+                  isVideo={memory.isVideo}
+                  alt="BeReal {memory.dateFormatted}"
+                  size="lg"
+                  interactive={true}
+                />
+              </div>
 
-          <!-- Dual Camera Frame -->
-          <div class="dual-frame-wrapper">
-            {#key currentMemory.id}
-              <DualCameraFrame
-                primarySrc={currentMemory.primaryPath}
-                secondarySrc={currentMemory.secondaryPath}
-                btsSrc={currentMemory.btsPath}
-                isVideo={currentMemory.isVideo}
-                alt="BeReal {currentMemory.dateFormatted}"
-                size="lg"
-                interactive={true}
-              />
-            {/key}
-          </div>
-        </article>
+              <!-- Divider line between items in the infinite feed -->
+              <div class="feed-card-divider"></div>
+            </article>
+          {/each}
+        </div>
       </div>
 
-      <!-- Bottom Quick-Bar & Stepper -->
-      <div class="feed-bottom-bar">
+      <!-- Quick Prev / Next Floating Navigation Arrows -->
+      <div class="feed-floating-nav">
         <button
           type="button"
-          class="bottom-step-btn"
+          class="nav-circle-btn"
           disabled={activeIndex === 0}
           on:click={handlePrev}
-          title="Previous Memory"
+          title="Previous Memory (↑)"
         >
           <ChevronUp size={16} />
-          <span>Previous</span>
         </button>
-
-        <span class="stepper-count-pill">{activeIndex + 1} / {$filteredMemories.length}</span>
-
         <button
           type="button"
-          class="bottom-step-btn"
+          class="nav-circle-btn"
           disabled={activeIndex >= $filteredMemories.length - 1}
           on:click={handleNext}
-          title="Next Memory"
+          title="Next Memory (↓)"
         >
-          <span>Next</span>
           <ChevronDown size={16} />
         </button>
       </div>
@@ -315,51 +327,11 @@
     z-index: 500;
   }
 
-  .floating-nav-btn {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: rgba(26, 26, 36, 0.85);
-    border: 1px solid var(--border-medium);
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 510;
-    transition: all var(--transition-fast);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  }
-
-  .floating-nav-btn:hover {
-    background: #252536;
-    border-color: rgba(255, 255, 255, 0.3);
-    transform: translateY(-50%) scale(1.08);
-  }
-
-  .nav-left {
-    left: 24px;
-  }
-
-  .nav-right {
-    right: 24px;
-  }
-
-  @media (max-width: 768px) {
-    .floating-nav-btn {
-      display: none;
-    }
-  }
-
   .feed-modal-shell {
     position: relative;
     width: 100%;
     max-width: 530px;
-    height: 94vh;
-    max-height: 900px;
+    height: 96vh;
     display: flex;
     flex-direction: column;
     background: #000000;
@@ -376,7 +348,8 @@
   }
 
   .feed-top-bar {
-    position: relative;
+    position: sticky;
+    top: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -388,36 +361,38 @@
     flex-shrink: 0;
   }
 
-  .feed-stage-viewport {
+  .feed-scroll-viewport {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    scroll-behavior: smooth;
+    padding: 18px 16px 40px 16px;
+    scroll-snap-type: y proximity;
+  }
+
+  .feed-cards-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 12px 16px;
+    gap: 36px;
+    width: 100%;
   }
 
-  .feed-card {
+  .feed-post-card {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
     width: 100%;
     max-width: 480px;
-    animation: cardFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    scroll-snap-align: center;
   }
 
-  @keyframes cardFadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+  .feed-card-divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    margin-top: 24px;
   }
 
   .back-nav-btn {
@@ -564,45 +539,40 @@
     justify-content: center;
   }
 
-  .feed-bottom-bar {
+  .feed-floating-nav {
+    position: absolute;
+    right: 18px;
+    bottom: 24px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 18px;
-    background: rgba(0, 0, 0, 0.92);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    flex-shrink: 0;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 50;
   }
 
-  .bottom-step-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: var(--radius-full);
-    background: #14141e;
+  .nav-circle-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(22, 22, 32, 0.88);
+    backdrop-filter: blur(10px);
     border: 1px solid var(--border-medium);
     color: #ffffff;
-    font-size: 12px;
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: all var(--transition-fast);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
   }
 
-  .bottom-step-btn:hover:not(:disabled) {
-    background: #252536;
+  .nav-circle-btn:hover:not(:disabled) {
+    background: #2b2b3e;
     border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.08);
   }
 
-  .bottom-step-btn:disabled {
-    opacity: 0.35;
+  .nav-circle-btn:disabled {
+    opacity: 0.3;
     cursor: not-allowed;
-  }
-
-  .stepper-count-pill {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
   }
 </style>

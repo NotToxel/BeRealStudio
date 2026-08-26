@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { filteredMemories, openFeedAt, openContextMenu } from '$lib/memoriesStore';
   import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
@@ -15,6 +15,7 @@
   let isDraggingScrubber = false;
   let scrollHideTimer: any = null;
   let scrollThumbTopPercent = 0;
+  let monthPositions: { key: string; title: string; topPercent: number; offsetTop: number }[] = [];
 
   interface MonthGroup {
     key: string;
@@ -50,39 +51,76 @@
     return groups;
   })();
 
-  let renderedMonthCount = 4;
-
-  $: visibleMonthGroups = monthGroups.slice(0, renderedMonthCount);
+  $: if (monthGroups.length > 0) {
+    tick().then(() => {
+      calculateMonthPositions();
+    });
+  }
 
   function handleMemoryClick(memory: ExplorerMemory) {
     openFeedAt(memory);
   }
 
+  function calculateMonthPositions() {
+    if (!scrollContainer) return;
+    const { scrollHeight, clientHeight } = scrollContainer;
+    const maxScroll = Math.max(1, scrollHeight - clientHeight);
+    const containerTop = scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop;
+
+    const positions: { key: string; title: string; topPercent: number; offsetTop: number }[] = [];
+
+    for (let i = 0; i < monthGroups.length; i++) {
+      const group = monthGroups[i];
+      const el = document.getElementById(`month-group-${group.key}`);
+      if (el) {
+        const elRect = el.getBoundingClientRect();
+        const sectionTop = elRect.top + scrollContainer.scrollTop - containerTop;
+        const topPercent = Math.min(96, Math.max(4, (sectionTop / maxScroll) * 92 + 4));
+        positions.push({
+          key: group.key,
+          title: group.title,
+          topPercent,
+          offsetTop: sectionTop,
+        });
+      } else {
+        // Fallback linear distribution if element not yet queried
+        const topPercent = monthGroups.length > 1 ? (i / (monthGroups.length - 1)) * 92 + 4 : 50;
+        positions.push({
+          key: group.key,
+          title: group.title,
+          topPercent,
+          offsetTop: (topPercent / 100) * maxScroll,
+        });
+      }
+    }
+
+    monthPositions = positions;
+    updateActiveMonth();
+  }
+
   function updateActiveMonth() {
     if (!scrollContainer) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-    const maxScroll = scrollHeight - clientHeight;
-    if (maxScroll > 0) {
-      scrollThumbTopPercent = Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100));
-    }
+    const maxScroll = Math.max(1, scrollHeight - clientHeight);
+    scrollThumbTopPercent = Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100));
 
-    // Find the month currently visible in viewport
-    const containerTop = scrollContainer.getBoundingClientRect().top;
-    for (let i = visibleMonthGroups.length - 1; i >= 0; i--) {
-      const group = visibleMonthGroups[i];
-      const el = document.getElementById(`month-group-${group.key}`);
-      if (el) {
-        const elTop = el.getBoundingClientRect().top;
-        if (elTop - containerTop <= 160) {
-          activeScrubMonth = group.title;
-          activeScrubKey = group.key;
-          break;
-        }
+    // Find the month currently visible in viewport with 80px offset
+    const currentScrollPos = scrollTop + 80;
+    let found = false;
+
+    for (let i = monthPositions.length - 1; i >= 0; i--) {
+      const pos = monthPositions[i];
+      if (currentScrollPos >= pos.offsetTop) {
+        activeScrubMonth = pos.title;
+        activeScrubKey = pos.key;
+        found = true;
+        break;
       }
     }
-    if (!activeScrubMonth && visibleMonthGroups.length > 0) {
-      activeScrubMonth = visibleMonthGroups[0].title;
-      activeScrubKey = visibleMonthGroups[0].key;
+
+    if (!found && monthPositions.length > 0) {
+      activeScrubMonth = monthPositions[0].title;
+      activeScrubKey = monthPositions[0].key;
     }
   }
 
@@ -94,40 +132,24 @@
       if (!isDraggingScrubber) {
         isScrolling = false;
       }
-    }, 1400);
-
-    // Progressive infinite scroll: render next batch when near bottom
-    if (scrollContainer) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-      if (scrollHeight - (scrollTop + clientHeight) < 700) {
-        if (renderedMonthCount < monthGroups.length) {
-          renderedMonthCount = Math.min(monthGroups.length, renderedMonthCount + 3);
-        }
-      }
-    }
+    }, 1200);
   }
 
-  async function scrollToMonth(key: string, title: string) {
-    const targetIdx = monthGroups.findIndex((g) => g.key === key);
-    if (targetIdx !== -1 && targetIdx >= renderedMonthCount) {
-      renderedMonthCount = Math.min(monthGroups.length, targetIdx + 2);
-      await tick();
-    }
-
+  function scrollToMonth(key: string, title: string) {
     activeScrubMonth = title;
     activeScrubKey = key;
     isScrolling = true;
     clearTimeout(scrollHideTimer);
     scrollHideTimer = setTimeout(() => {
       isScrolling = false;
-    }, 2000);
+    }, 1800);
 
     const el = document.getElementById(`month-group-${key}`);
     if (el && scrollContainer) {
-      const containerTop = scrollContainer.getBoundingClientRect().top;
-      const elTop = el.getBoundingClientRect().top;
-      const targetScroll = scrollContainer.scrollTop + (elTop - containerTop) - 12;
-      scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const targetScroll = scrollContainer.scrollTop + (elRect.top - containerRect.top) - 10;
+      scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
     }
   }
 
@@ -149,7 +171,7 @@
       clearTimeout(scrollHideTimer);
       scrollHideTimer = setTimeout(() => {
         isScrolling = false;
-      }, 1400);
+      }, 1200);
     }
 
     window.addEventListener('mousemove', onMove);
@@ -165,11 +187,24 @@
     const offsetY = Math.max(0, Math.min(rect.height, clientY - rect.top));
     const ratio = offsetY / rect.height;
 
-    const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    const maxScroll = Math.max(1, scrollContainer.scrollHeight - scrollContainer.clientHeight);
     scrollContainer.scrollTop = ratio * maxScroll;
     scrollThumbTopPercent = ratio * 100;
     updateActiveMonth();
   }
+
+  onMount(() => {
+    calculateMonthPositions();
+    const resizeObserver = new ResizeObserver(() => {
+      calculateMonthPositions();
+    });
+    if (scrollContainer) {
+      resizeObserver.observe(scrollContainer);
+    }
+    return () => {
+      resizeObserver.disconnect();
+    };
+  });
 
   onDestroy(() => {
     clearTimeout(scrollHideTimer);
@@ -192,7 +227,7 @@
       on:scroll={handleScroll}
     >
       <div class="memories-groups-container">
-        {#each visibleMonthGroups as group (group.key)}
+        {#each monthGroups as group (group.key)}
           <section id="month-group-{group.key}" class="month-section">
             <!-- BeReal-Style Month Spacer Header -->
             <div class="month-section-header">
@@ -243,7 +278,7 @@
       </div>
     </div>
 
-    <!-- Fixed Vertical Timeline Scrubber with Month Markers & Floating Date Popup (Stays fixed on screen) -->
+    <!-- Fixed Vertical Timeline Scrubber with Accurately Aligned Month Markers -->
     <div
       bind:this={scrubberTrackEl}
       class="timeline-scrubber-track"
@@ -264,24 +299,23 @@
         style="top: {scrollThumbTopPercent}%;"
       ></div>
 
-      <!-- Month Checkmarkers along fixed right track -->
-      {#each monthGroups as group, i}
-        {@const dotPosPercent = monthGroups.length > 1 ? (i / (monthGroups.length - 1)) * 92 + 4 : 50}
-        {@const isGroupActive = group.key === activeScrubKey}
+      <!-- Month Checkmarkers along track placed at exact section percentage -->
+      {#each monthPositions as pos}
+        {@const isGroupActive = pos.key === activeScrubKey}
         <button
           type="button"
           class="timeline-month-dot"
           class:is-active={isGroupActive}
-          style="top: {dotPosPercent}%;"
-          on:click|stopPropagation={() => scrollToMonth(group.key, group.title)}
-          title="Jump to {group.title} ({group.memories.length} BeReals)"
-          aria-label="Jump to {group.title}"
+          style="top: {pos.topPercent}%;"
+          on:click|stopPropagation={() => scrollToMonth(pos.key, pos.title)}
+          title="Jump to {pos.title}"
+          aria-label="Jump to {pos.title}"
         >
           <span class="dot-inner-core"></span>
         </button>
       {/each}
 
-      <!-- Floating Scrub/Scroll Date Popup Pill -->
+      <!-- Floating Scrub/Scroll Date Popup Pill (Aligned with Thumb) -->
       {#if isScrolling || isDraggingScrubber}
         <div
           class="timeline-floating-badge"
@@ -311,15 +345,6 @@
     padding-right: 36px;
     position: relative;
     scroll-behavior: smooth;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  /* Hide default scrollbar so only the custom timeline rail is visible */
-  .memories-scroll-viewport::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
   }
 
   .memories-groups-container {
@@ -448,121 +473,123 @@
   }
 
   .timeline-scrubber-track:hover .timeline-line-rail {
-    background: rgba(56, 189, 248, 0.4);
+    background: rgba(255, 255, 255, 0.28);
     width: 4px;
   }
 
   .timeline-scrubber-thumb {
     position: absolute;
-    width: 10px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
     height: 24px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
-    transform: translateY(-50%);
+    background: #f4f4f5;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.3);
     pointer-events: none;
-    transition: background 0.15s ease, width 0.15s ease;
+    transition: transform 0.1s ease, background 0.15s ease;
+    z-index: 85;
   }
 
   .timeline-scrubber-thumb.is-active,
   .timeline-scrubber-track:hover .timeline-scrubber-thumb {
     background: #38bdf8;
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
-    width: 12px;
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.5), 0 0 0 2px #38bdf8;
+    transform: translate(-50%, -50%) scale(1.15);
   }
 
   .timeline-month-dot {
     position: absolute;
-    width: 10px;
-    height: 10px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: #181824;
-    border: 1.5px solid rgba(255, 255, 255, 0.6);
-    padding: 0;
-    cursor: pointer;
-    transform: translateY(-50%);
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
-    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease, border-color 0.15s ease;
+    background: transparent;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .dot-inner-core {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: #ffffff;
-    transition: transform 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+    padding: 0;
+    z-index: 82;
+    transition: transform 0.15s ease;
   }
 
   .timeline-month-dot:hover {
-    transform: translateY(-50%) scale(1.6);
-    border-color: #38bdf8;
-    background: #09090e;
-    z-index: 10;
+    transform: translate(-50%, -50%) scale(1.35);
   }
 
-  .timeline-month-dot:hover .dot-inner-core {
-    background: #38bdf8;
-    transform: scale(1.3);
-  }
-
-  .timeline-month-dot.is-active {
-    border-color: #38bdf8;
-    background: #38bdf8;
-    transform: translateY(-50%) scale(1.35);
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.65);
+  .dot-inner-core {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    transition: all 0.18s ease;
   }
 
   .timeline-month-dot.is-active .dot-inner-core {
-    background: #09090e;
+    width: 9px;
+    height: 9px;
+    background: #38bdf8;
+    box-shadow: 0 0 8px #38bdf8;
+    border-color: #ffffff;
   }
 
-  /* Floating Popup Badge */
+  .timeline-month-dot:hover .dot-inner-core {
+    background: #ffffff;
+    transform: scale(1.2);
+  }
+
+  /* Floating Scrub/Scroll Date Popup Pill (Shows directly adjacent to thumb) */
   .timeline-floating-badge {
     position: absolute;
     right: 28px;
     transform: translateY(-50%);
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 16px;
-    background: rgba(16, 16, 24, 0.96);
-    backdrop-filter: blur(20px);
-    border: 1.5px solid rgba(56, 189, 248, 0.4);
-    border-radius: 999px;
-    color: #ffffff;
-    font-size: 13px;
-    font-weight: 800;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 12px rgba(56, 189, 248, 0.25);
-    white-space: nowrap;
+    gap: 6px;
+    background: rgba(18, 18, 28, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 5px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
     pointer-events: none;
+    white-space: nowrap;
     z-index: 90;
-    animation: badgePopIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: popupIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  @keyframes badgePopIn {
+  @keyframes popupIn {
     from {
       opacity: 0;
-      transform: translateY(-50%) scale(0.9);
+      transform: translateY(-50%) translateX(6px) scale(0.95);
     }
     to {
       opacity: 1;
-      transform: translateY(-50%) scale(1);
+      transform: translateY(-50%) translateX(0) scale(1);
     }
+  }
+
+  .floating-badge-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
   }
 
   .badge-pointer-arrow {
     position: absolute;
-    right: -6px;
+    right: -5px;
     top: 50%;
     transform: translateY(-50%) rotate(45deg);
-    width: 10px;
-    height: 10px;
-    background: rgba(16, 16, 24, 0.96);
-    border-top: 1.5px solid rgba(56, 189, 248, 0.4);
-    border-right: 1.5px solid rgba(56, 189, 248, 0.4);
+    width: 8px;
+    height: 8px;
+    background: rgba(18, 18, 28, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .empty-memories-state {
@@ -570,41 +597,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 20px;
+    padding: 70px 20px;
     text-align: center;
-    background: #0f0f15;
+    background: #0d0d13;
     border: 1px dashed var(--border-medium);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
   }
 
   .empty-icon-wrap {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #181822;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 12px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #15151f;
+    margin-bottom: 16px;
   }
 
   .empty-title {
     font-size: 16px;
     font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 4px;
+    color: var(--text-main);
+    margin-bottom: 6px;
   }
 
   .empty-desc {
     font-size: 13px;
     color: var(--text-secondary);
-    max-width: 320px;
-  }
-
-  @media (max-width: 600px) {
-    .memories-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
+    max-width: 360px;
   }
 </style>
