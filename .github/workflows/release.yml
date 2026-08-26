@@ -53,6 +53,7 @@ jobs:
               releaseBody = `## 🚀 BeReal Studio ${tagName}\n\nOne-click desktop application to browse, composite, and recap BeReal GDPR archives.`;
             }
 
+            let releaseId;
             // Check if release already exists
             try {
               const existing = await github.rest.repos.getReleaseByTag({
@@ -70,22 +71,48 @@ jobs:
                   draft: false,
                   prerelease: false
                 });
-                return existing.data.id;
+                releaseId = existing.data.id;
               }
             } catch (e) {
               // Not found, proceed to create
             }
 
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: tagName,
-              name: `BeReal Studio ${tagName}`,
-              body: releaseBody,
-              draft: false,
-              prerelease: false
-            });
-            return data.id;
+            if (!releaseId) {
+              const { data } = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tagName,
+                name: `BeReal Studio ${tagName}`,
+                body: releaseBody,
+                draft: false,
+                prerelease: false
+              });
+              releaseId = data.id;
+            }
+
+            // Clean up any unwanted build script or junk assets if present
+            try {
+              const assets = await github.rest.repos.listReleaseAssets({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: releaseId,
+                per_page: 100
+              });
+              for (const asset of assets.data) {
+                if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
+                  console.log(`Deleting unwanted asset: ${asset.name} (${asset.id})`);
+                  await github.rest.repos.deleteReleaseAsset({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    asset_id: asset.id
+                  });
+                }
+              }
+            } catch (e) {
+              console.log('Asset cleanup notice:', e.message);
+            }
+
+            return releaseId;
 
   build-tauri:
     needs: create-release
@@ -190,28 +217,36 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/release-artifacts"
           
-          # Find and copy all installer packages
-          echo "=== Scanning for release files in src-tauri/target/ ==="
-          find src-tauri/target/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.msi" -o -name "*.exe" \) | while read -r f; do
-            echo "Found bundle: $f"
-            cp "$f" "$GITHUB_WORKSPACE/release-artifacts/"
-          done
+          # Find and copy installer packages strictly from Tauri's bundle output directory
+          echo "=== Scanning for release bundle packages in src-tauri/target/release/bundle/ ==="
+          if [ -d "src-tauri/target/release/bundle" ]; then
+            find src-tauri/target/release/bundle/ -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.appimage" -o -name "*.msi" -o -name "*.exe" \) | while read -r f; do
+              echo "Found bundle: $f"
+              cp "$f" "$GITHUB_WORKSPACE/release-artifacts/"
+            done
+          fi
 
-          # Check for compiled standalone binaries
-          for bin in "src-tauri/target/release/bereal-studio" "src-tauri/target/release/BeReal Studio" "src-tauri/target/release/bereal_studio"; do
-            if [ -f "$bin" ]; then
-              echo "Found standalone binary: $bin"
-              if [ "${{ runner.os }}" = "Linux" ]; then
-                cp "$bin" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
-                chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
-                tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-Linux-x86_64"
-              elif [ "${{ runner.os }}" = "macOS" ]; then
-                cp "$bin" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
-                chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
-                tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-macOS-arm64"
-              fi
+          # Check for compiled standalone binaries strictly at target/release root
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio.exe" ]; then
+              echo "Found standalone Windows binary: bereal-studio.exe"
+              cp "src-tauri/target/release/bereal-studio.exe" "$GITHUB_WORKSPACE/release-artifacts/"
             fi
-          done
+          elif [ "${{ runner.os }}" = "Linux" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio" ]; then
+              echo "Found standalone Linux binary: bereal-studio"
+              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64"
+              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-Linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-Linux-x86_64"
+            fi
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            if [ -f "src-tauri/target/release/bereal-studio" ]; then
+              echo "Found standalone macOS binary: bereal-studio"
+              cp "src-tauri/target/release/bereal-studio" "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+              chmod +x "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64"
+              tar -czf "$GITHUB_WORKSPACE/release-artifacts/BeReal-Studio-macOS-arm64.tar.gz" -C "$GITHUB_WORKSPACE/release-artifacts" "BeReal-Studio-macOS-arm64"
+            fi
+          fi
 
           # Package macOS .app directory into tarball if present
           if [ -d "src-tauri/target/release/bundle/macos" ]; then
@@ -240,3 +275,41 @@ jobs:
               fi
             done
           fi
+
+  cleanup-release-assets:
+    needs: [create-release, build-tauri]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge Non-Release and Intermediate Build Binaries
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const releaseId = ${{ needs.create-release.outputs.release_id }};
+            if (!releaseId) {
+              console.log('No release_id provided, skipping asset cleanup.');
+              return;
+            }
+            try {
+              const assets = await github.rest.repos.listReleaseAssets({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: releaseId,
+                per_page: 100
+              });
+              for (const asset of assets.data) {
+                if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
+                  console.log(`Purging unwanted asset: ${asset.name} (${asset.id})`);
+                  await github.rest.repos.deleteReleaseAsset({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    asset_id: asset.id
+                  });
+                }
+              }
+              console.log('Asset cleanup completed successfully.');
+            } catch (e) {
+              console.log('Error during asset cleanup:', e.message);
+            }
+
