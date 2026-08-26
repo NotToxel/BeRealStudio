@@ -19,12 +19,12 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format | Direct Download Link |
 | :--- | :--- | :--- |
-| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64-setup.exe) |
-| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64_en-US.msi) |
-| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_aarch64.dmg) |
-| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64.dmg) |
-| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.AppImage) |
-| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.deb) |
+| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64-setup.exe) |
+| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64_en-US.msi) |
+| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_aarch64.dmg) |
+| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64.dmg) |
+| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.1_amd64.AppImage) |
+| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.1_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
@@ -54,24 +54,31 @@ Download the official standalone release for your platform from the [Latest Rele
 
 ### 📱 1. Native Memories & Calendar Explorer
 - **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
-- **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** and an interactive **Monthly Calendar Matrix**.
+- **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** (with viewport-filling timeline scrubber) and an interactive **Monthly Calendar Matrix** (with pinned sticky navigation).
 - **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
 - **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
 - **Interactive Dual-Camera Frame**:
   - **Click-to-Swap**: Flip front and back cameras instantly.
   - **Movable PIP**: Drag and reposition the selfie PIP anywhere or snap to the 4 corners.
   - **Inline BTS Player**: Stream Behind-the-Scenes live video micro-clips with a single click.
-- **Smart Search & Hierarchical Filtering**: Filter posts by text query, GPS location, BTS clips, captions, retakes, year, month, city, and country.
-- **Single-Memory Instant Export Dialog**: Export individual memories as Combined PIP, Side-by-Side, Front/Back only, MP4 video clip, or Motion Photo with customizable defaults.
+- **Smart Search & Live Compound Filtering**:
+  - Filter posts by text query, GPS location, BTS clips, captions, retakes, year, month, city, and country.
+  - Live dynamic count tags on all filter chips and dimension selectors update continuously as multi-level filters are applied.
+- **Single-Memory Instant Export Dialog**:
+  - **Picture-in-Picture & Side-by-Side**: High-resolution dual-camera composites with lossless EXIF restoration.
+  - **Apple Live Photo (.jpg + .mov pair)**: Generates matching Apple Content Identifier UUID metadata (`MakerApple:17` and `com.apple.quicktime.content.identifier`) recognized natively by macOS/iOS Apple Photos and iCloud.
+  - **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos directly into JPEG headers via Samsung SEFH binary trailers and Google MicroVideo XMP.
+  - **Raw Media Clips & Camera Isolations**: Export primary camera, selfie camera, or raw MP4 video clips independently.
 - **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
 
 ---
 
 ### 📸 2. Photo Processing Suite
 - **Metadata Restoration & EXIF Synchronization**: Losslessly embeds original capture dates, times, GPS coordinates, and caption descriptions into EXIF/IPTC photo headers.
+- **BeReal Moment Registry & True Cycle Date Anchoring**: Accurately anchors posts taken late or past midnight to their true BeReal notification cycle dates.
 - **Dual-Camera Compositing**: Recreates BeReal's signature aesthetic with rounded corners and clean borders in Picture-in-Picture and Side-by-Side layouts.
 - **Dual-Angle Perspective Export**: Choose between **Standard** (primary background), **Reversed** (selfie background), or export **Both Angles** concurrently.
-- **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos.
+- **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos *(requires JPEG format)*.
 - **Visual Timeline & Date Range Filter**: Interactive monthly activity density curve and calendar picker to easily filter memories by year, month, or custom dates.
 - **Fast Batch Processing**: Multi-threaded Rayon pipeline processes hundreds of archive photos in seconds.
 
@@ -152,9 +159,9 @@ npm run tauri build
 ```
 
 ### Build Artifact Locations:
-- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_2.0.0_x64_en-US.msi` or `.exe`
-- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.0.0_universal.dmg`
-- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.0.0_amd64.deb` or `appimage`
+- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_2.2.1_x64_en-US.msi` or `.exe`
+- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.2.1_universal.dmg`
+- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.2.1_amd64.deb` or `appimage`
 
 ---
 
@@ -171,42 +178,39 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ---
 
-## 🏗️ Project Architecture
+## 🏗️ Architecture & Directory Structure
 
 ```
 BeRealStudio/
-├── src/                                    # Frontend (Svelte 5 + SvelteKit SPA + TypeScript)
-│   ├── app.html                            # Root HTML & Inter typography
-│   ├── styles/global.css                   # Custom dark design system tokens
+├── src/                                    # Frontend (SvelteKit SPA + TypeScript)
+│   ├── app.html                            # Root HTML & Inter font imports
+│   ├── styles/global.css                   # Custom dark design system tokens & font-faces
 │   ├── lib/
-│   │   ├── types.ts                        # TypeScript data models & IPC interfaces
-│   │   ├── tauri.ts                        # Typed Tauri IPC bridge & event subscribers
-│   │   ├── stores.ts                       # Reactive stores & parallel multi-job queue
-│   │   ├── memoriesStore.ts                # Native Memories & Calendar state & caching
-│   │   ├── devMode.ts                      # Demo data generator & developer mode
+│   │   ├── types.ts                        # TypeScript models & IPC interfaces
+│   │   ├── tauri.ts                        # Tauri IPC bridge & typed event listeners
+│   │   ├── stores.ts                       # Svelte reactive state stores
+│   │   ├── memoriesStore.ts                # Memories explorer state & live compound filtering
 │   │   └── fonts.ts                        # Curated built-in font definitions
-│   ├── components/                         # Reusable UI Components
-│   │   ├── NavBar.svelte                   # Global top navigation with Activity badge
-│   │   ├── TitleBar.svelte                 # Custom frameless title bar & window controls
+│   ├── components/                         # Reusable UI Component Suite
+│   │   ├── NavBar.svelte                   # Top navigation bar (Home, Photos, Recap, Settings, About)
 │   │   ├── Toggle.svelte                   # Animated on/off switch
 │   │   ├── Slider.svelte                   # Value range slider with value pill
-│   │   ├── Stepper.svelte                  # Numeric stepper input
 │   │   ├── FilePicker.svelte               # Native folder & file dialog wrapper
-│   │   ├── DateRangePicker.svelte          # Dual date pickers with monthly density curve
-│   │   ├── SpeedCurvePreview.svelte        # Visual speed curve & audio waveform canvas
-│   │   ├── Modal.svelte                    # Accessible modal dialog
-│   │   ├── LogConsole.svelte               # Color-coded live terminal console
+│   │   ├── DateRangePicker.svelte          # Dual date pickers with monthly density histogram
+│   │   ├── ProgressBar.svelte              # Streaming progress indicator
+│   │   ├── LogConsole.svelte               # Color-coded live terminal log
 │   │   ├── ErrorModal.svelte               # Categorized error overlay
+│   │   ├── FontPicker.svelte               # Curated 7-font dropdown selector
 │   │   ├── RuleEditor.svelte               # Reverse geocoding rules editor
 │   │   └── memories/                       # Memories & Explorer Component Suite
-│   │       ├── MemoriesGrid.svelte         # Responsive memory card grid
-│   │       ├── CalendarGrid.svelte         # Interactive monthly calendar matrix
+│   │       ├── MemoriesGrid.svelte         # Responsive memory card grid & full-height scrubber
+│   │       ├── CalendarGrid.svelte         # Interactive monthly calendar with sticky navigation
 │   │       ├── DualCameraFrame.svelte      # Dual-camera frame with click-to-swap & movable PIP
 │   │       ├── MemoryFeedModal.svelte      # Fullscreen continuous vertical scroll feed
-│   │       ├── MemoryFilterBar.svelte      # Multi-dimensional search & drawer filters
+│   │       ├── MemoryFilterBar.svelte      # Live compound search & dimension filters
 │   │       ├── MemoryActionMenu.svelte     # Memory 3-dot dropdown menu
 │   │       ├── MemoryContextMenu.svelte    # Right-click context menu
-│   │       └── ExportMemoryModal.svelte    # Single-memory export dialog
+│   │       └── ExportMemoryModal.svelte    # Single-memory export dialog (Apple Live Photo & Motion Photo)
 │   ├── views/                              # Application Primary Views
 │   │   ├── Home.svelte                     # Main dashboard with hero & feature cards
 │   │   ├── MemoriesView.svelte             # Native Memories & Calendar Explorer View
@@ -215,7 +219,7 @@ BeRealStudio/
 │   │   ├── Activity.svelte                 # Parallel active operations & generation history
 │   │   ├── Processing.svelte               # Real-time progress & live streaming log view
 │   │   ├── Complete.svelte                 # Summary metrics, output opener & log exporter
-│   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & header settings
+│   │   ├── Settings.svelte                 # Global defaults, FFmpeg detection & inspector tools
 │   │   └── About.svelte                    # Privacy manifesto, authoring & open source credits
 │   └── routes/+page.svelte                 # SPA root page router
 │
@@ -232,13 +236,15 @@ BeRealStudio/
 │       │   ├── archive.rs                  # scan_archive, extract_zip (streaming)
 │       │   ├── toolkit.rs                  # start_toolkit, cancel_toolkit (Rayon multi-core)
 │       │   ├── recapper.rs                 # start_recapper, cancel_recapper
+│       │   ├── explorer.rs                 # load_memories, export_single_memory (Live Photo & Motion Photo)
 │       │   ├── settings.rs                 # load_settings, save_settings, reset_settings
 │       │   ├── system.rs                   # show_in_folder, check_ffmpeg, offline geodb, analyze_audio
 │       │   └── debug.rs                    # export_debug_log, get_debug_logs
 │       ├── pipeline/                       # Photo Processing Logic
-│       │   ├── parser.rs                   # Streaming JSON parsing & monthly histogram
+│       │   ├── parser.rs                   # Authoritative dataset fusion & moment registry
 │       │   ├── image_ops.rs                # Format conversion, PIP & Side-by-Side compositing
 │       │   ├── exif_writer.rs              # Lossless EXIF & IPTC JPEG segment injection
+│       │   ├── live_photo.rs               # Apple Photos Live Photo pair (.jpg + .mov) generator
 │       │   ├── motion_photo.rs             # Samsung SEFH/SEFT binary muxer & GCamera XMP
 │       │   ├── video_ops.rs                # FFmpeg dual-video PIP overlay
 │       │   ├── date_filter.rs              # Range filtering & density distribution
@@ -251,7 +257,7 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-├── package.json                            # App manifest & dependencies (v2.0.0)
+├── package.json                            # App manifest & dependencies (v2.2.1)
 └── README.md                               # User documentation & GDPR guide
 ```
 
@@ -263,8 +269,8 @@ BeRealStudio/
   - Monthly Memories Calendar Matrix with day thumbnails, late badges, and retake counters.
   - Interactive Feed & Lightbox with front/back camera click-to-swap and movable PIP.
   - Multi-dimensional search, hierarchical location drawers, and single-memory exports.
-- [ ] **🍏 Apple Photos Live Photos Compatibility**:
-  - Export paired still image (`.jpg`/`.heic`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier` metadata) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
+- [x] **🍏 Apple Photos Live Photos Compatibility** *(Completed in v2.2.1)*:
+  - Export paired still image (`.jpg`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier`) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
 - [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
   - Optional setting to burn original BeReal captions in authentic semi-transparent rounded pill styling directly onto composited images or recap slides.
 - [ ] **🎬 Recap Video Library & Gallery Viewer**:
@@ -276,10 +282,11 @@ BeRealStudio/
 
 **BeReal Studio** is authored and maintained by **[NotToxel](https://github.com/NotToxel)** ([GitHub Repository](https://github.com/NotToxel/BeRealStudio)).
 
-It unifies, rewrites, and modernizes the core capabilities of two pioneer open-source projects into a single, high-performance desktop application:
+It unifies, rewrites, and modernizes the core capabilities of three pioneer open-source projects into a single, high-performance desktop application:
 
 - **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator and reverse-geocoding rules engine.
 - **[BeReal-GDPR-Photo-Toolkit](https://github.com/hatobi/bereal-gdpr-photo-toolkit)** *(by [@hatobi](https://github.com/hatobi))* — Pioneer of BeReal GDPR archive extraction, EXIF metadata restoration, and Picture-in-Picture photo compositing.
+- **[makelive](https://github.com/mifi/makelive)** *(by [@mifi](https://github.com/mifi))* — Pioneer of Apple Photos compatible Live Photo generation with matching Content Identifier metadata synchronization on paired image and video assets.
 
 ---
 

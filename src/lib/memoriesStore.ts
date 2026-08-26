@@ -107,76 +107,6 @@ export function toggleBtsOnlyFilter() {
 // Current month viewed in the Calendar view ("YYYY-MM")
 export const calendarCurrentMonth = writable<string>('');
 
-// ─── Derived Location & Date Counts Store ─────────────────────────────────────
-export interface ExplorerFilterCounts {
-  byYear: Map<number, number>;
-  byMonth: Map<string, number>;
-  byCountry: Map<string, number>;
-  byCity: Map<string, number>;
-  bySuburb: Map<string, number>;
-}
-
-export const explorerFilterCounts = derived(explorerData, ($data): ExplorerFilterCounts => {
-  const counts: ExplorerFilterCounts = {
-    byYear: new Map(),
-    byMonth: new Map(),
-    byCountry: new Map(),
-    byCity: new Map(),
-    bySuburb: new Map(),
-  };
-
-  if (!$data || !$data.memories) return counts;
-
-  for (const m of $data.memories) {
-    counts.byYear.set(m.year, (counts.byYear.get(m.year) || 0) + 1);
-    counts.byMonth.set(m.monthKey, (counts.byMonth.get(m.monthKey) || 0) + 1);
-    if (m.country) counts.byCountry.set(m.country, (counts.byCountry.get(m.country) || 0) + 1);
-    if (m.city) counts.byCity.set(m.city, (counts.byCity.get(m.city) || 0) + 1);
-    if (m.suburb) counts.bySuburb.set(m.suburb, (counts.bySuburb.get(m.suburb) || 0) + 1);
-  }
-
-  return counts;
-});
-
-// Group cities by country for rich-looking dropdown menus
-export interface CountryCityGroup {
-  country: string;
-  totalPosts: number;
-  cities: { name: string; count: number }[];
-}
-
-export const citiesByCountry = derived(explorerData, ($data): CountryCityGroup[] => {
-  if (!$data || !$data.memories) return [];
-  const countryMap = new Map<string, Map<string, number>>();
-
-  for (const m of $data.memories) {
-    const country = m.country || 'Other';
-    const city = m.city || (m.locationName ? m.locationName.split(',')[0].trim() : '');
-    if (!city) continue;
-
-    if (!countryMap.has(country)) {
-      countryMap.set(country, new Map());
-    }
-    const cityMap = countryMap.get(country)!;
-    cityMap.set(city, (cityMap.get(city) || 0) + 1);
-  }
-
-  const result: CountryCityGroup[] = [];
-  for (const [country, cityMap] of countryMap.entries()) {
-    let totalPosts = 0;
-    const cities: { name: string; count: number }[] = [];
-    for (const [name, count] of cityMap.entries()) {
-      totalPosts += count;
-      cities.push({ name, count });
-    }
-    cities.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-    result.push({ country, totalPosts, cities });
-  }
-
-  result.sort((a, b) => b.totalPosts - a.totalPosts || a.country.localeCompare(b.country));
-  return result;
-});
-
 // ─── Derived Filtered Memories Store ──────────────────────────────────────────
 
 export const filteredMemories = derived<[typeof explorerData, typeof explorerFilter], ExplorerMemory[]>(
@@ -185,18 +115,19 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
     if (!$data || !$data.memories) return [];
 
     return $data.memories.filter((m: ExplorerMemory) => {
-      // 1. Text search (caption, location, suburb, city, country, date)
+      // 1. Text search (caption, suburb, city, country, human-readable date)
       if ($filter.searchQuery.trim()) {
         const q = $filter.searchQuery.toLowerCase().trim();
         const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
         const locationMatch =
-          (m.locationName ? m.locationName.toLowerCase().includes(q) : false) ||
           (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
           (m.city ? m.city.toLowerCase().includes(q) : false) ||
-          (m.country ? m.country.toLowerCase().includes(q) : false);
+          (m.country ? m.country.toLowerCase().includes(q) : false) ||
+          (m.locationName && !m.locationName.includes('°') && !/^-?\d+(\.\d+)?,\s*-?\d+/.test(m.locationName)
+            ? m.locationName.toLowerCase().includes(q)
+            : false);
         const dateMatch =
           m.dateFormatted.toLowerCase().includes(q) ||
-          m.takenAt.toLowerCase().includes(q) ||
           m.monthKey.includes(q);
         if (!captionMatch && !locationMatch && !dateMatch) return false;
       }
@@ -237,6 +168,143 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
 
       return true;
     });
+  }
+);
+
+// Helper for cross-dimension facet count calculation
+function matchesFacet(m: ExplorerMemory, filter: ExplorerFilterState, ignoreDim?: 'year' | 'month' | 'country' | 'city' | 'suburb'): boolean {
+  if (filter.searchQuery.trim()) {
+    const q = filter.searchQuery.toLowerCase().trim();
+    const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
+    const locationMatch =
+      (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
+      (m.city ? m.city.toLowerCase().includes(q) : false) ||
+      (m.country ? m.country.toLowerCase().includes(q) : false) ||
+      (m.locationName && !m.locationName.includes('°') && !/^-?\d+(\.\d+)?,\s*-?\d+/.test(m.locationName)
+        ? m.locationName.toLowerCase().includes(q)
+        : false);
+    const dateMatch =
+      m.dateFormatted.toLowerCase().includes(q) ||
+      m.monthKey.includes(q);
+    if (!captionMatch && !locationMatch && !dateMatch) return false;
+  }
+  if (ignoreDim !== 'year' && filter.selectedYear !== 'all' && m.year !== filter.selectedYear) return false;
+  if (ignoreDim !== 'month' && filter.selectedMonth !== 'all' && m.monthKey !== filter.selectedMonth) return false;
+  if (ignoreDim !== 'country' && filter.selectedCountry !== 'all' && m.country !== filter.selectedCountry) return false;
+  if (ignoreDim !== 'city' && filter.selectedCity !== 'all' && m.city !== filter.selectedCity) return false;
+  if (ignoreDim !== 'suburb' && filter.selectedSuburb !== 'all' && m.suburb !== filter.selectedSuburb) return false;
+  if (filter.hasLocationOnly && !m.location && !m.locationName) return false;
+  if (filter.hasBtsOnly && !m.btsPath) return false;
+  if (filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
+  if (filter.hasVideoOnly) {
+    const isVid = m.isVideo || (m.primaryPath && (m.primaryPath.endsWith('.mp4') || m.primaryPath.endsWith('.mov'))) || (m.secondaryPath && (m.secondaryPath.endsWith('.mp4') || m.secondaryPath.endsWith('.mov')));
+    if (!isVid) return false;
+  }
+  return true;
+}
+
+// ─── Derived Location & Date Counts Store (Live Compound Counts) ──────────────────
+export interface ExplorerFilterCounts {
+  byYear: Map<number, number>;
+  byMonth: Map<string, number>;
+  byCountry: Map<string, number>;
+  byCity: Map<string, number>;
+  bySuburb: Map<string, number>;
+  locationCount: number;
+  videoCount: number;
+  btsCount: number;
+  captionCount: number;
+}
+
+export const explorerFilterCounts = derived(
+  [explorerData, explorerFilter, filteredMemories],
+  ([$data, $filter, $filtered]): ExplorerFilterCounts => {
+    const counts: ExplorerFilterCounts = {
+      byYear: new Map(),
+      byMonth: new Map(),
+      byCountry: new Map(),
+      byCity: new Map(),
+      bySuburb: new Map(),
+      locationCount: 0,
+      videoCount: 0,
+      btsCount: 0,
+      captionCount: 0,
+    };
+
+    if (!$data || !$data.memories) return counts;
+
+    for (const m of $data.memories) {
+      if (matchesFacet(m, $filter, 'year')) {
+        counts.byYear.set(m.year, (counts.byYear.get(m.year) || 0) + 1);
+      }
+      if (matchesFacet(m, $filter, 'month')) {
+        counts.byMonth.set(m.monthKey, (counts.byMonth.get(m.monthKey) || 0) + 1);
+      }
+      if (m.country && matchesFacet(m, $filter, 'country')) {
+        counts.byCountry.set(m.country, (counts.byCountry.get(m.country) || 0) + 1);
+      }
+      if (m.city && matchesFacet(m, $filter, 'city')) {
+        counts.byCity.set(m.city, (counts.byCity.get(m.city) || 0) + 1);
+      }
+      if (m.suburb && matchesFacet(m, $filter, 'suburb')) {
+        counts.bySuburb.set(m.suburb, (counts.bySuburb.get(m.suburb) || 0) + 1);
+      }
+    }
+
+    // Media counts from active filtered set
+    const source = $filtered !== undefined ? $filtered : $data.memories;
+    for (const m of source) {
+      if (m.location) counts.locationCount++;
+      if (m.isVideo) counts.videoCount++;
+      if (m.btsPath) counts.btsCount++;
+      if (m.caption) counts.captionCount++;
+    }
+
+    return counts;
+  }
+);
+
+// Group cities by country for rich-looking dropdown menus (Live Filtered)
+export interface CountryCityGroup {
+  country: string;
+  totalPosts: number;
+  cities: { name: string; count: number }[];
+}
+
+export const citiesByCountry = derived(
+  [explorerData, explorerFilter],
+  ([$data, $filter]): CountryCityGroup[] => {
+    if (!$data || !$data.memories) return [];
+    const countryMap = new Map<string, Map<string, number>>();
+
+    for (const m of $data.memories) {
+      if (!matchesFacet(m, $filter, 'city')) continue;
+
+      const country = m.country || 'Other';
+      const city = m.city || (m.locationName ? m.locationName.split(',')[0].trim() : '');
+      if (!city) continue;
+
+      if (!countryMap.has(country)) {
+        countryMap.set(country, new Map());
+      }
+      const cityMap = countryMap.get(country)!;
+      cityMap.set(city, (cityMap.get(city) || 0) + 1);
+    }
+
+    const result: CountryCityGroup[] = [];
+    for (const [country, cityMap] of countryMap.entries()) {
+      let totalPosts = 0;
+      const cities: { name: string; count: number }[] = [];
+      for (const [name, count] of cityMap.entries()) {
+        totalPosts += count;
+        cities.push({ name, count });
+      }
+      cities.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      result.push({ country, totalPosts, cities });
+    }
+
+    result.sort((a, b) => b.totalPosts - a.totalPosts || a.country.localeCompare(b.country));
+    return result;
   }
 );
 
@@ -474,9 +542,9 @@ export function closeContextMenu() {
   contextMenuState.update((s) => ({ ...s, isOpen: false }));
 }
 
-// ─── Export Preferences & Modal State ─────────────────────────────────────────
-export interface ExportPreferences {
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo';
+// ─── Partitioned Export Preferences (Photos, Videos, BTS) ─────────────────────
+export interface PhotoExportPreferences {
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'motion_photo' | 'apple_live_photo';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;
@@ -484,33 +552,103 @@ export interface ExportPreferences {
   isDefaultSet: boolean;
 }
 
-const defaultExportPreferences: ExportPreferences = {
+export interface VideoExportPreferences {
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only';
+  embedGps: boolean;
+  isDefaultSet: boolean;
+}
+
+export interface BtsExportPreferences {
+  exportType: 'bts_only';
+  isDefaultSet: boolean;
+}
+
+export type ExportPreferences = PhotoExportPreferences;
+
+export const defaultPhotoPreferences: PhotoExportPreferences = {
   exportType: 'combined_pip',
   format: 'Jpeg',
-  quality: 92,
+  quality: 95,
   embedExif: true,
   embedGps: true,
   isDefaultSet: false,
 };
 
-function loadSavedExportPreferences(): ExportPreferences {
+export const defaultVideoPreferences: VideoExportPreferences = {
+  exportType: 'combined_pip',
+  embedGps: true,
+  isDefaultSet: false,
+};
+
+export const defaultBtsPreferences: BtsExportPreferences = {
+  exportType: 'bts_only',
+  isDefaultSet: false,
+};
+
+function loadSavedPhotoPreferences(): PhotoExportPreferences {
   if (typeof window !== 'undefined') {
     try {
-      const saved = localStorage.getItem('bereal_export_preferences');
-      if (saved) return { ...defaultExportPreferences, ...JSON.parse(saved) };
+      const saved = localStorage.getItem('bereal_photo_export_prefs') || localStorage.getItem('bereal_export_preferences');
+      if (saved) return { ...defaultPhotoPreferences, ...JSON.parse(saved) };
     } catch {}
   }
-  return { ...defaultExportPreferences };
+  return { ...defaultPhotoPreferences };
 }
 
-export const exportPreferences = writable<ExportPreferences>(loadSavedExportPreferences());
+function loadSavedVideoPreferences(): VideoExportPreferences {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_video_export_prefs');
+      if (saved) return { ...defaultVideoPreferences, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...defaultVideoPreferences };
+}
+
+function loadSavedBtsPreferences(): BtsExportPreferences {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_bts_export_prefs');
+      if (saved) return { ...defaultBtsPreferences, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...defaultBtsPreferences };
+}
+
+export const photoExportPreferences = writable<PhotoExportPreferences>(loadSavedPhotoPreferences());
+export const videoExportPreferences = writable<VideoExportPreferences>(loadSavedVideoPreferences());
+export const btsExportPreferences = writable<BtsExportPreferences>(loadSavedBtsPreferences());
+export const exportPreferences = photoExportPreferences; // backward compatibility
 
 if (typeof window !== 'undefined') {
-  exportPreferences.subscribe((val) => {
+  photoExportPreferences.subscribe((val) => {
     try {
-      localStorage.setItem('bereal_export_preferences', JSON.stringify(val));
+      localStorage.setItem('bereal_photo_export_prefs', JSON.stringify(val));
     } catch {}
   });
+
+  videoExportPreferences.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_video_export_prefs', JSON.stringify(val));
+    } catch {}
+  });
+
+  btsExportPreferences.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_bts_export_prefs', JSON.stringify(val));
+    } catch {}
+  });
+}
+
+export function isMemoryVideo(memory?: ExplorerMemory | null): boolean {
+  if (!memory) return false;
+  return !!(
+    memory.isVideo ||
+    (memory.primaryPath &&
+      (memory.primaryPath.toLowerCase().endsWith('.mp4') ||
+        memory.primaryPath.toLowerCase().endsWith('.mov') ||
+        memory.primaryPath.toLowerCase().endsWith('.webm')))
+  );
 }
 
 export const exportModalState = writable<{

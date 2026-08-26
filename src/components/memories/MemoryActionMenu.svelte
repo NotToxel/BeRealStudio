@@ -85,7 +85,7 @@
     await handleExport('combined_pip');
   }
 
-  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
+  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo') {
     closeMenu();
     if (!memory.primaryPath) return;
 
@@ -252,118 +252,115 @@
 
       <!-- Quick Export Variations -->
       <div class="menu-section">
-        <span class="menu-header">Export Variations</span>
+        <span class="menu-header">Quick Save</span>
 
         <button type="button" class="menu-item" on:click={() => handleExport('combined_pip')}>
-          <Layers size={15} class="text-blue-400" />
+          <Layers size={14} class="text-blue-400" />
           <span>Save Picture-in-Picture</span>
         </button>
 
-        <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
-          <SlidersHorizontal size={15} class="text-purple-400" />
-          <span>Save Side-by-Side</span>
-        </button>
+        {#if memory.secondaryPath}
+          <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
+            <SlidersHorizontal size={14} class="text-purple-400" />
+            <span>Save Side-by-Side</span>
+          </button>
+        {/if}
 
         <button type="button" class="menu-item" on:click={() => handleExport('primary_only')}>
-          <Camera size={15} class="text-teal-400" />
+          <Camera size={14} class="text-teal-400" />
           <span>Save Main Camera</span>
         </button>
 
         {#if memory.secondaryPath}
           <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
-            <User size={15} class="text-rose-400" />
+            <User size={14} class="text-rose-400" />
             <span>Save Selfie Camera</span>
           </button>
         {/if}
 
         {#if memory.btsPath}
           <button type="button" class="menu-item" on:click={() => handleExport('bts_only')}>
-            <Film size={15} class="text-amber-400" />
-            <span>Save BTS Clip (Video)</span>
+            <Film size={14} class="text-amber-400" />
+            <span>Save BTS Video (.mp4)</span>
           </button>
           <button type="button" class="menu-item" on:click={() => handleExport('motion_photo')}>
-            <Sparkles size={15} class="text-emerald-400" />
-            <span>Save Motion Photo (Live)</span>
+            <Sparkles size={14} class="text-emerald-400" />
+            <span>Save Motion Photo (Android)</span>
+          </button>
+          <button type="button" class="menu-item" on:click={() => handleExport('apple_live_photo')}>
+            <Sparkles size={14} class="text-sky-400" />
+            <span>Save Apple Live Photo (iOS)</span>
           </button>
         {/if}
       </div>
 
       <div class="menu-divider"></div>
 
-      <!-- Copy Details & Coordinates -->
+      <!-- Compact Copy Info Grid -->
       <div class="menu-section">
-        <span class="menu-header">Copy Info</span>
+        <span class="menu-header">Copy</span>
 
-        <!-- Output Filename in properly formatted Toolkit convention -->
-        <button
-          type="button"
-          class="menu-item"
-          on:click={() => copyToClipboard(getFormattedOutputFilename(memory), 'Output Filename')}
-        >
-          <FileText size={15} class="text-emerald-400" />
-          <span>Copy Output Filename</span>
-        </button>
-
-        {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Source Filename')}>
-            <FileText size={15} class="text-cyan-400" />
-            <span>Copy Source Filename</span>
-          </button>
-        {/if}
-
-        {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}>
-            <FolderOpen size={15} class="text-slate-400" />
-            <span>Copy Full File Path</span>
-          </button>
-        {/if}
-
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Timestamp')}>
-          <Clock size={15} class="text-blue-400" />
-          <span>Copy Timestamp ({memory.timeFormatted})</span>
-        </button>
-
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(`${memory.dateFormatted} • ${memory.timeFormatted}`, 'Formatted Date')}>
-          <Copy size={15} class="text-indigo-400" />
-          <span>Copy Formatted Date</span>
-        </button>
-
-        {#if memory.locationName || memory.location}
+        <div class="copy-compact-grid">
           <button
             type="button"
-            class="menu-item"
-            on:click={() =>
-              copyToClipboard(
-                memory.locationName || `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
-                'Location'
-              )}
+            class="copy-grid-btn"
+            on:click={() => copyToClipboard(`${memory.dateFormatted} • ${memory.timeFormatted}`, 'Date & Time')}
+            title="Copy formatted date and time"
           >
-            <MapPin size={15} class="text-rose-400" />
-            <span>Copy Location</span>
+            <Clock size={12} class="text-indigo-400" />
+            <span>Date</span>
           </button>
-        {/if}
 
-        {#if memory.location}
+          {#if memory.primaryPath}
+            <button
+              type="button"
+              class="copy-grid-btn"
+              on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}
+              title="Copy absolute file path"
+            >
+              <FolderOpen size={12} class="text-slate-400" />
+              <span>Path</span>
+            </button>
+          {/if}
+
+          {#if memory.locationName || memory.location}
+            <button
+              type="button"
+              class="copy-grid-btn"
+              on:click={() =>
+                copyToClipboard(
+                  memory.locationName || `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
+                  'Location'
+                )}
+              title="Copy location / GPS coordinates"
+            >
+              <MapPin size={12} class="text-rose-400" />
+              <span>Location</span>
+            </button>
+          {/if}
+
+          {#if memory.caption}
+            <button
+              type="button"
+              class="copy-grid-btn"
+              on:click={() => copyToClipboard(memory.caption || '', 'Caption')}
+              title="Copy caption text"
+            >
+              <FileText size={12} class="text-yellow-400" />
+              <span>Caption</span>
+            </button>
+          {/if}
+
           <button
             type="button"
-            class="menu-item"
-            on:click={() =>
-              copyToClipboard(
-                `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
-                'GPS Coordinates'
-              )}
+            class="copy-grid-btn"
+            on:click={() => copyToClipboard(getFormattedOutputFilename(memory), 'Filename')}
+            title="Copy standard output filename"
           >
-            <Copy size={15} class="text-teal-400" />
-            <span>Copy GPS Coordinates</span>
+            <FileText size={12} class="text-emerald-400" />
+            <span>Filename</span>
           </button>
-        {/if}
-
-        {#if memory.caption}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
-            <FileText size={15} class="text-yellow-400" />
-            <span>Copy Caption</span>
-          </button>
-        {/if}
+        </div>
       </div>
     </div>
   {/if}
@@ -468,6 +465,39 @@
   .menu-item:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
+  }
+
+  /* Compact Copy Grid (2-column pill buttons) */
+  .copy-compact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 2px 4px 4px 4px;
+  }
+
+  .copy-grid-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .copy-grid-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    transform: translateY(-0.5px);
   }
 
   /* Inline Reveal Selection Row */

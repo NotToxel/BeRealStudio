@@ -336,7 +336,7 @@ export interface ExportSinglePostOptions {
   secondaryPath?: string;
   btsPath?: string;
   outputPath: string;
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo';
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;

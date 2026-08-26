@@ -6,6 +6,9 @@
   import Images from 'lucide-svelte/icons/images';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Calendar from 'lucide-svelte/icons/calendar';
+  import MessageSquare from 'lucide-svelte/icons/message-square';
+  import Clock from 'lucide-svelte/icons/clock';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
 
   let scrollContainer: HTMLElement | null = null;
   let scrubberTrackEl: HTMLElement | null = null;
@@ -78,132 +81,190 @@
     if (!scrollContainer) return;
     const { scrollHeight, clientHeight } = scrollContainer;
     const maxScroll = Math.max(1, scrollHeight - clientHeight);
-    const containerTop = scrollContainer.getBoundingClientRect().top + scrollContainer.scrollTop;
 
     const positions: { key: string; title: string; topPercent: number; offsetTop: number }[] = [];
 
     for (let i = 0; i < monthGroups.length; i++) {
       const group = monthGroups[i];
       const el = document.getElementById(`month-group-${group.key}`);
-      if (el) {
-        const elRect = el.getBoundingClientRect();
-        const sectionTop = elRect.top + scrollContainer.scrollTop - containerTop;
-        const topPercent = Math.min(96, Math.max(4, (sectionTop / maxScroll) * 92 + 4));
-        positions.push({
-          key: group.key,
-          title: group.title,
-          topPercent,
-          offsetTop: sectionTop,
-        });
-      } else {
-        // Fallback linear distribution if element not yet queried
-        const topPercent = monthGroups.length > 1 ? (i / (monthGroups.length - 1)) * 92 + 4 : 50;
-        positions.push({
-          key: group.key,
-          title: group.title,
-          topPercent,
-          offsetTop: (topPercent / 100) * maxScroll,
-        });
-      }
+      const topPercent = monthGroups.length > 1 ? (i / (monthGroups.length - 1)) * 92 + 4 : 50;
+      const sectionTop = el ? el.offsetTop : (i / Math.max(1, monthGroups.length - 1)) * maxScroll;
+
+      positions.push({
+        key: group.key,
+        title: group.title,
+        topPercent,
+        offsetTop: sectionTop,
+      });
     }
 
     monthPositions = positions;
     updateActiveMonth();
   }
 
+  let isProgrammaticScroll = false;
+  let programmaticScrollTimer: ReturnType<typeof setTimeout> | null = null;
+  let scrollRafPending = false;
+
   function updateActiveMonth() {
-    if (!scrollContainer) return;
+    if (!scrollContainer || monthPositions.length === 0) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
     const maxScroll = Math.max(1, scrollHeight - clientHeight);
-    scrollThumbTopPercent = Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100));
 
-    // Find the month currently visible in viewport with 80px offset
-    const currentScrollPos = scrollTop + 80;
-    let found = false;
+    // If at or near bottom (within 16px of maxScroll), lock to the last month
+    if (scrollTop >= maxScroll - 16) {
+      const last = monthPositions[monthPositions.length - 1];
+      activeScrubMonth = last.title;
+      activeScrubKey = last.key;
+      scrollThumbTopPercent = last.topPercent;
+      return;
+    }
 
-    for (let i = monthPositions.length - 1; i >= 0; i--) {
-      const pos = monthPositions[i];
-      if (currentScrollPos >= pos.offsetTop) {
-        activeScrubMonth = pos.title;
-        activeScrubKey = pos.key;
-        found = true;
+    // If at or near top (within 10px of top), lock to the first month
+    if (scrollTop <= 10) {
+      const first = monthPositions[0];
+      activeScrubMonth = first.title;
+      activeScrubKey = first.key;
+      scrollThumbTopPercent = first.topPercent;
+      return;
+    }
+
+    let activeIdx = 0;
+    let nextFrac = 0;
+
+    for (let i = 0; i < monthPositions.length; i++) {
+      if (scrollTop + 10 >= monthPositions[i].offsetTop) {
+        activeIdx = i;
+      } else {
         break;
       }
     }
 
-    if (!found && monthPositions.length > 0) {
-      activeScrubMonth = monthPositions[0].title;
-      activeScrubKey = monthPositions[0].key;
+    if (activeIdx < monthPositions.length - 1) {
+      const cur = monthPositions[activeIdx];
+      const next = monthPositions[activeIdx + 1];
+      const span = Math.max(1, next.offsetTop - cur.offsetTop);
+      nextFrac = Math.min(1, Math.max(0, (scrollTop - cur.offsetTop) / span));
+    }
+
+    const currentPos = monthPositions[activeIdx];
+    if (currentPos) {
+      activeScrubMonth = currentPos.title;
+      activeScrubKey = currentPos.key;
+    }
+
+    if (monthPositions.length > 1) {
+      const stepPct = 92 / (monthPositions.length - 1);
+      scrollThumbTopPercent = 4 + (activeIdx + nextFrac) * stepPct;
+    } else {
+      scrollThumbTopPercent = 50;
     }
   }
 
   function handleScroll() {
-    updateActiveMonth();
+    if (isDraggingScrubber) return;
+    if (!isProgrammaticScroll && !scrollRafPending) {
+      scrollRafPending = true;
+      requestAnimationFrame(() => {
+        updateActiveMonth();
+        scrollRafPending = false;
+      });
+    }
     isScrolling = true;
     clearTimeout(scrollHideTimer);
     scrollHideTimer = setTimeout(() => {
-      if (!isDraggingScrubber) {
+      if (!isDraggingScrubber && !isProgrammaticScroll) {
         isScrolling = false;
       }
-    }, 1200);
+    }, 800);
   }
 
   function scrollToMonth(key: string, title: string) {
     activeScrubMonth = title;
     activeScrubKey = key;
     isScrolling = true;
-    clearTimeout(scrollHideTimer);
-    scrollHideTimer = setTimeout(() => {
+    isProgrammaticScroll = true;
+
+    const pos = monthPositions.find((p) => p.key === key);
+    if (pos) {
+      scrollThumbTopPercent = pos.topPercent;
+    }
+
+    if (programmaticScrollTimer) clearTimeout(programmaticScrollTimer);
+    programmaticScrollTimer = setTimeout(() => {
+      isProgrammaticScroll = false;
       isScrolling = false;
-    }, 1800);
+    }, 1000);
 
     const el = document.getElementById(`month-group-${key}`);
     if (el && scrollContainer) {
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const targetScroll = scrollContainer.scrollTop + (elRect.top - containerRect.top) - 10;
-      scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      scrollContainer.scrollTo({ top: el.offsetTop, behavior: 'smooth' });
     }
   }
 
-  function startScrubberDrag(e: MouseEvent | TouchEvent) {
+  function jumpToNearestMonthFromPct(pct: number, smooth: boolean = true) {
+    if (monthGroups.length === 0 || !scrollContainer) return;
+    if (monthGroups.length === 1) {
+      scrollToMonth(monthGroups[0].key, monthGroups[0].title);
+      return;
+    }
+    const stepPct = 92 / (monthGroups.length - 1);
+    const nearestIdx = Math.max(0, Math.min(monthGroups.length - 1, Math.round((pct - 4) / stepPct)));
+    const targetGroup = monthGroups[nearestIdx];
+    if (!targetGroup) return;
+
+    if (smooth) {
+      scrollToMonth(targetGroup.key, targetGroup.title);
+    } else {
+      activeScrubMonth = targetGroup.title;
+      activeScrubKey = targetGroup.key;
+      scrollThumbTopPercent = monthPositions[nearestIdx]?.topPercent ?? pct;
+      const el = document.getElementById(`month-group-${targetGroup.key}`);
+      if (el && scrollContainer) {
+        scrollContainer.scrollTop = el.offsetTop;
+      }
+    }
+  }
+
+  function handleTrackPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {}
     isDraggingScrubber = true;
     isScrolling = true;
     handleScrubberMove(e);
-
-    function onMove(ev: MouseEvent | TouchEvent) {
-      handleScrubberMove(ev);
-    }
-
-    function onEnd() {
-      isDraggingScrubber = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onEnd);
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend', onEnd);
-      clearTimeout(scrollHideTimer);
-      scrollHideTimer = setTimeout(() => {
-        isScrolling = false;
-      }, 1200);
-    }
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onEnd);
-    window.addEventListener('touchmove', onMove);
-    window.addEventListener('touchend', onEnd);
   }
 
-  function handleScrubberMove(e: MouseEvent | TouchEvent) {
-    if (!scrubberTrackEl || !scrollContainer) return;
-    const rect = scrubberTrackEl.getBoundingClientRect();
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const offsetY = Math.max(0, Math.min(rect.height, clientY - rect.top));
-    const ratio = offsetY / rect.height;
+  function handleTrackPointerMove(e: PointerEvent) {
+    if (!isDraggingScrubber) return;
+    handleScrubberMove(e);
+  }
 
-    const maxScroll = Math.max(1, scrollContainer.scrollHeight - scrollContainer.clientHeight);
-    scrollContainer.scrollTop = ratio * maxScroll;
-    scrollThumbTopPercent = ratio * 100;
-    updateActiveMonth();
+  function handleTrackPointerUp(e: PointerEvent) {
+    if (!isDraggingScrubber) return;
+    const target = e.currentTarget as HTMLElement;
+    try {
+      target.releasePointerCapture(e.pointerId);
+    } catch {}
+    isDraggingScrubber = false;
+    clearTimeout(scrollHideTimer);
+    scrollHideTimer = setTimeout(() => {
+      isScrolling = false;
+    }, 1200);
+  }
+
+  function handleScrubberMove(e: PointerEvent | MouseEvent | TouchEvent) {
+    if (!scrubberTrackEl || !scrollContainer || monthGroups.length === 0) return;
+    const rect = scrubberTrackEl.getBoundingClientRect();
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+    const offsetY = Math.max(0, Math.min(rect.height, clientY - rect.top));
+    const ratio = offsetY / rect.height; // 0..1
+    const pct = ratio * 92 + 4; // 4%..96%
+
+    // Snap to nearest discrete month
+    jumpToNearestMonthFromPct(pct, false);
   }
 
   onMount(() => {
@@ -259,6 +320,7 @@
                   on:click={() => handleMemoryClick(memory)}
                   on:contextmenu={(e) => openContextMenu(e, memory)}
                   on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleMemoryClick(memory)}
+                  aria-label="BeReal from {memory.dateFormatted} at {memory.timeFormatted || 'unknown time'}"
                 >
                   <DualCameraFrame
                     primarySrc={memory.primaryPath}
@@ -279,22 +341,65 @@
                     debugInfo={memory.debugInfo}
                   />
 
+                  <!-- Simple Caption Floating Overlay on Photo Hover (Compact) -->
+                  {#if memory.caption}
+                    <div class="card-caption-hover-bubble" role="tooltip">
+                      <span class="caption-bubble-text">{memory.caption}</span>
+                    </div>
+                  {/if}
+
                   <!-- Hover Overlay Subtext info -->
                   <div class="card-caption-strip">
-                    <span class="card-date-text">{memory.dateFormatted}</span>
+                    <div class="card-date-wrap">
+                      <span class="card-date-text">{memory.dateFormatted}</span>
+                      {#if memory.caption}
+                        <span class="card-caption-dot" title="Has caption" aria-label="Has caption"></span>
+                      {/if}
+                      
+                      <!-- Rich Date & Time Tooltip Popover -->
+                      <div class="date-rich-tooltip" role="tooltip">
+                        <div class="tooltip-row">
+                          <Clock size={11} class="text-sky-400" />
+                          <span class="tooltip-time-val">{memory.timeFormatted || 'Unknown time'}</span>
+                        </div>
+                        <div class="tooltip-subtag" class:is-late={memory.isLate} class:is-ontime={!memory.isLate}>
+                          {memory.isLate ? (memory.lateExact || memory.lateDuration || 'Late') : 'On Time'}
+                        </div>
+                        <div class="tooltip-tip-arrow"></div>
+                      </div>
+                    </div>
+
                     <div class="card-meta-right">
                       {#if memory.isLate && ($memoryHeaderSettings.showLatePillsInGrid ?? true)}
-                        <span
-                          class="card-late-pill"
-                          title={memory.lateExact ? `${memory.lateExact} (Posted ${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (Posted ${memory.timeFormatted})` : 'Posted late')}
-                        >
-                          {memory.lateDuration || 'Late'}
-                        </span>
+                        <div class="card-late-wrap">
+                          <span class="card-late-pill">
+                            {memory.lateDuration || 'Late'}
+                          </span>
+                          <!-- Rich Late Tooltip Popover -->
+                          <div class="late-rich-tooltip" role="tooltip">
+                            <div class="late-tooltip-title">Posted Late</div>
+                            <div class="late-tooltip-desc">{memory.lateExact || memory.lateDuration || 'Posted after BeReal alert'}</div>
+                            <div class="tooltip-tip-arrow"></div>
+                          </div>
+                        </div>
                       {/if}
-                      {#if memory.locationName}
-                        <div class="card-loc-pill" title={memory.locationName}>
-                          <MapPin size={10} />
-                          <span>{memory.city || memory.locationName}</span>
+
+                      {#if memory.locationName || memory.location}
+                        <div class="card-loc-wrap">
+                          <div class="card-loc-pill" aria-label={memory.locationName || 'Location'}>
+                            <MapPin size={10} class="flex-shrink-0" />
+                            <span class="card-loc-text">{memory.city || memory.locationName}</span>
+                          </div>
+                          <!-- Rich Location Tooltip Popover -->
+                          <div class="loc-rich-tooltip" role="tooltip">
+                            <div class="loc-tooltip-title">{memory.locationName || 'Location'}</div>
+                            {#if memory.location}
+                              <div class="loc-tooltip-coords font-mono">
+                                {memory.location.latitude.toFixed(4)}°, {memory.location.longitude.toFixed(4)}°
+                              </div>
+                            {/if}
+                            <div class="tooltip-tip-arrow"></div>
+                          </div>
                         </div>
                       {/if}
                     </div>
@@ -308,54 +413,73 @@
     </div>
 
     <!-- Fixed Vertical Timeline Scrubber with Accurately Aligned Month Markers -->
-    <div
-      bind:this={scrubberTrackEl}
-      class="timeline-scrubber-track"
-      role="slider"
-      tabindex="0"
-      aria-label="Timeline Month Scrubber"
-      aria-valuenow={Math.round(scrollThumbTopPercent)}
-      on:mousedown={startScrubberDrag}
-      on:touchstart|passive={startScrubberDrag}
-      title="Drag scrubber or click markers to jump through timeline"
-    >
-      <div class="timeline-line-rail"></div>
-
-      <!-- Scrubber Thumb Pill -->
+    {#if monthGroups.length >= 2}
       <div
-        class="timeline-scrubber-thumb"
-        class:is-active={isDraggingScrubber}
-        style="top: {scrollThumbTopPercent}%;"
-      ></div>
+        bind:this={scrubberTrackEl}
+        class="timeline-scrubber-track"
+        class:is-dragging={isDraggingScrubber}
+        class:is-scrolling={isScrolling}
+        role="slider"
+        tabindex="0"
+        aria-label="Timeline Month Scrubber"
+        aria-valuenow={Math.round(scrollThumbTopPercent)}
+        on:pointerdown={handleTrackPointerDown}
+        on:pointermove={handleTrackPointerMove}
+        on:pointerup={handleTrackPointerUp}
+        on:pointercancel={handleTrackPointerUp}
+        on:lostpointercapture={handleTrackPointerUp}
+        title="Drag scrubber or click markers to jump through timeline"
+      >
+        <div class="timeline-line-rail"></div>
 
-      <!-- Month Checkmarkers along track placed at exact section percentage -->
-      {#each monthPositions as pos}
-        {@const isGroupActive = pos.key === activeScrubKey}
-        <button
-          type="button"
-          class="timeline-month-dot"
-          class:is-active={isGroupActive}
-          style="top: {pos.topPercent}%;"
-          on:click|stopPropagation={() => scrollToMonth(pos.key, pos.title)}
-          title="Jump to {pos.title}"
-          aria-label="Jump to {pos.title}"
-        >
-          <span class="dot-inner-core"></span>
-        </button>
-      {/each}
-
-      <!-- Floating Scrub/Scroll Date Popup Pill (Aligned with Thumb) -->
-      {#if isScrolling || isDraggingScrubber}
+        <!-- Dynamic Drag Thumb Indicator -->
         <div
-          class="timeline-floating-badge"
-          style="top: {scrollThumbTopPercent}%;"
+          class="timeline-scrubber-thumb"
+          class:is-active={isScrolling || isDraggingScrubber}
+          style="top: {Math.max(3, Math.min(97, scrollThumbTopPercent))}%;"
         >
-          <Calendar size={13} class="text-sky-400" />
-          <span class="floating-badge-text">{activeScrubMonth || 'Timeline'}</span>
-          <div class="badge-pointer-arrow"></div>
+          <div class="thumb-inner-capsule"></div>
         </div>
-      {/if}
-    </div>
+
+        <!-- Aligned Month Dot Markers along Rail (Evenly Distributed 4%..96%) -->
+        {#each monthPositions as pos}
+          {@const grp = monthGroups.find((g) => g.key === pos.key)}
+          {@const postCount = grp?.memories.length || 0}
+          <button
+            type="button"
+            class="timeline-month-dot"
+            class:is-active={activeScrubKey === pos.key}
+            style="top: {pos.topPercent}%;"
+            on:pointerdown|stopPropagation
+            on:mousedown|stopPropagation
+            on:click|stopPropagation={() => scrollToMonth(pos.key, pos.title)}
+            aria-label="Jump to {pos.title}"
+          >
+            <span class="dot-inner-core"></span>
+
+            <!-- Rich Sleek Hover Tooltip -->
+            <div class="month-hover-tooltip" role="tooltip">
+              <span class="month-tooltip-title">{pos.title}</span>
+              {#if postCount > 0}
+                <span class="month-tooltip-badge">{postCount} {postCount === 1 ? 'post' : 'posts'}</span>
+              {/if}
+              <div class="tooltip-arrow"></div>
+            </div>
+          </button>
+        {/each}
+
+        <!-- Interactive Floating Tooltip Pill (Only shown while scrolling/dragging when not hovering specific dots) -->
+        {#if (isScrolling || isDraggingScrubber) && activeScrubMonth}
+          <div
+            class="timeline-floating-badge"
+            style="top: {Math.max(5, Math.min(95, scrollThumbTopPercent))}%;"
+          >
+            <span class="floating-badge-text">{activeScrubMonth || 'Timeline'}</span>
+            <div class="badge-pointer-arrow"></div>
+          </div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -363,17 +487,32 @@
   .memories-grid-wrapper {
     position: relative;
     width: 100%;
-    min-height: 480px;
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .memories-scroll-viewport {
+    flex: 1;
+    min-height: 0;
     width: 100%;
-    max-height: calc(100vh - 170px);
+    height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 36px;
+    padding-bottom: 24px;
     position: relative;
-    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .memories-scroll-viewport::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .memories-groups-container {
@@ -381,6 +520,7 @@
     flex-direction: column;
     gap: 32px;
     width: 100%;
+    padding-bottom: 60px;
   }
 
   .month-section {
@@ -388,9 +528,6 @@
     flex-direction: column;
     gap: 14px;
     width: 100%;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 380px;
-    contain: layout style;
   }
 
   /* BeReal Style Month Spacers / Divider */
@@ -437,9 +574,6 @@
     border-radius: 18px;
     transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
     outline: none;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 240px;
-    contain: layout style paint;
   }
 
   .grid-card-wrap:hover {
@@ -457,14 +591,210 @@
     box-shadow: 0 0 0 3px #38bdf8;
   }
 
+  /* Sleek & High-Performance Caption Floating Overlay on Photo Hover */
+  .card-caption-hover-bubble {
+    position: absolute;
+    bottom: 34px;
+    left: 8px;
+    right: 8px;
+    background: rgba(10, 10, 16, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    padding: 4px 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.16s ease;
+    z-index: 15;
+    text-align: center;
+  }
+
+  .grid-card-wrap:hover .card-caption-hover-bubble,
+  .grid-card-wrap:focus-visible .card-caption-hover-bubble {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .caption-bubble-text {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: #f1f5f9;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .card-caption-strip {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
-    padding: 6px 4px 2px 4px;
+    gap: 4px;
+    padding: 5px 2px 2px 2px;
     font-size: 11px;
     color: var(--text-secondary);
+    min-width: 0;
+  }
+
+  /* Rich Date & Time Tooltip Popover */
+  .card-date-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: default;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .card-caption-dot {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #38bdf8;
+    margin-left: 4px;
+    flex-shrink: 0;
+    box-shadow: 0 0 3px rgba(56, 189, 248, 0.6);
+    opacity: 0.85;
+  }
+
+  .date-rich-tooltip,
+  .late-rich-tooltip,
+  .loc-rich-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(13, 13, 20, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.16s ease;
+    z-index: 50;
+  }
+
+  .card-date-wrap:hover .date-rich-tooltip,
+  .card-late-wrap:hover .late-rich-tooltip,
+  .card-loc-wrap:hover .loc-rich-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Align right-hand meta tooltips to the right edge to avoid screen overflow */
+  .card-meta-right .loc-rich-tooltip,
+  .card-meta-right .late-rich-tooltip {
+    left: auto;
+    right: 0;
+    transform: translateY(4px);
+  }
+
+  .card-meta-right .card-late-wrap:hover .late-rich-tooltip,
+  .card-meta-right .card-loc-wrap:hover .loc-rich-tooltip {
+    transform: translateY(0);
+  }
+
+  .card-meta-right .tooltip-tip-arrow {
+    left: auto;
+    right: 12px;
+    transform: rotate(45deg);
+  }
+
+  .tooltip-tip-arrow {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px;
+    height: 8px;
+    background: #0d0d14;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tooltip-time-val {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: var(--font-mono);
+  }
+
+  .tooltip-subtag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .tooltip-subtag.is-ontime {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .tooltip-subtag.is-late {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .late-tooltip-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f87171;
+  }
+
+  .late-tooltip-desc {
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  .loc-tooltip-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .loc-tooltip-coords {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: #38bdf8;
+  }
+
+  .card-late-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .card-loc-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
   }
 
   .card-date-text {
@@ -473,6 +803,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 10.5px;
   }
 
   .card-meta-right {
@@ -480,6 +812,8 @@
     align-items: center;
     gap: 4px;
     margin-left: auto;
+    flex-shrink: 0;
+    max-width: 55%;
   }
 
   .card-late-pill {
@@ -513,14 +847,22 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 80px;
+    max-width: 72px;
+    cursor: help;
+  }
+
+  .card-loc-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   /* Fixed Vertical Timeline Fast Scrubber Track */
   .timeline-scrubber-track {
     position: absolute;
     right: 6px;
-    top: 20px;
+    top: 14px;
     bottom: 24px;
     width: 24px;
     display: flex;
@@ -528,21 +870,58 @@
     justify-content: center;
     cursor: ns-resize;
     user-select: none;
-    z-index: 80;
+    z-index: 30;
+  }
+
+  /* Suppress floating thumb badge if user is hovering over any month dot */
+  .timeline-scrubber-track:has(.timeline-month-dot:hover) .timeline-floating-badge {
+    display: none !important;
+    opacity: 0 !important;
+  }
+
+  /* Suppress individual dot tooltips while user is actively dragging, scrolling, or clicking */
+  .timeline-scrubber-track.is-dragging .month-hover-tooltip,
+  .timeline-scrubber-track.is-scrolling .month-hover-tooltip,
+  .timeline-scrubber-track:active .month-hover-tooltip {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   .timeline-line-rail {
     position: absolute;
-    top: 0;
-    bottom: 0;
+    top: 8px;
+    bottom: 8px;
     width: 3px;
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.16);
     border-radius: 999px;
     transition: background 0.15s ease, width 0.15s ease;
   }
 
+  .timeline-line-rail::before,
+  .timeline-line-rail::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  }
+
+  .timeline-line-rail::before {
+    top: -4px;
+  }
+
+  .timeline-line-rail::after {
+    bottom: -4px;
+  }
+
   .timeline-scrubber-track:hover .timeline-line-rail {
-    background: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.32);
     width: 4px;
   }
 
@@ -557,7 +936,7 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.3);
     pointer-events: none;
     transition: transform 0.1s ease, background 0.15s ease;
-    z-index: 85;
+    z-index: 35;
   }
 
   .timeline-scrubber-thumb.is-active,
@@ -581,12 +960,70 @@
     justify-content: center;
     cursor: pointer;
     padding: 0;
-    z-index: 82;
+    z-index: 32;
     transition: transform 0.15s ease;
   }
 
   .timeline-month-dot:hover {
     transform: translate(-50%, -50%) scale(1.35);
+    z-index: 45;
+  }
+
+  /* Sleek Hover Tooltip Popover for Month Dots */
+  .month-hover-tooltip {
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(6px) scale(0.95);
+    background: rgba(14, 14, 22, 0.96);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 12px rgba(56, 189, 248, 0.15);
+    border-radius: var(--radius-full);
+    padding: 5px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100;
+  }
+
+  .timeline-month-dot:hover .month-hover-tooltip {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+
+  .month-tooltip-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+  }
+
+  .month-tooltip-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.14);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+  }
+
+  .tooltip-arrow {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 7px;
+    height: 7px;
+    background: #0e0e16;
+    border-top: 1px solid rgba(56, 189, 248, 0.35);
+    border-right: 1px solid rgba(56, 189, 248, 0.35);
   }
 
   .dot-inner-core {

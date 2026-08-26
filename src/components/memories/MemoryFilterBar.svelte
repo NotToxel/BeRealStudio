@@ -104,16 +104,20 @@
       {/if}
     </div>
 
-    <!-- Toggle Quick Filter Chips -->
+    <!-- Toggle Quick Filter Chips (with Live Dynamic Compound Counts) -->
     <div class="quick-chips-row">
       <button
         type="button"
         class="filter-chip chip-location"
         class:active={$explorerFilter.hasLocationOnly}
         on:click={() => ($explorerFilter.hasLocationOnly = !$explorerFilter.hasLocationOnly)}
+        title="Show memories with GPS location tag ({counts.locationCount})"
       >
         <MapPin size={12} />
         <span>Location</span>
+        {#if counts.locationCount > 0}
+          <span class="chip-count-badge">{counts.locationCount}</span>
+        {/if}
       </button>
 
       <button
@@ -121,9 +125,13 @@
         class="filter-chip chip-video"
         class:active={$explorerFilter.hasVideoOnly}
         on:click={toggleVideoOnlyFilter}
+        title="Show memories with video ({counts.videoCount})"
       >
         <Clapperboard size={12} />
         <span>Videos</span>
+        {#if counts.videoCount > 0}
+          <span class="chip-count-badge">{counts.videoCount}</span>
+        {/if}
       </button>
 
       <button
@@ -131,9 +139,13 @@
         class="filter-chip chip-bts"
         class:active={$explorerFilter.hasBtsOnly}
         on:click={toggleBtsOnlyFilter}
+        title="Show memories with Behind-the-Scenes live clip ({counts.btsCount})"
       >
         <Film size={12} />
         <span>BTS Clips</span>
+        {#if counts.btsCount > 0}
+          <span class="chip-count-badge">{counts.btsCount}</span>
+        {/if}
       </button>
 
       <button
@@ -141,17 +153,23 @@
         class="filter-chip chip-captions"
         class:active={$explorerFilter.hasCaptionOnly}
         on:click={() => ($explorerFilter.hasCaptionOnly = !$explorerFilter.hasCaptionOnly)}
+        title="Show memories with caption text ({counts.captionCount})"
       >
         <MessageSquare size={12} />
         <span>Captions</span>
+        {#if counts.captionCount > 0}
+          <span class="chip-count-badge">{counts.captionCount}</span>
+        {/if}
       </button>
+
+      <div class="chips-divider"></div>
 
       <button
         type="button"
         class="filter-chip advanced-toggle"
         class:active={showAdvanced}
         on:click={() => (showAdvanced = !showAdvanced)}
-        title="More filters"
+        title="More filters (Country, City, Year, Month)"
       >
         <Filter size={12} />
         <span>Filters</span>
@@ -222,7 +240,7 @@
 
               <div class="popover-divider"></div>
 
-              {#each $explorerData.uniqueCountries as country}
+              {#each $explorerData.uniqueCountries.filter((c) => (counts.byCountry.get(c) || 0) > 0) as country}
                 {@const cnt = counts.byCountry.get(country) || 0}
                 <button
                   type="button"
@@ -280,25 +298,27 @@
               </button>
 
               {#each $citiesByCountry as group}
-                <div class="popover-group-header">
-                  <CountryFlag country={group.country} size="sm" />
-                  <span class="group-country-name">{group.country}</span>
-                  <span class="group-total-badge">{group.totalPosts}</span>
-                </div>
+                {#if group.totalPosts > 0}
+                  <div class="popover-group-header">
+                    <CountryFlag country={group.country} size="sm" />
+                    <span class="group-country-name">{group.country}</span>
+                    <span class="group-total-badge">{group.totalPosts}</span>
+                  </div>
 
-                {#each group.cities as cityItem}
-                  <button
-                    type="button"
-                    class="popover-item sub-item"
-                    class:active={$explorerFilter.selectedCity === cityItem.name}
-                    on:click={() => selectCity(cityItem.name)}
-                  >
-                    <div class="popover-item-left">
-                      <span class="popover-item-title">{cityItem.name}</span>
-                    </div>
-                    <span class="item-count-badge">{cityItem.count}</span>
-                  </button>
-                {/each}
+                  {#each group.cities.filter((c) => c.count > 0) as cityItem}
+                    <button
+                      type="button"
+                      class="popover-item sub-item"
+                      class:active={$explorerFilter.selectedCity === cityItem.name}
+                      on:click={() => selectCity(cityItem.name)}
+                    >
+                      <div class="popover-item-left">
+                        <span class="popover-item-title">{cityItem.name}</span>
+                      </div>
+                      <span class="item-count-badge">{cityItem.count}</span>
+                    </button>
+                  {/each}
+                {/if}
               {/each}
             </div>
           {/if}
@@ -341,7 +361,7 @@
 
               <div class="popover-divider"></div>
 
-              {#each $explorerData.uniqueSuburbs as suburb}
+              {#each $explorerData.uniqueSuburbs.filter((s) => (counts.bySuburb.get(s) || 0) > 0) as suburb}
                 {@const cnt = counts.bySuburb.get(suburb) || 0}
                 <button
                   type="button"
@@ -390,7 +410,7 @@
 
               <div class="popover-divider"></div>
 
-              {#each $explorerData.uniqueYears as yr}
+              {#each $explorerData.uniqueYears.filter((y) => (counts.byYear.get(y) || 0) > 0) as yr}
                 {@const cnt = counts.byYear.get(yr) || 0}
                 <button
                   type="button"
@@ -445,7 +465,7 @@
 
               <div class="popover-divider"></div>
 
-              {#each $explorerData.uniqueMonths as mo}
+              {#each $explorerData.uniqueMonths.filter((mo) => (counts.byMonth.get(mo) || 0) > 0) as mo}
                 {@const cnt = counts.byMonth.get(mo) || 0}
                 {@const y = parseInt(mo.slice(0, 4))}
                 {@const m = parseInt(mo.slice(5, 7))}
@@ -599,6 +619,28 @@
     border-color: #8b5cf6;
     color: #a78bfa;
     box-shadow: 0 2px 10px rgba(139, 92, 246, 0.25);
+  }
+
+  .chips-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-subtle);
+    margin: 0 2px;
+  }
+
+  .chip-count-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .filter-chip.active .chip-count-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: inherit;
   }
 
   .reset-chip {
@@ -779,7 +821,7 @@
     width: 100%;
   }
 
-  .popover-item:hover {
+  .popover-item:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
   }
@@ -788,6 +830,13 @@
     background: rgba(56, 189, 248, 0.15);
     color: #38bdf8;
     font-weight: 700;
+  }
+
+  .popover-item:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(80%);
   }
 
   .popover-item.sub-item {

@@ -41,7 +41,7 @@
     }
   }
 
-  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
+  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo') {
     closeContextMenu();
     if (!memory || !memory.primaryPath) return;
 
@@ -203,7 +203,17 @@
         on:click={() => handleExport('motion_photo')}
       >
         <Sparkles size={13} class="menu-item-icon text-emerald-400" />
-        <span>Save Motion Photo (Live)</span>
+        <span>Save Motion Photo (Android)</span>
+      </button>
+
+      <button
+        type="button"
+        class="menu-item"
+        disabled={isExporting}
+        on:click={() => handleExport('apple_live_photo')}
+      >
+        <Sparkles size={13} class="menu-item-icon text-sky-400" />
+        <span>Save Apple Live Photo (iOS)</span>
       </button>
     {/if}
 
