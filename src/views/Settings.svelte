@@ -149,24 +149,18 @@
     }
   }
 
-  onMount(async () => {
-    if (!$ffmpegInfo.checked) {
-      await detectFfmpeg();
-    }
-    if (!$exiftoolStore.checked) {
-      await detectExiftoolHandler();
-    }
-    if (!$hwInfoStore) {
-      await detectHwInfo();
-    }
-    if (!$offlineGeoDbStatus?.tiers?.length) {
-      try {
-        const dbStatus = await checkOfflineGeoDb();
-        offlineGeoDbStatus.set(dbStatus);
-      } catch (e) {
-        console.warn('Failed to check offline geodb:', e);
-      }
-    }
+  onMount(() => {
+    // Run diagnostics asynchronously without blocking component lifecycle
+    Promise.allSettled([
+      !$ffmpegInfo.checked ? detectFfmpeg() : Promise.resolve(null),
+      !$exiftoolStore.checked ? detectExiftoolHandler() : Promise.resolve(),
+      !$hwInfoStore ? detectHwInfo() : Promise.resolve(),
+      (!$offlineGeoDbStatus?.tiers?.length)
+        ? checkOfflineGeoDb()
+            .then((dbStatus) => offlineGeoDbStatus.set(dbStatus))
+            .catch((e) => console.warn('Failed to check offline geodb:', e))
+        : Promise.resolve(),
+    ]);
   });
 
   async function handleDownloadTier(tierId: string) {
