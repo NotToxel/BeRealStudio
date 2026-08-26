@@ -148,15 +148,39 @@
 
   function handleDayClick(dayNum: number) {
     const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const raw = $rawMemoriesByDate.get(dateStr);
+    if (raw && raw.length > 0) {
+      console.log(`[Calendar Day Click ${dateStr}]`, {
+        isLate: raw[0].isLate,
+        lateDuration: raw[0].lateDuration,
+        lateExact: raw[0].lateExact,
+        timeFormatted: raw[0].timeFormatted,
+        takenAt: raw[0].takenAt,
+      });
+    }
     const posts = $memoriesByDate.get(dateStr);
     if (posts && posts.length > 0) {
       openFeedAt(posts[0]);
-    } else {
-      const raw = $rawMemoriesByDate.get(dateStr);
-      if (raw && raw.length > 0) {
-        openFeedAt(raw[0]);
+    } else if (raw && raw.length > 0) {
+      openFeedAt(raw[0]);
+    }
+  }
+
+  $: if ($rawMemoriesByDate && yearMonth) {
+    let onTimeCount = 0;
+    let lateCount = 0;
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const dStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      const posts = $rawMemoriesByDate.get(dStr) || [];
+      if (posts.length > 0) {
+        if (posts[0].isLate) {
+          lateCount++;
+        } else {
+          onTimeCount++;
+        }
       }
     }
+    console.log(`[Calendar Debug ${yearMonth}] Active Days: ${onTimeCount + lateCount} | On-Time (White Border): ${onTimeCount} | Late (Borderless): ${lateCount}`);
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -747,14 +771,22 @@
 
   .day-cell.has-memory {
     cursor: pointer;
-    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border: none;
+    outline: none;
+    box-sizing: border-box;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
   }
 
-  /* Medium-thick white outline for On-Time BeReals */
+  /* Crisp white outline for On-Time BeReals ONLY */
   .day-cell.has-memory.is-on-time {
-    border: 2.5px solid #ffffff;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+  }
+
+  /* Late BeReals have NO border outline */
+  .day-cell.has-memory:not(.is-on-time):not(.is-filter-match) {
+    border: none;
+    box-shadow: none;
   }
 
   /* Filtered-out ghost state: soft dimming preserving calendar shape & context */

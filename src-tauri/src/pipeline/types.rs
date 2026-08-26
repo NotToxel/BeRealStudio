@@ -63,17 +63,17 @@ pub struct BeRealPost {
     pub secondary: Option<MediaAsset>,
     pub secondary_placeholder: Option<MediaAsset>,
     pub bts_media: Option<MediaAsset>,
-    #[serde(alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate")]
+    #[serde(alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate", alias = "creation_date", alias = "createdAt", alias = "created_at", alias = "date")]
     pub taken_at: String,
     pub location: Option<Location>,
     pub caption: Option<String>,
     pub retake_counter: Option<u32>,
     pub visibility: Option<Vec<String>>,
-    #[serde(default, alias = "late_in_seconds", alias = "lateSeconds", alias = "secondsLate", deserialize_with = "deserialize_flexible_i64")]
+    #[serde(default, alias = "late_in_seconds", alias = "lateSeconds", alias = "secondsLate", alias = "late_seconds", alias = "lateTime", alias = "late_time", alias = "delayInSeconds", alias = "delay_in_seconds", alias = "late_by", deserialize_with = "deserialize_flexible_i64")]
     pub late_in_seconds: Option<i64>,
-    #[serde(default, alias = "is_late", alias = "late", alias = "isLatePost", deserialize_with = "deserialize_flexible_bool")]
+    #[serde(default, alias = "is_late", alias = "late", alias = "isLatePost", alias = "is_late_post", alias = "wasLate", alias = "was_late", alias = "isLate", alias = "is_late_bereal", deserialize_with = "deserialize_flexible_bool")]
     pub is_late: Option<bool>,
-    #[serde(default, alias = "notification_at", alias = "momentAt", alias = "moment_at", alias = "berealMoment", alias = "bereal_moment", alias = "notificationDate", alias = "notification_date")]
+    #[serde(default, alias = "notification_at", alias = "momentAt", alias = "moment_at", alias = "berealMoment", alias = "bereal_moment", alias = "notificationDate", alias = "notification_date", alias = "moment_date", alias = "momentDate", alias = "notifiedAt", alias = "notified_at", alias = "pushNotificationAt", alias = "push_notification_at")]
     pub notification_at: Option<String>,
 }
 

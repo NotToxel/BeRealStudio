@@ -323,28 +323,36 @@ fn load_explorer_memories_inner(
 
             let retake_counter = post.retake_counter.unwrap_or(0);
             
+            // Calculate moment difference between notification time and actual post time
+            let notif_dt = post.notification_at.as_deref().and_then(parser::parse_taken_at);
+            let post_dt = parser::parse_taken_at(&post.taken_at);
+            let moment_diff_sec = match (notif_dt, post_dt) {
+                (Some(n), Some(p)) => {
+                    let d = (p - n).num_seconds();
+                    if d > 0 { Some(d) } else { None }
+                }
+                _ => None,
+            };
+
             // A post is determined to be late when the boolean tag is true (or fallback if absent)
             let is_late = match post.is_late {
                 Some(b) => b,
-                None => post.late_in_seconds.map(|s| s > 0).unwrap_or(false),
+                None => {
+                    if let Some(s) = post.late_in_seconds {
+                        s > 0
+                    } else if let Some(diff) = moment_diff_sec {
+                        diff > 120
+                    } else {
+                        false
+                    }
+                }
             };
 
             let (late_duration, late_exact, late_seconds) = if is_late {
-                // Calculate how late based on BeReal moment time (notification_at) vs actual post time (taken_at)
-                let notif_dt = post.notification_at.as_deref().and_then(parser::parse_taken_at);
-                let post_dt = parser::parse_taken_at(&post.taken_at);
-
-                let late_sec = match (notif_dt, post_dt) {
-                    (Some(n), Some(p)) => {
-                        let diff = (p - n).num_seconds();
-                        if diff > 0 {
-                            diff
-                        } else {
-                            post.late_in_seconds.unwrap_or(0).max(0)
-                        }
-                    }
-                    _ => post.late_in_seconds.unwrap_or(0).max(0),
-                };
+                let late_sec = moment_diff_sec
+                    .or(post.late_in_seconds)
+                    .unwrap_or(0)
+                    .max(0);
 
                 if late_sec > 0 {
                     let hrs = late_sec / 3600;
@@ -378,6 +386,13 @@ fn load_explorer_memories_inner(
             } else {
                 (None, None, None)
             };
+
+            if idx < 10 || is_late {
+                println!(
+                    "[EXPLORER_DEBUG] Post #{}: taken_at='{}' raw_is_late={:?} raw_late_sec={:?} notif_at={:?} => IS_LATE={} late_dur={:?}",
+                    idx, post.taken_at, post.is_late, post.late_in_seconds, post.notification_at, is_late, late_duration
+                );
+            }
 
             ExplorerMemory {
                 id: format!("bereal-{}", idx),
