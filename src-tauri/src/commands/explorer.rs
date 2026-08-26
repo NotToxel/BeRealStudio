@@ -14,7 +14,7 @@ use zip::ZipArchive;
 
 use crate::{
     pipeline::{
-        exif_writer, image_ops, motion_photo,
+        exif_writer, image_ops, motion_photo, video_ops,
         parser::{self, parse_taken_at},
         types::{BeRealPost, Location, LocationRule, OutputFormat, RuleCondition},
     },
@@ -607,6 +607,81 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
         None
     };
 
+    let is_video = prim_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            let e = ext.to_lowercase();
+            e == "mp4" || e == "mov" || e == "webm"
+        })
+        .unwrap_or(false);
+
+    if is_video {
+        match opts.export_type.as_str() {
+            "primary_only" => {
+                fs::copy(prim_path, out_dest)?;
+                let _ = video_ops::set_video_metadata(out_dest, &dt);
+            }
+            "secondary_only" => {
+                if let Some(sec_str) = &opts.secondary_path {
+                    let sec_path = Path::new(sec_str);
+                    if sec_path.exists() {
+                        fs::copy(sec_path, out_dest)?;
+                        let _ = video_ops::set_video_metadata(out_dest, &dt);
+                    } else {
+                        anyhow::bail!("Secondary video not found: {}", sec_str);
+                    }
+                } else {
+                    anyhow::bail!("No secondary video available for this memory.");
+                }
+            }
+            "combined_sidebyside" => {
+                if let Some(sec_str) = &opts.secondary_path {
+                    let sec_path = Path::new(sec_str);
+                    if sec_path.exists() {
+                        video_ops::combine_videos_side_by_side(prim_path, sec_path, out_dest)?;
+                        let _ = video_ops::set_video_metadata(out_dest, &dt);
+                    } else {
+                        fs::copy(prim_path, out_dest)?;
+                        let _ = video_ops::set_video_metadata(out_dest, &dt);
+                    }
+                } else {
+                    fs::copy(prim_path, out_dest)?;
+                    let _ = video_ops::set_video_metadata(out_dest, &dt);
+                }
+            }
+            "bts_only" => {
+                if let Some(bts_str) = &opts.bts_path {
+                    let bts_path = Path::new(bts_str);
+                    if bts_path.exists() {
+                        fs::copy(bts_path, out_dest)?;
+                    } else {
+                        anyhow::bail!("BTS video file not found on disk: {}", bts_str);
+                    }
+                } else {
+                    anyhow::bail!("No BTS video available for this memory.");
+                }
+            }
+            _ => {
+                // Default to PIP video
+                if let Some(sec_str) = &opts.secondary_path {
+                    let sec_path = Path::new(sec_str);
+                    if sec_path.exists() {
+                        video_ops::combine_videos_pip(prim_path, sec_path, out_dest, |_| {})?;
+                        let _ = video_ops::set_video_metadata(out_dest, &dt);
+                    } else {
+                        fs::copy(prim_path, out_dest)?;
+                        let _ = video_ops::set_video_metadata(out_dest, &dt);
+                    }
+                } else {
+                    fs::copy(prim_path, out_dest)?;
+                    let _ = video_ops::set_video_metadata(out_dest, &dt);
+                }
+            }
+        }
+        return Ok(out_dest.display().to_string());
+    }
+
     let fmt = match opts.format.to_lowercase().as_str() {
         "webp" => OutputFormat::WebP,
         "png" => OutputFormat::Png,
@@ -688,6 +763,46 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
                 if bts_path.exists() {
                     let _ = motion_photo::create_motion_photo(out_dest, bts_path);
                 }
+            }
+        }
+        "apple_live_photo" | "live_photo" => {
+            let parent_dir = out_dest.parent().unwrap_or(Path::new("."));
+            let file_stem = out_dest.file_stem().and_then(|s| s.to_str()).unwrap_or("bereal_live_photo");
+
+            let temp_composite = parent_dir.join(format!("{}_temp_export.jpg", file_stem));
+            if let Some(sec_str) = &opts.secondary_path {
+                let sec_path = Path::new(sec_str);
+                if sec_path.exists() {
+                    let combined = image_ops::combine_pip(prim_path, sec_path)?;
+                    let rgb = combined.to_rgb8();
+                    image_ops::save_rgb_image(&rgb, &temp_composite, &OutputFormat::Jpeg, opts.quality)?;
+                } else {
+                    image_ops::convert_image(prim_path, &temp_composite, &OutputFormat::Jpeg, opts.quality)?;
+                }
+            } else {
+                image_ops::convert_image(prim_path, &temp_composite, &OutputFormat::Jpeg, opts.quality)?;
+            }
+
+            if let Some(bts_str) = &opts.bts_path {
+                let bts_path = Path::new(bts_str);
+                if bts_path.exists() {
+                    let (dest_jpg, dest_mov) = crate::pipeline::live_photo::create_apple_live_photo_pair(
+                        &temp_composite,
+                        bts_path,
+                        parent_dir,
+                        file_stem,
+                        &dt,
+                        location.as_ref(),
+                        opts.caption.as_deref(),
+                    )?;
+                    let _ = std::fs::remove_file(&temp_composite);
+                    return Ok(format!("{} + {}", dest_jpg.display(), dest_mov.display()));
+                }
+            }
+
+            let _ = std::fs::rename(&temp_composite, out_dest);
+            if opts.embed_exif {
+                let _ = exif_writer::write_metadata(out_dest, &dt, location.as_ref(), opts.caption.as_deref());
             }
         }
         _ => {

@@ -10,6 +10,9 @@
     explorerData,
     openExportModal,
     exportPreferences,
+    photoExportPreferences,
+    videoExportPreferences,
+    isMemoryVideo,
     memoryHeaderSettings,
     showMemoryDebugBadges,
     formatMemoryLocation,
@@ -138,15 +141,16 @@
 
   async function handleQuickDownload(mem: ExplorerMemory) {
     if (!mem.primaryPath) return;
-    const prefs = $exportPreferences;
+    const isVideo = isMemoryVideo(mem);
+    const prefs = isVideo ? $videoExportPreferences : $photoExportPreferences;
+    
     if (!prefs.isDefaultSet) {
       openExportModal(mem);
       return;
     }
 
     try {
-      const isVideo = prefs.exportType === 'bts_only';
-      const ext = isVideo ? 'mp4' : prefs.format.toLowerCase() === 'png' ? 'png' : prefs.format.toLowerCase() === 'webp' ? 'webp' : 'jpg';
+      const ext = isVideo ? 'mp4' : (prefs as any).format?.toLowerCase() === 'png' ? 'png' : (prefs as any).format?.toLowerCase() === 'webp' ? 'webp' : 'jpg';
       const defaultFilename = `${mem.takenAt.slice(0, 10)}_${prefs.exportType}.${ext}`;
 
       const savePath = await save({
@@ -163,9 +167,9 @@
         btsPath: mem.btsPath,
         outputPath: savePath,
         exportType: prefs.exportType,
-        format: prefs.format,
-        quality: prefs.quality || 92,
-        embedExif: prefs.embedExif,
+        format: isVideo ? 'Jpeg' : (prefs as any).format || 'Jpeg',
+        quality: isVideo ? 95 : (prefs as any).quality || 95,
+        embedExif: isVideo ? true : (prefs as any).embedExif ?? true,
         takenAt: mem.takenAt,
         latitude: prefs.embedGps && mem.location ? mem.location.latitude : undefined,
         longitude: prefs.embedGps && mem.location ? mem.location.longitude : undefined,

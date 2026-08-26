@@ -2,8 +2,13 @@
   import {
     exportModalState,
     closeExportModal,
-    exportPreferences,
-    type ExportPreferences,
+    photoExportPreferences,
+    videoExportPreferences,
+    btsExportPreferences,
+    isMemoryVideo,
+    type PhotoExportPreferences,
+    type VideoExportPreferences,
+    type BtsExportPreferences,
   } from '$lib/memoriesStore';
   import { exportSingleMemory } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
@@ -17,37 +22,57 @@
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Check from 'lucide-svelte/icons/check';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import Lock from 'lucide-svelte/icons/lock';
 
   let isExporting = false;
   let exportSuccess = false;
 
   $: state = $exportModalState;
   $: memory = state?.memory;
-  $: prefs = $exportPreferences;
+  $: isVideo = isMemoryVideo(memory);
 
-  let selectedType: ExportPreferences['exportType'] = $exportPreferences?.exportType || 'combined_pip';
-  let selectedFormat: 'Jpeg' | 'Png' | 'WebP' = ($exportPreferences?.format as any) || 'Jpeg';
-  let imageQuality: number = $exportPreferences?.quality || 95;
-  let embedExif = $exportPreferences?.embedExif ?? true;
-  let embedGps = $exportPreferences?.embedGps ?? true;
-  let makeDefault = $exportPreferences?.isDefaultSet ?? false;
+  type AnyExportType = 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo';
 
-  // Sync state when modal is opened
-  $: if (state?.isOpen && $exportPreferences) {
-    selectedType = $exportPreferences.exportType || 'combined_pip';
-    selectedFormat = ($exportPreferences.format as any) || 'Jpeg';
-    imageQuality = $exportPreferences.quality || 95;
-    embedExif = $exportPreferences.embedExif ?? true;
-    embedGps = $exportPreferences.embedGps ?? true;
-    makeDefault = $exportPreferences.isDefaultSet ?? false;
+  let selectedType: AnyExportType = 'combined_pip';
+  let selectedFormat: 'Jpeg' | 'Png' | 'WebP' = 'Jpeg';
+  let imageQuality: number = 95;
+  let embedExif = true;
+  let embedGps = true;
+  let makeDefault = false;
+
+  // Sync state when modal is opened for a specific memory
+  $: if (state?.isOpen && memory) {
+    if (isVideo) {
+      selectedType = $videoExportPreferences.exportType || 'combined_pip';
+      embedGps = $videoExportPreferences.embedGps ?? true;
+      makeDefault = $videoExportPreferences.isDefaultSet ?? false;
+    } else {
+      selectedType = $photoExportPreferences.exportType || 'combined_pip';
+      selectedFormat = $photoExportPreferences.format || 'Jpeg';
+      imageQuality = $photoExportPreferences.quality || 95;
+      embedExif = $photoExportPreferences.embedExif ?? true;
+      embedGps = $photoExportPreferences.embedGps ?? true;
+      makeDefault = $photoExportPreferences.isDefaultSet ?? false;
+    }
   }
 
   $: if (memory && !memory.secondaryPath && (selectedType === 'combined_pip' || selectedType === 'combined_sidebyside' || selectedType === 'secondary_only')) {
     selectedType = 'primary_only';
   }
 
-  $: if (memory && !memory.btsPath && (selectedType === 'bts_only' || selectedType === 'motion_photo')) {
+  $: if (memory && isVideo && (selectedType === 'motion_photo' || selectedType === 'apple_live_photo')) {
     selectedType = 'combined_pip';
+  }
+
+  $: if (memory && !memory.btsPath && (selectedType === 'bts_only' || selectedType === 'motion_photo' || selectedType === 'apple_live_photo')) {
+    selectedType = 'combined_pip';
+  }
+
+  // Force JPEG for motion photos and Apple Live Photos
+  $: if (selectedType === 'motion_photo' || selectedType === 'apple_live_photo') {
+    if (selectedFormat !== 'Jpeg') {
+      selectedFormat = 'Jpeg';
+    }
   }
 
   async function handleConfirmExport() {
@@ -57,24 +82,39 @@
       isExporting = true;
       exportSuccess = false;
 
-      // Save preference if set as default
-      exportPreferences.set({
-        exportType: selectedType,
-        format: selectedFormat,
-        quality: imageQuality,
-        embedExif,
-        embedGps,
-        isDefaultSet: makeDefault,
-      });
+      // Save preference partitioned specifically by media kind
+      if (selectedType === 'bts_only') {
+        btsExportPreferences.set({
+          exportType: 'bts_only',
+          isDefaultSet: makeDefault,
+        });
+      } else if (isVideo) {
+        videoExportPreferences.set({
+          exportType: selectedType as any,
+          embedGps,
+          isDefaultSet: makeDefault,
+        });
+      } else {
+        photoExportPreferences.set({
+          exportType: selectedType as any,
+          format: selectedFormat,
+          quality: imageQuality,
+          embedExif,
+          embedGps,
+          isDefaultSet: makeDefault,
+        });
+      }
 
       const datePrefix = memory.takenAt ? memory.takenAt.slice(0, 10) : 'bereal';
-      const isVideoExport = selectedType === 'bts_only';
+      const isVideoExport = isVideo || selectedType === 'bts_only';
       const ext = isVideoExport ? 'mp4' : selectedFormat.toLowerCase() === 'png' ? 'png' : selectedFormat.toLowerCase() === 'webp' ? 'webp' : 'jpg';
       const defaultFilename = `${datePrefix}_${selectedType}.${ext}`;
 
       const filters = isVideoExport
         ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
-        : [{ name: `${selectedFormat} Image`, extensions: [ext] }];
+        : selectedType === 'apple_live_photo'
+          ? [{ name: 'Apple Live Photo (.jpg + .mov)', extensions: ['jpg'] }]
+          : [{ name: `${selectedFormat} Image`, extensions: [ext] }];
 
       const savePath = await save({
         defaultPath: defaultFilename,
@@ -93,9 +133,9 @@
         btsPath: memory.btsPath,
         outputPath: savePath,
         exportType: selectedType,
-        format: selectedFormat,
+        format: isVideoExport ? 'Jpeg' : selectedFormat,
         quality: imageQuality,
-        embedExif,
+        embedExif: isVideoExport ? true : embedExif,
         takenAt: memory.takenAt,
         latitude: embedGps && memory.location ? memory.location.latitude : undefined,
         longitude: embedGps && memory.location ? memory.location.longitude : undefined,
@@ -168,8 +208,8 @@
               <Layers size={18} />
             </div>
             <div class="option-text">
-              <span class="option-name">Picture-in-Picture</span>
-              <span class="option-desc">Main photo + selfie camera inset</span>
+              <span class="option-name">{isVideo ? 'PIP Video' : 'Picture-in-Picture'}</span>
+              <span class="option-desc">{isVideo ? 'Main video with selfie inset (.mp4)' : 'Main photo + selfie camera inset'}</span>
             </div>
           </label>
 
@@ -190,8 +230,8 @@
               <Columns2 size={18} />
             </div>
             <div class="option-text">
-              <span class="option-name">Side-by-Side</span>
-              <span class="option-desc">Both cameras side by side</span>
+              <span class="option-name">{isVideo ? 'Side-by-Side Video' : 'Side-by-Side'}</span>
+              <span class="option-desc">{isVideo ? 'Both video angles side by side' : 'Both cameras side by side'}</span>
             </div>
           </label>
 
@@ -210,8 +250,8 @@
               <Camera size={18} />
             </div>
             <div class="option-text">
-              <span class="option-name">Main Camera Only</span>
-              <span class="option-desc">High-res primary photo</span>
+              <span class="option-name">{isVideo ? 'Main Video Only' : 'Main Camera Only'}</span>
+              <span class="option-desc">{isVideo ? 'Primary camera video clip (.mp4)' : 'High-res primary photo'}</span>
             </div>
           </label>
 
@@ -232,8 +272,8 @@
               <User size={18} />
             </div>
             <div class="option-text">
-              <span class="option-name">Selfie Camera Only</span>
-              <span class="option-desc">Front-facing camera photo</span>
+              <span class="option-name">{isVideo ? 'Selfie Video Only' : 'Selfie Camera Only'}</span>
+              <span class="option-desc">{isVideo ? 'Front-facing selfie video (.mp4)' : 'Front-facing camera photo'}</span>
             </div>
           </label>
 
@@ -254,36 +294,80 @@
               </div>
               <div class="option-text">
                 <span class="option-name">BTS Micro-Video</span>
-                <span class="option-desc">Raw video clip (.mp4)</span>
+                <span class="option-desc">Behind-the-scenes clip (.mp4)</span>
               </div>
             </label>
 
-            <!-- Option: Motion Photo (if available) -->
-            <label
-              class="format-option-card"
-              class:selected={selectedType === 'motion_photo'}
-            >
-              <input
-                type="radio"
-                name="exportType"
-                value="motion_photo"
-                bind:group={selectedType}
-              />
-              <div class="option-icon-box text-emerald-400">
-                <Sparkles size={18} />
-              </div>
-              <div class="option-text">
-                <span class="option-name">Motion Photo (Live)</span>
-                <span class="option-desc">JPEG with embedded video</span>
-              </div>
-            </label>
+            <!-- Option: Motion Photo (Samsung & Google) (Only for photo memories) -->
+            {#if !isVideo}
+              <label
+                class="format-option-card"
+                class:selected={selectedType === 'motion_photo'}
+              >
+                <input
+                  type="radio"
+                  name="exportType"
+                  value="motion_photo"
+                  bind:group={selectedType}
+                />
+                <div class="option-icon-box text-emerald-400">
+                  <Sparkles size={18} />
+                </div>
+                <div class="option-text">
+                  <span class="option-name">Motion Photo (Android)</span>
+                  <span class="option-desc">Samsung SEFH &amp; Google XMP</span>
+                </div>
+              </label>
+
+              <!-- Option: Apple Live Photo (Pair) -->
+              <label
+                class="format-option-card"
+                class:selected={selectedType === 'apple_live_photo'}
+              >
+                <input
+                  type="radio"
+                  name="exportType"
+                  value="apple_live_photo"
+                  bind:group={selectedType}
+                />
+                <div class="option-icon-box text-sky-400">
+                  <Sparkles size={18} />
+                </div>
+                <div class="option-text">
+                  <span class="option-name">Apple Live Photo (iOS)</span>
+                  <span class="option-desc">Paired .jpg + .mov Live Photo</span>
+                </div>
+              </label>
+            {/if}
           {/if}
         </div>
 
-        <!-- Format & Quality Section (for image exports) -->
-        {#if selectedType !== 'bts_only'}
+        <!-- Format & Quality Section -->
+        {#if isVideo || selectedType === 'bts_only'}
           <div class="format-quality-section">
-            <div class="section-label">OUTPUT FORMAT &amp; QUALITY</div>
+            <div class="section-label-row">
+              <span class="section-label">VIDEO OUTPUT FORMAT</span>
+              <span class="format-req-badge">H.264 Video • AAC Audio</span>
+            </div>
+
+            <div class="video-format-banner">
+              <div class="video-format-icon">
+                <Film size={16} class="text-sky-400" />
+              </div>
+              <div class="video-format-info">
+                <span class="video-format-title">MP4 Video Format</span>
+                <span class="video-format-desc">Native high-definition video with original audio synchronization</span>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="format-quality-section">
+            <div class="section-label-row">
+              <span class="section-label">OUTPUT FORMAT &amp; QUALITY</span>
+              {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                <span class="format-req-badge">JPEG Required for Live Media</span>
+              {/if}
+            </div>
 
             <div class="format-pills-row">
               <button
@@ -298,17 +382,27 @@
                 type="button"
                 class="format-pill-btn"
                 class:active={selectedFormat === 'WebP'}
+                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' ? 'WebP format is not supported for Live & Motion Photos (JPEG required)' : 'WebP image'}
                 on:click={() => (selectedFormat = 'WebP')}
               >
-                WEBP
+                <span>WEBP</span>
+                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                  <Lock size={11} class="lock-icon" />
+                {/if}
               </button>
               <button
                 type="button"
                 class="format-pill-btn"
                 class:active={selectedFormat === 'Png'}
+                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' ? 'PNG format is not supported for Live & Motion Photos (JPEG required)' : 'Lossless PNG'}
                 on:click={() => (selectedFormat = 'Png')}
               >
-                PNG
+                <span>PNG</span>
+                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                  <Lock size={11} class="lock-icon" />
+                {/if}
               </button>
             </div>
 
@@ -341,6 +435,7 @@
               </div>
             {/if}
           </div>
+        {/if}
 
           <!-- Metadata & Location Options -->
           <div class="metadata-section">
@@ -360,7 +455,6 @@
               {/if}
             </div>
           </div>
-        {/if}
 
         <!-- Remember as Default Option -->
         <div class="default-preference-row">
@@ -425,7 +519,7 @@
 
   .modal-card {
     width: 100%;
-    max-width: 480px;
+    max-width: 540px;
     background: #111118;
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-lg);
@@ -511,11 +605,28 @@
     overflow-y: auto;
   }
 
+  .section-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   .section-label {
     font-size: 10px;
     font-weight: 800;
     color: var(--text-muted);
     letter-spacing: 0.08em;
+  }
+
+  .format-req-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #38bdf8;
   }
 
   .format-options-grid {
@@ -590,9 +701,8 @@
   .option-desc {
     font-size: 10.5px;
     color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.3;
+    white-space: normal;
   }
 
   .format-quality-section {
@@ -601,6 +711,44 @@
     gap: 10px;
     padding-top: 6px;
     border-top: 1px solid var(--border-subtle);
+  }
+
+  .video-format-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #14141e;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: var(--radius-md);
+  }
+
+  .video-format-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: rgba(56, 189, 248, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .video-format-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .video-format-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .video-format-desc {
+    font-size: 10.5px;
+    color: var(--text-secondary);
   }
 
   .format-pills-row {
@@ -615,13 +763,17 @@
     border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
-  .format-pill-btn:hover {
+  .format-pill-btn:hover:not(:disabled) {
     background: #1f1f2e;
     color: #ffffff;
   }
@@ -630,6 +782,21 @@
     background: rgba(56, 189, 248, 0.15);
     border-color: #38bdf8;
     color: #38bdf8;
+  }
+
+  .format-pill-btn:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
+    background: rgba(14, 14, 20, 0.4);
+    border: 1.5px dashed rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    pointer-events: none;
+  }
+
+  :global(.lock-icon) {
+    color: var(--text-muted);
+    opacity: 0.7;
   }
 
   .quality-number-row {

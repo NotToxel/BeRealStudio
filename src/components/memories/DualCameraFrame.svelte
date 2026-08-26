@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, onMount } from 'svelte';
   import { getSafeImageSrc, getMediaDataUrl, globalPerspective, globalAudioSettings, showMemoryDebugBadges } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';
@@ -8,6 +8,9 @@
   import Move from 'lucide-svelte/icons/move';
   import Camera from 'lucide-svelte/icons/camera';
   import User from 'lucide-svelte/icons/circle-user';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Minus from 'lucide-svelte/icons/minus';
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import VolumeIcon from '../common/VolumeIcon.svelte';
 
   export let primarySrc: string | undefined = undefined;
@@ -141,7 +144,7 @@
   let rafId: number | null = null;
 
   function startPipDrag(e: MouseEvent | TouchEvent) {
-    if (!interactive || !containerEl) return;
+    if (!interactive || size !== 'lg' || !containerEl) return;
     e.stopPropagation();
     isDragging = true;
     wasDragged = false;
@@ -257,18 +260,36 @@
   let baseVideoEl: HTMLVideoElement | null = null;
   let pipVideoEl: HTMLVideoElement | null = null;
   let isHovered = false;
+  let isPlaying = false;
+  let currentTime = 0;
+  let duration = 0;
+  let isSeeking = false;
+  let playbackTrackEl: HTMLElement | null = null;
+
+  $: hasVideoContent = isBaseVideo || isPipVideo || isPlayingBts;
 
   function handleMouseEnter() {
     isHovered = true;
-    playVideoPreview();
+    if (size !== 'lg' && !isPlaying) {
+      playVideo();
+    }
   }
 
   function handleMouseLeave() {
     isHovered = false;
-    pauseVideoPreview();
+    if (size !== 'lg') {
+      pauseVideo();
+    }
   }
 
-  function playVideoPreview() {
+  function handleCanvasClick(e: MouseEvent) {
+    if (hasVideoContent && size === 'lg' && zoomLevel <= 1.01 && !wasDragged) {
+      togglePlayPause(e);
+    }
+  }
+
+  function playVideo() {
+    isPlaying = true;
     const vol = $globalAudioSettings.volume;
     if (baseVideoEl) {
       baseVideoEl.volume = vol;
@@ -280,17 +301,111 @@
       pipVideoEl.muted = isVideoMuted;
       pipVideoEl.play().catch(() => {});
     }
+    if (btsVideoEl && isPlayingBts) {
+      btsVideoEl.volume = vol;
+      btsVideoEl.muted = isBtsMuted;
+      btsVideoEl.play().catch(() => {});
+    }
   }
 
-  function pauseVideoPreview() {
-    if (baseVideoEl) {
-      baseVideoEl.pause();
-      baseVideoEl.currentTime = 0;
+  function pauseVideo() {
+    isPlaying = false;
+    if (baseVideoEl) baseVideoEl.pause();
+    if (pipVideoEl) pipVideoEl.pause();
+    if (btsVideoEl && isPlayingBts) btsVideoEl.pause();
+  }
+
+  function togglePlayPause(e?: Event) {
+    e?.stopPropagation();
+    if (isPlayingBts) {
+      if (btsVideoEl) {
+        if (btsVideoEl.paused) {
+          btsVideoEl.play().catch(() => {});
+          isPlaying = true;
+        } else {
+          btsVideoEl.pause();
+          isPlaying = false;
+        }
+      }
+      return;
     }
-    if (pipVideoEl) {
-      pipVideoEl.pause();
-      pipVideoEl.currentTime = 0;
+
+    if (isPlaying) {
+      pauseVideo();
+    } else {
+      playVideo();
     }
+  }
+
+  function handleTimeUpdate() {
+    if (isSeeking) return;
+    if (isPlayingBts && btsVideoEl) {
+      currentTime = btsVideoEl.currentTime;
+      duration = btsVideoEl.duration || duration;
+    } else if (baseVideoEl) {
+      currentTime = baseVideoEl.currentTime;
+      duration = baseVideoEl.duration || pipVideoEl?.duration || duration;
+    } else if (pipVideoEl) {
+      currentTime = pipVideoEl.currentTime;
+      duration = pipVideoEl.duration || duration;
+    }
+  }
+
+  function handleLoadedMetadata(e: Event) {
+    const el = e.currentTarget as HTMLVideoElement;
+    if (el && el.duration) {
+      duration = el.duration;
+    }
+  }
+
+  function handleScrubberPointerDown(e: PointerEvent) {
+    if (e.button !== 0 || !duration) return;
+    e.stopPropagation();
+    isSeeking = true;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    seekToPoint(e);
+  }
+
+  function handleScrubberPointerMove(e: PointerEvent) {
+    if (!isSeeking || !duration) return;
+    e.stopPropagation();
+    seekToPoint(e);
+  }
+
+  function handleScrubberPointerUp(e: PointerEvent) {
+    if (!isSeeking) return;
+    e.stopPropagation();
+    isSeeking = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    if (isPlaying) {
+      playVideo();
+    }
+  }
+
+  function seekToPoint(e: PointerEvent | MouseEvent) {
+    if (!playbackTrackEl || !duration) return;
+    const rect = playbackTrackEl.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const targetTime = ratio * duration;
+    currentTime = targetTime;
+
+    if (isPlayingBts && btsVideoEl) {
+      btsVideoEl.currentTime = targetTime;
+    } else {
+      if (baseVideoEl) baseVideoEl.currentTime = targetTime;
+      if (pipVideoEl) pipVideoEl.currentTime = targetTime;
+    }
+  }
+
+  function formatVideoTime(sec: number): string {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
   $: largeImage = swapped ? resolvedSecondary : resolvedPrimary;
@@ -299,6 +414,153 @@
 
   $: isBaseVideo = (isVideo || isMediaVideo(largeImage));
   $: isPipVideo = isMediaVideo(smallPipImage);
+
+  // Native Platform Zoom & Pan Engine
+  let zoomLevel = 1.0;
+  let panX = 0;
+  let panY = 0;
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panRafId: number | null = null;
+  let canvasWrapEl: HTMLElement | null = null;
+
+  // Reset zoom on media or perspective switch
+  $: if (primarySrc || secondarySrc || forceSwapped !== undefined) {
+    resetZoom();
+  }
+
+  function resetZoom(e?: Event) {
+    e?.stopPropagation();
+    zoomLevel = 1.0;
+    panX = 0;
+    panY = 0;
+    isPanning = false;
+  }
+
+  function zoomIn(e?: Event) {
+    e?.stopPropagation();
+    zoomLevel = Math.min(4.0, Math.round((zoomLevel + 0.5) * 10) / 10);
+    clampPan();
+  }
+
+  function zoomOut(e?: Event) {
+    e?.stopPropagation();
+    zoomLevel = Math.max(1.0, Math.round((zoomLevel - 0.5) * 10) / 10);
+    if (zoomLevel <= 1.01) {
+      panX = 0;
+      panY = 0;
+    } else {
+      clampPan();
+    }
+  }
+
+  function clampPan() {
+    if (zoomLevel <= 1.01) {
+      panX = 0;
+      panY = 0;
+      return;
+    }
+    const el = canvasWrapEl || containerEl;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const baseW = rect.width / zoomLevel;
+    const baseH = rect.height / zoomLevel;
+    const maxPanX = (baseW * (zoomLevel - 1)) / 2;
+    const maxPanY = (baseH * (zoomLevel - 1)) / 2;
+    panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+  }
+
+  function handleWheelZoom(e: WheelEvent) {
+    // Trackpad pinch gesture (e.ctrlKey) or Ctrl + Mouse Wheel
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const zoomFactor = -e.deltaY * 0.008;
+      const nextZoom = Math.min(4.0, Math.max(1.0, Math.round((zoomLevel + zoomFactor) * 100) / 100));
+
+      if (nextZoom <= 1.01) {
+        resetZoom();
+      } else {
+        zoomLevel = nextZoom;
+        clampPan();
+      }
+    } else if (zoomLevel > 1.01) {
+      // 2-finger trackpad panning / mouse wheel scroll when zoomed
+      e.preventDefault();
+      e.stopPropagation();
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+      clampPan();
+    }
+  }
+
+  function handleDoubleClickZoom(e: MouseEvent) {
+    e.stopPropagation();
+
+    if (zoomLevel > 1.05) {
+      resetZoom();
+    } else {
+      const el = canvasWrapEl || containerEl;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const clickX = e.clientX - rect.left - rect.width / 2;
+        const clickY = e.clientY - rect.top - rect.height / 2;
+        zoomLevel = 2.5;
+        panX = -clickX * 0.6;
+        panY = -clickY * 0.6;
+        clampPan();
+      } else {
+        zoomLevel = 2.5;
+      }
+    }
+  }
+
+  let isDraggingCanvas = false;
+  let panDragStartX = 0;
+  let panDragStartY = 0;
+  let initialPanX = 0;
+  let initialPanY = 0;
+
+  function handlePanPointerDown(e: PointerEvent) {
+    if (zoomLevel <= 1.01 || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    isPanning = true;
+    isDraggingCanvas = true;
+    panDragStartX = e.clientX;
+    panDragStartY = e.clientY;
+    initialPanX = panX;
+    initialPanY = panY;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  }
+
+  function handlePanPointerMove(e: PointerEvent) {
+    if (!isDraggingCanvas) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const deltaX = e.clientX - panDragStartX;
+    const deltaY = e.clientY - panDragStartY;
+    panX = initialPanX + deltaX;
+    panY = initialPanY + deltaY;
+    clampPan();
+  }
+
+  function handlePanPointerUp(e: PointerEvent) {
+    if (!isDraggingCanvas) return;
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingCanvas = false;
+    isPanning = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    clampPan();
+  }
 </script>
 
 <div
@@ -312,7 +574,23 @@
   aria-label={alt}
 >
   <!-- Large Base Canvas (Primary or Secondary when swapped) -->
-  <div class="large-canvas-wrap" class:canvas-flipped={swapped}>
+  <div
+    bind:this={canvasWrapEl}
+    class="large-canvas-wrap"
+    class:canvas-flipped={swapped}
+    class:is-zoomed={zoomLevel > 1.01}
+    class:is-panning={isPanning}
+    role="presentation"
+    style={zoomLevel > 1.01 ? `transform: translate3d(${panX}px, ${panY}px, 0) scale(${zoomLevel}); transform-origin: center center; will-change: transform; cursor: ${isPanning ? 'grabbing' : 'grab'};` : ''}
+    on:wheel={handleWheelZoom}
+    on:dblclick={handleDoubleClickZoom}
+    on:pointerdown={handlePanPointerDown}
+    on:pointermove={handlePanPointerMove}
+    on:pointerup={handlePanPointerUp}
+    on:pointercancel={handlePanPointerUp}
+    on:lostpointercapture={handlePanPointerUp}
+    on:click={handleCanvasClick}
+  >
     {#if isPlayingBts && safeBtsSrc}
       <video
         bind:this={btsVideoEl}
@@ -320,7 +598,12 @@
         class="media-layer base-video"
         autoplay
         playsinline
+        draggable="false"
         muted={isBtsMuted}
+        on:timeupdate={handleTimeUpdate}
+        on:loadedmetadata={handleLoadedMetadata}
+        on:play={() => (isPlaying = true)}
+        on:pause={() => (isPlaying = false)}
         on:ended={handleVideoEnded}
       >
         <track kind="captions" />
@@ -334,6 +617,11 @@
         muted={isVideoMuted}
         playsinline
         preload="metadata"
+        draggable="false"
+        on:timeupdate={handleTimeUpdate}
+        on:loadedmetadata={handleLoadedMetadata}
+        on:play={() => (isPlaying = true)}
+        on:pause={() => (isPlaying = false)}
       >
         <track kind="captions" />
       </video>
@@ -344,6 +632,7 @@
         class="media-layer base-image"
         loading="lazy"
         decoding="async"
+        draggable="false"
         on:error={swapped ? handleSecondaryImgError : handlePrimaryImgError}
       />
     {:else}
@@ -351,12 +640,21 @@
         <span class="placeholder-text">Photo Unavailable</span>
       </div>
     {/if}
+  </div>
 
-    <!-- Video indicator badge when idle (not hovered & not playing BTS) -->
-    {#if (isBaseVideo || isPipVideo) && !isHovered && !isPlayingBts}
-      <div class="video-indicator-badge" title="Hover to play preview">
-        <Play size={10} class="fill-current text-white" />
-      </div>
+  <!-- Inset & Floating UI Overlays (Direct children of frame container, invariant to canvas zoom/pan) -->
+
+    <!-- Video indicator badge when paused -->
+    {#if (isBaseVideo || isPipVideo) && !isPlaying && !isPlayingBts}
+      <button
+        type="button"
+        class="video-indicator-badge"
+        on:click={togglePlayPause}
+        title={size === 'lg' ? 'Click to play video' : 'Hover to play preview'}
+        aria-label="Play video"
+      >
+        <Play size={size === 'lg' ? 12 : 10} class="fill-current text-white" />
+      </button>
     {/if}
 
     <!-- Video Audio Mute/Unmute Icon Button when hovered -->
@@ -444,8 +742,8 @@
           on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleSwap(e)}
           on:mousedown={startPipDrag}
           on:touchstart={startPipDrag}
-          title="Click to swap cameras • Drag to move anywhere"
-          aria-label="Selfie camera inset — Click to swap, drag to move"
+          title={size === 'lg' ? "Click to swap cameras • Drag to move" : "Click to swap cameras"}
+          aria-label={size === 'lg' ? "Selfie camera inset — Click to swap, drag to move" : "Selfie camera inset — Click to swap"}
         >
           {#if (swapped ? primaryError : secondaryError)}
             <div class="pip-glass-placeholder" title="Camera view unavailable">
@@ -528,7 +826,120 @@
         {/if}
       </div>
     {/if}
-  </div>
+
+    <!-- Video Playback Control Bar with Interactive Scrubber, Play/Pause, Scrubber, Timestamp, and Audio -->
+    {#if hasVideoContent && (size === 'lg' || isHovered || isPlaying)}
+      <div
+        class="video-playback-controls-bar"
+        class:is-active={isHovered || isPlaying || isSeeking || size === 'lg'}
+      >
+        <!-- Play / Pause Button -->
+        <button
+          type="button"
+          class="playback-play-btn"
+          on:click={togglePlayPause}
+          title={isPlaying ? 'Pause Video' : 'Play Video'}
+          aria-label={isPlaying ? 'Pause Video' : 'Play Video'}
+        >
+          {#if isPlaying}
+            <Pause size={12} class="fill-current" />
+          {:else}
+            <Play size={12} class="fill-current" />
+          {/if}
+        </button>
+
+        <!-- Interactive Scrubber Progress Bar -->
+        <div
+          bind:this={playbackTrackEl}
+          class="playback-progress-track"
+          class:is-seeking={isSeeking}
+          role="slider"
+          tabindex="0"
+          aria-label="Video Playback Progress"
+          aria-valuenow={Math.round(currentTime)}
+          aria-valuemin="0"
+          aria-valuemax={Math.round(duration)}
+          on:pointerdown={handleScrubberPointerDown}
+          on:pointermove={handleScrubberPointerMove}
+          on:pointerup={handleScrubberPointerUp}
+          on:pointercancel={handleScrubberPointerUp}
+        >
+          <div class="progress-rail-bg"></div>
+          <div
+            class="progress-fill-bar"
+            style="width: {duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0}%;"
+          ></div>
+          <div
+            class="progress-scrub-thumb"
+            style="left: {duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0}%;"
+          ></div>
+        </div>
+
+        <!-- Current / Total Time Display -->
+        <span class="playback-time-text">
+          {formatVideoTime(currentTime)} / {formatVideoTime(duration)}
+        </span>
+
+        <!-- Audio Mute / Unmute Button -->
+        <button
+          type="button"
+          class="playback-audio-btn"
+          class:is-muted={isPlayingBts ? isBtsMuted : isVideoMuted}
+          on:click={isPlayingBts ? toggleBtsMute : toggleVideoMute}
+          title={(isPlayingBts ? isBtsMuted : isVideoMuted) ? 'Unmute Audio' : 'Mute Audio'}
+          aria-label="Toggle audio"
+        >
+          <VolumeIcon muted={isPlayingBts ? isBtsMuted : isVideoMuted} size={12} />
+        </button>
+      </div>
+    {/if}
+
+    <!-- Interactive Floating Zoom Toolbar (Only shown when zoomed in) -->
+    {#if zoomLevel > 1.01}
+      <div class="zoom-floating-controls is-zoomed">
+        <button
+          type="button"
+          class="zoom-btn"
+          disabled={zoomLevel <= 1.01}
+          on:click={zoomOut}
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+        >
+          <Minus size={12} />
+        </button>
+
+        <button
+          type="button"
+          class="zoom-level-pill"
+          on:click={resetZoom}
+          title="Reset Zoom (Double-Click image or press 0)"
+          aria-label="Reset Zoom"
+        >
+          <span>{Math.round(zoomLevel * 100)}%</span>
+        </button>
+
+        <button
+          type="button"
+          class="zoom-btn"
+          disabled={zoomLevel >= 4.0}
+          on:click={zoomIn}
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+        >
+          <Plus size={12} />
+        </button>
+
+        <button
+          type="button"
+          class="zoom-btn reset-btn"
+          on:click={resetZoom}
+          title="Reset Zoom to 100%"
+          aria-label="Reset Zoom"
+        >
+          <RotateCcw size={11} />
+        </button>
+      </div>
+    {/if}
 </div>
 
 <style>
@@ -792,15 +1203,15 @@
     padding: 1px 5px;
   }
 
-  /* Video indicator badge when idle */
+  /* Video indicator badge when paused */
   .video-indicator-badge {
     position: absolute;
     bottom: 8px;
     right: 8px;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.72);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: #ffffff;
@@ -808,9 +1219,25 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     z-index: 15;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+    padding: 0;
+  }
+
+  .video-indicator-badge:hover {
+    background: #38bdf8;
+    color: #000000;
+    border-color: #38bdf8;
+    transform: scale(1.12);
+  }
+
+  .size-lg .video-indicator-badge {
+    width: 36px;
+    height: 36px;
+    bottom: 14px;
+    right: 14px;
   }
 
   /* Movable Inset PIP Positioning matching 100% exact BeReal measurements */
@@ -1049,5 +1476,227 @@
   .bts-audio-pill.is-muted {
     color: #f87171;
     border-color: rgba(248, 113, 113, 0.4);
+  }
+
+  /* Video Playback Scrubber & Control Bar */
+  .video-playback-controls-bar {
+    position: absolute;
+    bottom: 10px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(8, 8, 14, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--radius-full);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 32;
+  }
+
+  .bereal-frame-container:hover .video-playback-controls-bar,
+  .video-playback-controls-bar.is-active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .size-lg .zoom-floating-controls {
+    bottom: 44px;
+  }
+
+  .playback-play-btn,
+  .playback-audio-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .playback-play-btn:hover,
+  .playback-audio-btn:hover {
+    background: #38bdf8;
+    color: #000000;
+    border-color: #38bdf8;
+    transform: scale(1.1);
+  }
+
+  .playback-audio-btn.is-muted {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
+  }
+
+  .playback-progress-track {
+    position: relative;
+    flex: 1;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .progress-rail-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    transition: height 0.15s ease;
+  }
+
+  .playback-progress-track:hover .progress-rail-bg,
+  .playback-progress-track.is-seeking .progress-rail-bg {
+    height: 5px;
+  }
+
+  .progress-fill-bar {
+    position: absolute;
+    left: 0;
+    height: 4px;
+    background: #38bdf8;
+    border-radius: 999px;
+    pointer-events: none;
+    transition: height 0.15s ease;
+  }
+
+  .playback-progress-track:hover .progress-fill-bar,
+  .playback-progress-track.is-seeking .progress-fill-bar {
+    height: 5px;
+  }
+
+  .progress-scrub-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+    pointer-events: none;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .playback-progress-track:hover .progress-scrub-thumb,
+  .playback-progress-track.is-seeking .progress-scrub-thumb {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .playback-time-text {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: #a1a1aa;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .large-canvas-wrap.is-zoomed {
+    transition: none !important;
+    user-select: none;
+    touch-action: none;
+  }
+
+  /* Floating Zoom Control Bar */
+  .zoom-floating-controls {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 6px;
+    background: rgba(10, 10, 16, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 40;
+  }
+
+  .zoom-floating-controls.is-zoomed {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .zoom-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.15s ease;
+  }
+
+  .zoom-btn:hover:not(:disabled) {
+    background: #38bdf8;
+    color: #000000;
+    border-color: #38bdf8;
+    transform: scale(1.1);
+  }
+
+  .zoom-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .zoom-level-pill {
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #ffffff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .zoom-level-pill:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #38bdf8;
+  }
+
+  .zoom-btn.reset-btn {
+    width: 22px;
+    height: 22px;
+    background: rgba(248, 113, 113, 0.15);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: #f87171;
+  }
+
+  .zoom-btn.reset-btn:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
   }
 </style>

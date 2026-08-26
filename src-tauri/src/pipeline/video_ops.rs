@@ -88,6 +88,44 @@ pub fn combine_videos_pip(
     Ok(())
 }
 
+/// Combine two video files side by side via FFmpeg.
+pub fn combine_videos_side_by_side(
+    primary: &Path,
+    secondary: &Path,
+    output: &Path,
+) -> Result<()> {
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let ffmpeg = detect_ffmpeg().context("FFmpeg required for video combining")?;
+
+    let filter = "[0:v][1:v]hstack=inputs=2[out]";
+
+    let status = silent_command(&ffmpeg)
+        .args([
+            "-i", primary.to_str().unwrap_or(""),
+            "-i", secondary.to_str().unwrap_or(""),
+            "-filter_complex", filter,
+            "-map", "[out]",
+            "-map", "0:a?",
+            "-c:v", "libx264",
+            "-preset", "medium",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-shortest",
+            "-y",
+            output.to_str().unwrap_or(""),
+        ])
+        .status()
+        .context("Failed to launch FFmpeg for side-by-side video combining")?;
+
+    if !status.success() {
+        anyhow::bail!("FFmpeg side-by-side video combine failed with exit code: {}", status);
+    }
+    Ok(())
+}
+
 /// Set video file metadata (creation date) via FFmpeg.
 pub fn set_video_metadata(video_path: &Path, datetime: &chrono::DateTime<chrono::Utc>) -> Result<()> {
     // Set file timestamps

@@ -189,12 +189,44 @@
   .memories-view-container {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    height: 100%;
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding-bottom: 60px;
+    overflow: hidden;
     animation: viewFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .explorer-content-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .active-view-frame {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .explorer-view-stage {
+    flex: 1;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .explorer-view-stage.is-active {
+    display: flex;
   }
 
   @keyframes viewFade {
@@ -211,7 +243,7 @@
   .memories-sticky-header {
     position: sticky;
     top: -18px;
-    z-index: 40;
+    z-index: 60;
     background: rgba(9, 9, 12, 0.94);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);

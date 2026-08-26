@@ -21,6 +21,10 @@
   import CalendarIcon from 'lucide-svelte/icons/calendar';
   import Grid from 'lucide-svelte/icons/layout-grid';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import Clock from 'lucide-svelte/icons/clock';
+  import MessageSquare from 'lucide-svelte/icons/message-square';
 
   const weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -81,6 +85,12 @@
     return dates;
   })();
 
+  let calendarContainerEl: HTMLElement | null = null;
+
+  $: if (yearMonth && calendarContainerEl) {
+    calendarContainerEl.scrollTop = 0;
+  }
+
   let focusedMatchingDate: string | null = null;
   let focusedDateTimer: any = null;
 
@@ -110,6 +120,16 @@
     focusedDateTimer = setTimeout(() => {
       focusedMatchingDate = null;
     }, 3200);
+
+    setTimeout(() => {
+      const el = document.getElementById(`calendar-day-${targetDate}`);
+      if (el && calendarContainerEl) {
+        const containerRect = calendarContainerEl.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const targetScroll = calendarContainerEl.scrollTop + (elRect.top - containerRect.top) - 120;
+        calendarContainerEl.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      }
+    }, 60);
   }
 
   // Month matching statistics
@@ -184,172 +204,166 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="calendar-view-container">
-  <!-- Month Switcher Header with Centered Nav Cluster -->
-  <div class="calendar-header-bar">
-    <div class="calendar-nav-cluster">
-      <button
-        type="button"
-        class="month-nav-btn prev-btn"
-        disabled={!hasPrevMonth}
-        on:click={prevMonth}
-        title="Previous Month (or scroll up)"
-        aria-label="Previous month"
-      >
-        <ChevronLeft size={16} />
-      </button>
-
-      <div class="month-title-group">
+<div class="calendar-view-container" bind:this={calendarContainerEl}>
+  <!-- Sticky Top Header containing BOTH Month Navigation and Weekday Headers in a solid opaque header -->
+  <div class="calendar-sticky-topbar">
+    <!-- Month Switcher Header with Centered Nav Cluster -->
+    <div class="calendar-header-bar">
+      <div class="calendar-nav-cluster">
         <button
           type="button"
-          class="month-picker-trigger-btn"
-          class:is-active={isPickerOpen}
-          on:click={() => (isPickerOpen = !isPickerOpen)}
-          title="Click to open Month & Year picker"
-          aria-expanded={isPickerOpen}
+          class="month-nav-btn prev-btn"
+          disabled={!hasPrevMonth}
+          on:click={prevMonth}
+          title="Previous Month (or scroll up)"
+          aria-label="Previous month"
         >
-          <CalendarIcon size={16} class="text-sky-400" />
-          <span class="month-title-text">{monthTitle}</span>
-          <ChevronDown size={14} class="picker-chevron {isPickerOpen ? 'rotate-180' : ''}" />
+          <ChevronLeft size={16} />
         </button>
 
-        <!-- Rich Month / Year Popover -->
-        {#if isPickerOpen}
-          <div class="month-picker-popover">
-            <div class="picker-year-row">
-              <button
-                type="button"
-                class="picker-nav-btn"
-                disabled={!hasPrevYear}
-                on:click={() => hasPrevYear && pickerYear--}
-                title={hasPrevYear ? "Previous Year" : "No memories in earlier years"}
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span class="picker-year-title">{pickerYear}</span>
-              <button
-                type="button"
-                class="picker-nav-btn"
-                disabled={!hasNextYear}
-                on:click={() => hasNextYear && pickerYear++}
-                title={hasNextYear ? "Next Year" : "No memories in later years"}
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
+        <div class="month-title-group">
+          <button
+            type="button"
+            class="month-picker-trigger-btn"
+            class:is-active={isPickerOpen}
+            on:click={() => (isPickerOpen = !isPickerOpen)}
+            title="Click to open Month & Year picker"
+            aria-expanded={isPickerOpen}
+          >
+            <CalendarIcon size={16} class="text-sky-400" />
+            <span class="month-title-text">{monthTitle}</span>
+            <ChevronDown size={14} class="picker-chevron {isPickerOpen ? 'rotate-180' : ''}" />
+          </button>
 
-            <div class="picker-months-grid">
-              {#each monthNames as mName, mIdx}
-                {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
-                {@const isCurrent = mKey === yearMonth}
-                {@const hasData = availableMonths.includes(mKey)}
-                {@const cnt = $explorerFilterCounts?.byMonth.get(mKey) || 0}
-
+          <!-- Rich Month / Year Popover -->
+          {#if isPickerOpen}
+            <div class="month-picker-popover">
+              <div class="picker-year-row">
                 <button
                   type="button"
-                  class="picker-month-btn"
-                  class:is-selected={isCurrent}
-                  class:has-memories={hasData}
-                  disabled={!hasData}
-                  on:click={() => hasData && selectMonthFromPicker(mIdx)}
-                  title={hasData ? `${mName} ${pickerYear}: ${cnt} BeReals` : `No memories in ${mName} ${pickerYear}`}
+                  class="picker-nav-btn"
+                  disabled={!hasPrevYear}
+                  on:click={() => hasPrevYear && pickerYear--}
+                  title={hasPrevYear ? "Previous Year" : "No memories in earlier years"}
                 >
-                  <span class="month-name-text">{mName}</span>
-                  {#if cnt > 0}
-                    <span class="month-count-tag">{cnt}</span>
-                  {:else if hasData}
-                    <span class="month-data-dot"></span>
-                  {/if}
+                  <ChevronLeft size={14} />
                 </button>
-              {/each}
+                <span class="picker-year-title">{pickerYear}</span>
+                <button
+                  type="button"
+                  class="picker-nav-btn"
+                  disabled={!hasNextYear}
+                  on:click={() => hasNextYear && pickerYear++}
+                  title={hasNextYear ? "Next Year" : "No memories in later years"}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div class="picker-months-grid">
+                {#each monthNames as mName, mIdx}
+                  {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
+                  {@const isCurrent = mKey === yearMonth}
+                  {@const hasData = availableMonths.includes(mKey)}
+                  {@const cnt = $explorerFilterCounts?.byMonth.get(mKey) || 0}
+
+                  <button
+                    type="button"
+                    class="picker-month-btn"
+                    class:is-selected={isCurrent}
+                    class:has-memories={hasData}
+                    disabled={!hasData}
+                    on:click={() => hasData && selectMonthFromPicker(mIdx)}
+                    title={hasData ? `${mName} ${pickerYear}: ${cnt} BeReals` : `No memories in ${mName} ${pickerYear}`}
+                  >
+                    <span class="month-name-text">{mName}</span>
+                    {#if cnt > 0}
+                      <span class="month-count-tag">{cnt}</span>
+                    {:else if hasData}
+                      <span class="month-data-dot"></span>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+
+              <div class="picker-footer-row">
+                <button
+                  type="button"
+                  class="picker-today-btn"
+                  on:click={jumpToLatestMonth}
+                >
+                  <Sparkles size={12} class="text-amber-400" />
+                  <span>Latest Month</span>
+                </button>
+              </div>
             </div>
-
-            <div class="picker-footer-row">
-              <button
-                type="button"
-                class="picker-today-btn"
-                on:click={jumpToLatestMonth}
-              >
-                <Sparkles size={12} class="text-amber-400" />
-                <span>Latest Month</span>
-              </button>
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <button
-        type="button"
-        class="month-nav-btn next-btn"
-        disabled={!hasNextMonth}
-        on:click={nextMonth}
-        title="Next Month (Right arrow)"
-        aria-label="Next month"
-      >
-        <ChevronRight size={16} />
-      </button>
-    </div>
-
-    <!-- Right Side: Filter Quick Control Panel or Key Hint -->
-    {#if isFiltering}
-      <div class="calendar-filter-control-panel">
-        <div class="filter-panel-meta">
-          <span class="filter-sparkle">✦</span>
-          <span class="filter-stats-text">
-            <strong>{allMatchingDates.length}</strong> matching {allMatchingDates.length === 1 ? 'day' : 'days'}
-          </span>
-        </div>
-
-        <div class="filter-nav-btn-group">
-          <button
-            type="button"
-            class="filter-step-btn"
-            disabled={allMatchingDates.length <= 1}
-            on:click={jumpToPrevMatchingPost}
-            title="Jump to Previous Matching BeReal"
-            aria-label="Previous matching post"
-          >
-            <ChevronLeft size={12} />
-            <span>Prev</span>
-          </button>
-
-          <button
-            type="button"
-            class="filter-step-btn next-step-btn"
-            disabled={allMatchingDates.length <= 1}
-            on:click={jumpToNextMatchingPost}
-            title="Jump to Next Matching BeReal"
-            aria-label="Next matching post"
-          >
-            <span>Next</span>
-            <ChevronRight size={12} />
-          </button>
+          {/if}
         </div>
 
         <button
           type="button"
-          class="filter-clear-pill-btn"
-          on:click={resetFilters}
-          title="Reset all filters"
+          class="month-nav-btn next-btn"
+          disabled={!hasNextMonth}
+          on:click={nextMonth}
+          title="Next Month (Right arrow)"
+          aria-label="Next month"
         >
-          Reset
+          <ChevronRight size={16} />
         </button>
       </div>
-    {:else}
-      <!-- Arrow Keys Navigation Hint Badge -->
-      <div class="scroll-hint-tag" title="Use Left / Right arrow keys to change months">
-        <span>← / → to flip months</span>
-      </div>
-    {/if}
-  </div>
 
-  <!-- Weekday Headers -->
-  <div class="weekdays-grid">
-    {#each weekdays as day}
-      <div class="weekday-header-cell">
-        <span>{day}</span>
-      </div>
-    {/each}
+      <!-- Right Side: Filter Quick Control Panel or Key Hint -->
+      {#if isFiltering}
+        <div class="calendar-filter-control-panel">
+          <div class="filter-panel-meta">
+            <span class="filter-sparkle">✦</span>
+            <span class="filter-stats-text">
+              <strong>{allMatchingDates.length}</strong> matching {allMatchingDates.length === 1 ? 'day' : 'days'}
+            </span>
+          </div>
+
+          <div class="filter-nav-btn-group">
+            <button
+              type="button"
+              class="filter-step-btn"
+              disabled={allMatchingDates.length <= 1}
+              on:click={jumpToPrevMatchingPost}
+              title="Jump to Previous Matching BeReal"
+              aria-label="Previous matching post"
+            >
+              <ChevronLeft size={12} />
+              <span>Prev</span>
+            </button>
+
+            <button
+              type="button"
+              class="filter-step-btn next-step-btn"
+              disabled={allMatchingDates.length <= 1}
+              on:click={jumpToNextMatchingPost}
+              title="Jump to Next Matching BeReal"
+              aria-label="Next matching post"
+            >
+              <span>Next</span>
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        </div>
+      {:else}
+        <!-- Arrow Keys Navigation Hint Badge -->
+        <div class="scroll-hint-tag" title="Use Left / Right arrow keys to change months">
+          <span>← / → to flip months</span>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Weekday Headers -->
+    <div class="weekdays-grid">
+      {#each weekdays as day}
+        <div class="weekday-header-cell">
+          <span>{day}</span>
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Calendar Days Grid (Smooth transitions on filter toggles) -->
@@ -377,6 +391,7 @@
         {@const lateTooltip = primaryPost ? (primaryPost.lateExact ? `${primaryPost.lateExact} (${primaryPost.timeFormatted})` : (primaryPost.lateDuration ? `${primaryPost.lateDuration} (${primaryPost.timeFormatted})` : 'Posted late')) : ''}
 
         <div
+          id="calendar-day-{dateStr}"
           class="day-cell"
           class:has-memory={hasRawPost}
           class:is-on-time={isOnTime}
@@ -388,7 +403,7 @@
           on:click={() => hasRawPost && handleDayClick(dayNum)}
           on:contextmenu={(e) => hasRawPost && primaryPost && openContextMenu(e, primaryPost)}
           on:keydown={(e) => hasRawPost && (e.key === 'Enter' || e.key === ' ') && handleDayClick(dayNum)}
-          title={isFilteredOut ? `Excluded by filters (${rawPosts.length} BeReal)` : (isFilterMatch ? `Matches filter (${dayPosts.length} BeReal)` : (isLate ? lateTooltip : (hasRawPost ? `On Time • ${primaryPost?.timeFormatted}` : '')))}
+          aria-label={hasRawPost && primaryPost ? `BeReal from ${primaryPost.dateFormatted}, ${isOnTime ? 'On Time' : 'Late'}` : `Day ${dayNum}`}
         >
           {#if hasRawPost && primaryPost}
             <div class="active-day-card">
@@ -411,20 +426,25 @@
 
               <!-- Late indicator badge if isLate is true -->
               {#if isLate && ($memoryHeaderSettings.showLatePillsInCalendar ?? true)}
-                <div class="day-late-badge" title={lateTooltip}>
+                <div class="day-late-badge">
                   <span>{primaryPost.lateDuration || 'Late'}</span>
                 </div>
               {/if}
 
               <!-- Top-right corner BeReal count badge -->
               {#if isFilterMatch && dayPosts.length > 1}
-                <div class="day-count-badge is-matching-badge" title="{dayPosts.length} matching BeReals">
+                <div class="day-count-badge is-matching-badge">
                   {dayPosts.length}
                 </div>
               {:else if !isFiltering && rawPosts.length > 1}
-                <div class="day-count-badge" title="{rawPosts.length} BeReals on this day">
+                <div class="day-count-badge">
                   {rawPosts.length}
                 </div>
+              {/if}
+
+              <!-- Subtle caption indicator dot if has caption -->
+              {#if primaryPost.caption}
+                <div class="day-caption-dot" title="Has caption" aria-label="Has caption"></div>
               {/if}
 
               <!-- Filtered Out Ghost Tag -->
@@ -433,6 +453,43 @@
                   <span>Filtered</span>
                 </div>
               {/if}
+
+              <!-- Rich Day Hover Popover (Visible on hover/focus) -->
+              <div class="calendar-day-hover-card" role="tooltip">
+                <div class="cal-hover-top">
+                  <span class="cal-hover-date-val">{primaryPost.dateFormatted}</span>
+                  <div class="cal-hover-time-tag">
+                    <Clock size={10} class="text-sky-400" />
+                    <span>{primaryPost.timeFormatted || 'Unknown time'}</span>
+                  </div>
+                </div>
+
+                <div class="cal-hover-details">
+                  <div class="cal-hover-status-pill" class:is-late={primaryPost.isLate} class:is-ontime={!primaryPost.isLate}>
+                    {primaryPost.isLate ? `⚠️ ${primaryPost.lateDuration || 'Late'} (${primaryPost.lateExact || 'Late'})` : '✓ On Time'}
+                  </div>
+
+                  {#if primaryPost.city || primaryPost.locationName}
+                    <div class="cal-hover-loc-row">
+                      <MapPin size={10} class="text-rose-400 flex-shrink-0" />
+                      <span class="cal-hover-loc-text">{primaryPost.city || primaryPost.locationName}</span>
+                    </div>
+                  {/if}
+
+                  {#if primaryPost.caption}
+                    <div class="cal-hover-caption-row">
+                      <span class="cal-hover-caption-text">{primaryPost.caption}</span>
+                    </div>
+                  {/if}
+
+                  {#if rawPosts.length > 1}
+                    <div class="cal-hover-multi-tag">
+                      <span>{rawPosts.length} BeReals on this day</span>
+                    </div>
+                  {/if}
+                </div>
+                <div class="cal-hover-tip-arrow"></div>
+              </div>
             </div>
           {:else}
             <div class="empty-day-box">
@@ -462,21 +519,50 @@
   .calendar-view-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    width: 100%;
-    background: #09090e;
+    gap: 14px;
+    background: #0d0d12;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
-    padding: 18px;
+    padding: 0 18px 24px 18px;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  .calendar-sticky-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    background: #0d0d12;
+    padding: 14px 18px 8px 18px;
+    margin: 0 -18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .calendar-header-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-subtle);
     position: relative;
+  }
+
+  .weekdays-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding: 4px 0 0 0;
+  }
+
+  .weekday-header-cell {
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
   }
 
   .calendar-nav-cluster {
@@ -894,6 +980,20 @@
     transform: scale(1.08);
   }
 
+  .day-caption-dot {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 4px rgba(56, 189, 248, 0.7);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0.85;
+  }
+
   .filtered-out-indicator {
     position: absolute;
     bottom: 6px;
@@ -911,6 +1011,134 @@
     letter-spacing: 0.04em;
     pointer-events: none;
     z-index: 10;
+  }
+
+  /* Rich Day Hover Popover */
+  .calendar-day-hover-card {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    background: rgba(12, 12, 18, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 170px;
+    max-width: 220px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 60;
+  }
+
+  .day-cell.has-memory:hover .calendar-day-hover-card,
+  .day-cell.has-memory:focus-visible .calendar-day-hover-card {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .cal-hover-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .cal-hover-date-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+  }
+
+  .cal-hover-time-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: #38bdf8;
+    white-space: nowrap;
+  }
+
+  .cal-hover-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cal-hover-status-pill {
+    align-self: flex-start;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .cal-hover-status-pill.is-ontime {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .cal-hover-status-pill.is-late {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .cal-hover-loc-row,
+  .cal-hover-caption-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
+
+  .cal-hover-loc-text {
+    color: #f4f4f5;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cal-hover-caption-text {
+    color: #e4e4e7;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .cal-hover-multi-tag {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #a1a1aa;
+    padding-top: 2px;
+  }
+
+  .cal-hover-tip-arrow {
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 9px;
+    height: 9px;
+    background: #0c0c12;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    border-right: 1px solid rgba(255, 255, 255, 0.16);
   }
 
   /* Focused Match Pulse State when stepping with Prev/Next */
@@ -988,24 +1216,6 @@
   .filter-step-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
-  }
-
-  .filter-clear-pill-btn {
-    padding: 3px 8px;
-    border-radius: var(--radius-full);
-    background: rgba(244, 63, 94, 0.16);
-    border: 1px solid rgba(244, 63, 94, 0.4);
-    color: #fda4af;
-    font-size: 10.5px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .filter-clear-pill-btn:hover {
-    background: #f43f5e;
-    color: #ffffff;
-    border-color: #f43f5e;
   }
 
   .empty-day-box {
