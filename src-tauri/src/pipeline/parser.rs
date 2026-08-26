@@ -1038,7 +1038,7 @@ pub fn parse_posts(json_path: &Path) -> Result<Vec<BeRealPost>> {
     Ok(result)
 }
 
-/// Intelligently merge a primary list of posts (e.g. from memories.json) and secondary list (from posts.json)
+/// Intelligently merge a primary list of posts (from posts.json and memories.json)
 pub fn merge_posts_and_memories(
     memories_posts: Vec<(BeRealPost, String)>,
     posts_json_posts: Vec<(BeRealPost, String)>,
@@ -1050,105 +1050,105 @@ pub fn merge_posts_and_memories(
         return memories_posts;
     }
 
-    let mut posts_by_time: HashMap<String, (BeRealPost, String)> = HashMap::new();
-    let mut posts_by_minute: HashMap<String, (BeRealPost, String)> = HashMap::new();
-    let mut posts_by_media: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    // 1. Build lookup tables for memories.json by timestamp, minute prefix, and media filename
+    let mut memories_by_time: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut memories_by_minute: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut memories_by_media: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut moments: Vec<(DateTime<Utc>, String, Option<String>)> = Vec::new();
 
-    for (p, raw) in posts_json_posts {
-        posts_by_time.insert(p.taken_at.clone(), (p.clone(), raw.clone()));
-        if p.taken_at.len() >= 16 {
-            posts_by_minute.insert(p.taken_at[..16].to_string(), (p.clone(), raw.clone()));
+    for (m, raw) in &memories_posts {
+        memories_by_time.insert(m.taken_at.clone(), (m.clone(), raw.clone()));
+        if m.taken_at.len() >= 16 {
+            memories_by_minute.insert(m.taken_at[..16].to_string(), (m.clone(), raw.clone()));
         }
-        if let Some(ref prim) = p.primary {
+        if let Some(ref prim) = m.primary {
             if let Some(fname) = Path::new(&prim.path).file_name().and_then(|n| n.to_str()) {
-                posts_by_media.insert(fname.to_lowercase(), (p.clone(), raw.clone()));
+                memories_by_media.insert(fname.to_lowercase(), (m.clone(), raw.clone()));
             }
         }
-    }
-
-    // Extract chronological BeReal moment cycle registry from memories before consuming
-    let mut moments: Vec<(DateTime<Utc>, String, Option<String>)> = Vec::new();
-    for (m, _) in &memories_posts {
         if let Some(ref notif_str) = m.notification_at {
             if let Some(dt) = parse_taken_at(notif_str) {
                 moments.push((dt, notif_str.clone(), m.date.clone()));
             }
         }
     }
+
     moments.sort_by_key(|k| k.0);
     moments.dedup_by(|a, b| a.1 == b.1);
 
-    let mut merged = Vec::with_capacity(memories_posts.len() + 10);
-    let mut used_post_times = HashSet::new();
+    let mut merged = Vec::with_capacity(posts_json_posts.len() + 10);
+    let mut used_mem_times = HashSet::new();
 
-    for (mut mem_post, mem_raw) in memories_posts {
-        let matched = posts_by_time.get(&mem_post.taken_at)
+    // 2. Iterate through all posts in posts_json_posts (guaranteeing 100% of posts appear in calendar and feed)
+    for (mut post, post_raw) in posts_json_posts {
+        let mem_match = memories_by_time.get(&post.taken_at)
             .or_else(|| {
-                if mem_post.taken_at.len() >= 16 {
-                    posts_by_minute.get(&mem_post.taken_at[..16])
+                if post.taken_at.len() >= 16 {
+                    memories_by_minute.get(&post.taken_at[..16])
                 } else {
                     None
                 }
             })
             .or_else(|| {
-                mem_post.primary.as_ref().and_then(|prim| {
+                post.primary.as_ref().and_then(|prim| {
                     Path::new(&prim.path).file_name().and_then(|n| n.to_str()).and_then(|fname| {
-                        posts_by_media.get(&fname.to_lowercase())
+                        memories_by_media.get(&fname.to_lowercase())
                     })
                 })
             });
 
-        if let Some((post_match, _)) = matched {
-            used_post_times.insert(post_match.taken_at.clone());
-            if mem_post.retake_counter.is_none() {
-                mem_post.retake_counter = post_match.retake_counter;
+        if let Some((mem, _)) = mem_match {
+            used_mem_times.insert(mem.taken_at.clone());
+            if post.is_late.is_none() {
+                post.is_late = mem.is_late;
             }
-            if mem_post.visibility.is_none() {
-                mem_post.visibility = post_match.visibility.clone();
+            if post.late_in_seconds.is_none() {
+                post.late_in_seconds = mem.late_in_seconds;
             }
-            if mem_post.primary.is_none() {
-                mem_post.primary = post_match.primary.clone();
+            if post.notification_at.is_none() {
+                post.notification_at = mem.notification_at.clone();
             }
-            if mem_post.secondary.is_none() {
-                mem_post.secondary = post_match.secondary.clone();
+            if post.date.is_none() {
+                post.date = mem.date.clone();
             }
-            if mem_post.caption.is_none() {
-                mem_post.caption = post_match.caption.clone();
+            if post.location.is_none() {
+                post.location = mem.location.clone();
             }
-            if mem_post.location.is_none() {
-                mem_post.location = post_match.location.clone();
+            if post.caption.is_none() {
+                post.caption = mem.caption.clone();
             }
-            if mem_post.bts_media.is_none() {
-                mem_post.bts_media = post_match.bts_media.clone();
+            if post.bts_media.is_none() {
+                post.bts_media = mem.bts_media.clone();
             }
-        }
-
-        merged.push((mem_post, mem_raw));
-    }
-
-    // Append any extra posts from posts.json that were not in memories.json and resolve their cycle info
-    for (p_time, (mut extra_post, extra_raw)) in posts_by_time {
-        if !used_post_times.contains(&p_time) {
-            if let Some(post_dt) = parse_taken_at(&extra_post.taken_at) {
-                // Find closest moment <= post_dt (the moment this post belongs to)
+        } else {
+            // Post exists in posts.json but missing in memories.json: derive its BeReal moment from registry
+            if let Some(post_dt) = parse_taken_at(&post.taken_at) {
                 let matched_moment = moments.iter().rev().find(|m| m.0 <= post_dt);
                 if let Some((m_dt, m_str, m_date)) = matched_moment {
                     let diff_sec = (post_dt - *m_dt).num_seconds();
-                    if extra_post.notification_at.is_none() {
-                        extra_post.notification_at = Some(m_str.clone());
+                    if post.notification_at.is_none() {
+                        post.notification_at = Some(m_str.clone());
                     }
-                    if extra_post.is_late.is_none() {
-                        extra_post.is_late = Some(diff_sec > 120);
+                    if post.is_late.is_none() {
+                        post.is_late = Some(diff_sec > 120);
                     }
-                    if extra_post.late_in_seconds.is_none() && diff_sec > 120 {
-                        extra_post.late_in_seconds = Some(diff_sec);
+                    if post.late_in_seconds.is_none() && diff_sec > 120 {
+                        post.late_in_seconds = Some(diff_sec);
                     }
-                    if extra_post.date.is_none() && m_date.is_some() {
-                        extra_post.date = m_date.clone();
+                    if post.date.is_none() && m_date.is_some() {
+                        post.date = m_date.clone();
                     }
                 }
             }
-            merged.push((extra_post, extra_raw));
+        }
+
+        merged.push((post, post_raw));
+    }
+
+    // 3. Append any memory that was in memories.json but not in posts.json
+    for (m, mem_raw) in memories_posts {
+        if !used_mem_times.contains(&m.taken_at) {
+            merged.push((m, mem_raw));
         }
     }
 
