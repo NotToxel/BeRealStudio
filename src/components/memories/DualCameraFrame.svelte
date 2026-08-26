@@ -351,7 +351,7 @@
       </div>
     {/if}
 
-    <!-- Video Audio Mute/Unmute Control Pill when hovered -->
+    <!-- Video Audio Mute/Unmute Icon Button when hovered -->
     {#if (isBaseVideo || isPipVideo) && isHovered && !isPlayingBts}
       <div class="video-audio-cluster">
         <button
@@ -363,7 +363,6 @@
           aria-label="Toggle video audio"
         >
           <VolumeIcon muted={isVideoMuted} size={12} />
-          <span>{isVideoMuted ? 'Muted' : `${Math.round($globalAudioSettings.volume * 100)}%`}</span>
         </button>
       </div>
     {/if}
@@ -752,29 +751,27 @@
   .video-audio-pill {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 9px;
-    background: rgba(0, 0, 0, 0.78);
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: var(--radius-full);
-    font-size: 10.5px;
-    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     color: #ffffff;
     cursor: pointer;
-    transition: all 0.15s ease;
+    padding: 0;
+    transition: all 0.2s ease;
   }
 
   .video-audio-pill:hover {
-    background: rgba(56, 189, 248, 0.25);
-    border-color: #38bdf8;
-    color: #38bdf8;
-    transform: scale(1.04);
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
   }
 
   .video-audio-pill.is-muted {
     color: #f87171;
-    border-color: rgba(248, 113, 113, 0.35);
+    border-color: rgba(248, 113, 113, 0.4);
   }
 
   /* BTS Play Trigger & Audio Controls Cluster */
