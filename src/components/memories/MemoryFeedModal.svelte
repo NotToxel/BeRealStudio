@@ -451,16 +451,16 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #14141e;
-    border: 1px solid var(--border-medium);
-    color: #ffffff;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
   .quick-download-btn:hover {
-    background: #252536;
-    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
   }
 
   .post-header-row {

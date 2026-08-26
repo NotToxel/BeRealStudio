@@ -221,6 +221,33 @@
             <span>Copy Location</span>
           </button>
         {/if}
+
+        {#if memory.location}
+          <button
+            type="button"
+            class="menu-item"
+            on:click={() =>
+              copyToClipboard(
+                `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
+                'GPS'
+              )}
+          >
+            <Copy size={15} class="text-teal-400" />
+            <span>Copy GPS Coordinates</span>
+          </button>
+        {/if}
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Timestamp')}>
+          <Copy size={15} class="text-blue-400" />
+          <span>Copy Timestamp ({memory.dateFormatted})</span>
+        </button>
+
+        {#if memory.primaryPath}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}>
+            <Copy size={15} class="text-slate-400" />
+            <span>Copy Full File Path</span>
+          </button>
+        {/if}
       </div>
     </div>
   {/if}
