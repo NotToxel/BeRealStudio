@@ -154,38 +154,12 @@
   function handleDayClick(dayNum: number) {
     const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const raw = $rawMemoriesByDate.get(dateStr);
-    if ($showMemoryDebugBadges && raw && raw.length > 0) {
-      console.log(`[Calendar Day Click ${dateStr}]`, {
-        isLate: raw[0].isLate,
-        lateDuration: raw[0].lateDuration,
-        lateExact: raw[0].lateExact,
-        timeFormatted: raw[0].timeFormatted,
-        takenAt: raw[0].takenAt,
-      });
-    }
     const posts = $memoriesByDate.get(dateStr);
     if (posts && posts.length > 0) {
       openFeedAt(posts[0]);
     } else if (raw && raw.length > 0) {
       openFeedAt(raw[0]);
     }
-  }
-
-  $: if ($showMemoryDebugBadges && $rawMemoriesByDate && yearMonth) {
-    let onTimeCount = 0;
-    let lateCount = 0;
-    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-      const dStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-      const posts = $rawMemoriesByDate.get(dStr) || [];
-      if (posts.length > 0) {
-        if (posts[0].isLate) {
-          lateCount++;
-        } else {
-          onTimeCount++;
-        }
-      }
-    }
-    console.log(`[Calendar Debug ${yearMonth}] Active Days: ${onTimeCount + lateCount} | On-Time (White Border): ${onTimeCount} | Late (Borderless): ${lateCount}`);
   }
 
   function handleKeydown(e: KeyboardEvent) {

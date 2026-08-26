@@ -10,6 +10,7 @@
     openExportModal,
     exportPreferences,
     memoryHeaderSettings,
+    showMemoryDebugBadges,
     formatMemoryLocation,
     formatMemoryTimeTag,
   } from '$lib/memoriesStore';
@@ -333,8 +334,8 @@
                 />
               </div>
 
-              <!-- Dev Debug JSON & Extraction Inspector -->
-              {#if memory.rawJson || memory.debugInfo}
+              <!-- Dev Debug JSON & Extraction Inspector (Hidden behind $showMemoryDebugBadges flag) -->
+              {#if $showMemoryDebugBadges && (memory.rawJson || memory.debugInfo)}
                 <details class="feed-dev-debug-accordion">
                   <summary class="debug-accordion-summary">
                     <span class="debug-tag {memory.isLate ? 'is-late' : 'is-ontime'}">

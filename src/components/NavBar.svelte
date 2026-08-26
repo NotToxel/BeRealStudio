@@ -21,6 +21,11 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      navigate('settings');
+      return;
+    }
     if (isDev && e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
       e.preventDefault();
       if ($currentArchive) {
