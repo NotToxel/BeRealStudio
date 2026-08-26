@@ -21,76 +21,90 @@
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Download from 'lucide-svelte/icons/download';
 
-  const CARD_HEIGHT = 700; // Height per card slot (Header + 3:4 Frame + Caption + Padding)
-
   let scrollContainer: HTMLElement | null = null;
-  let scrollTop = 0;
   let activeIndex = 0;
   let lastJumpedId: string | null = null;
-  let isJumping = false;
-
-  $: totalVirtualHeight = $filteredMemories.length * CARD_HEIGHT;
-
-  // Windowed virtual range: Render 1 card before and 3 cards ahead (max 5 in DOM)
-  $: windowStartIndex = Math.max(0, Math.floor(scrollTop / CARD_HEIGHT) - 1);
-  $: windowEndIndex = Math.min($filteredMemories.length, windowStartIndex + 5);
-  $: visibleSlice = $filteredMemories.slice(windowStartIndex, windowEndIndex);
+  let scrollTimeout: any = null;
 
   $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
 
-  // Jump to active memory ONLY when the active memory ID changes (guarded to prevent recursive reactive loops)
+  // Jump to active memory ONLY when the active memory ID changes
   $: if ($activeFeedMemory && scrollContainer && $activeFeedMemory.id !== lastJumpedId) {
     lastJumpedId = $activeFeedMemory.id;
-    jumpToActiveMemory();
-  }
-
-  async function jumpToActiveMemory() {
-    if (!$activeFeedMemory || !scrollContainer) return;
     const targetIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
     if (targetIdx !== -1) {
       activeIndex = targetIdx;
-      isJumping = true;
-      await tick();
-      if (!scrollContainer) return;
-      const vh = scrollContainer.clientHeight || 750;
-      const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
-      const targetScroll = Math.max(0, targetIdx * CARD_HEIGHT - centerOffset);
-      scrollTop = targetScroll;
-      scrollContainer.scrollTop = targetScroll;
-      setTimeout(() => {
-        isJumping = false;
-      }, 50);
+    }
+    jumpToActiveMemory($activeFeedMemory.id);
+  }
+
+  async function jumpToActiveMemory(id: string) {
+    await tick();
+    if (!scrollContainer) return;
+    const el = document.getElementById(`feed-card-${id}`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
     }
   }
 
-  function handleScroll(e: Event) {
-    const el = e.currentTarget as HTMLElement;
-    if (!el) return;
-    scrollTop = el.scrollTop;
-    if (!isJumping) {
-      const newIdx = Math.min(
-        $filteredMemories.length - 1,
-        Math.max(0, Math.round((scrollTop + CARD_HEIGHT * 0.4) / CARD_HEIGHT))
-      );
-      if (newIdx !== activeIndex) {
-        activeIndex = newIdx;
+  function handleScroll() {
+    if (!scrollContainer) return;
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      updateActiveIndexFromScroll();
+    }, 40);
+  }
+
+  function updateActiveIndexFromScroll() {
+    if (!scrollContainer) return;
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+
+    let closestIdx = activeIndex;
+    let minDistance = Infinity;
+
+    for (let i = 0; i < $filteredMemories.length; i++) {
+      const mem = $filteredMemories[i];
+      const el = document.getElementById(`feed-card-${mem.id}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const cardCenterY = rect.top + rect.height / 2;
+        const dist = Math.abs(centerY - cardCenterY);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIdx = i;
+        }
       }
+    }
+
+    if (closestIdx !== activeIndex) {
+      activeIndex = closestIdx;
+    }
+  }
+
+  function scrollToIndex(idx: number) {
+    if (idx < 0 || idx >= $filteredMemories.length || !scrollContainer) return;
+    const mem = $filteredMemories[idx];
+    const el = document.getElementById(`feed-card-${mem.id}`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      activeIndex = idx;
     }
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (!$activeFeedMemory) return;
     if (e.key === 'Escape') {
-      closeFeed();
+      handleClose();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k') {
       e.preventDefault();
-      if (scrollContainer && activeIndex > 0) {
-        scrollContainer.scrollBy({ top: -CARD_HEIGHT, behavior: 'smooth' });
+      if (activeIndex > 0) {
+        scrollToIndex(activeIndex - 1);
       }
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j' || e.key === ' ') {
       e.preventDefault();
-      if (scrollContainer && activeIndex < $filteredMemories.length - 1) {
-        scrollContainer.scrollBy({ top: CARD_HEIGHT, behavior: 'smooth' });
+      if (activeIndex < $filteredMemories.length - 1) {
+        scrollToIndex(activeIndex + 1);
       }
     }
   }
@@ -138,8 +152,13 @@
 
   function handleClose() {
     lastJumpedId = null;
+    clearTimeout(scrollTimeout);
     closeFeed();
   }
+
+  onDestroy(() => {
+    clearTimeout(scrollTimeout);
+  });
 
   $: userName = $explorerData?.userName || 'toxel';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
@@ -194,24 +213,19 @@
         </div>
       </div>
 
-      <!-- High-Performance Virtual Windowed Infinite Scroll Viewport -->
+      <!-- Natural Flow Infinite Scroll Viewport with Zero Clipping / Overlaps -->
       <div
         bind:this={scrollContainer}
-        class="feed-virtual-viewport custom-thick-scrollbar"
+        class="feed-scroll-viewport custom-thick-scrollbar"
         on:scroll={handleScroll}
       >
-        <!-- Virtual Spacer representing total scroll height -->
-        <div class="virtual-canvas" style="height: {totalVirtualHeight}px;">
-          {#each visibleSlice as memory, i (memory.id)}
-            {@const globalIdx = windowStartIndex + i}
+        <div class="feed-cards-container">
+          {#each $filteredMemories as memory (memory.id)}
             {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
             {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
 
-            <article
-              class="virtual-feed-card"
-              style="top: {globalIdx * CARD_HEIGHT}px; height: {CARD_HEIGHT}px;"
-            >
-              <!-- Post Header -->
+            <article id="feed-card-{memory.id}" class="feed-post-card">
+              <!-- Post Header Row -->
               <div class="post-header-row">
                 <div class="user-avatar-wrap">
                   {#if profilePic}
@@ -251,7 +265,7 @@
                 </div>
               {/if}
 
-              <!-- BeReal Dual Camera Frame (Full size, with placeholder fallback while loading) -->
+              <!-- BeReal Dual Camera Frame (Full size) -->
               <div class="dual-frame-wrapper">
                 <DualCameraFrame
                   primarySrc={memory.primaryPath}
@@ -264,8 +278,8 @@
                 />
               </div>
 
-              <!-- Divider between items in infinite scroll -->
-              <div class="virtual-card-divider"></div>
+              <!-- Clean Spacing & Divider between items in infinite scroll -->
+              <div class="feed-card-divider"></div>
             </article>
           {/each}
         </div>
@@ -320,37 +334,39 @@
     flex-shrink: 0;
   }
 
-  .feed-virtual-viewport {
+  .feed-scroll-viewport {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: auto;
-    position: relative;
+    scroll-behavior: smooth;
+    padding: 20px 16px 48px 16px;
+    scroll-snap-type: y proximity;
   }
 
-  .virtual-canvas {
-    position: relative;
-    width: 100%;
-  }
-
-  .virtual-feed-card {
-    position: absolute;
-    left: 0;
-    right: 0;
+  .feed-cards-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 16px 20px 16px;
-    gap: 10px;
+    gap: 32px;
+    width: 100%;
+  }
+
+  .feed-post-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 480px;
+    scroll-snap-align: center;
     box-sizing: border-box;
   }
 
-  .virtual-card-divider {
+  .feed-card-divider {
     height: 1px;
     background: rgba(255, 255, 255, 0.08);
-    margin-top: 14px;
+    margin-top: 20px;
     width: 100%;
-    max-width: 480px;
   }
 
   .back-nav-btn {
@@ -419,7 +435,6 @@
     align-items: center;
     gap: 10px;
     width: 100%;
-    max-width: 480px;
   }
 
   .user-avatar-wrap {
@@ -481,7 +496,6 @@
 
   .post-header-caption-wrap {
     width: 100%;
-    max-width: 480px;
     padding: 0 4px;
   }
 
@@ -495,7 +509,6 @@
 
   .dual-frame-wrapper {
     width: 100%;
-    max-width: 480px;
     display: flex;
     justify-content: center;
   }
