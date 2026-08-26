@@ -21,7 +21,7 @@
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Download from 'lucide-svelte/icons/download';
 
-  const CARD_HEIGHT = 700; // Estimated card slot height for smooth virtual spacing
+  const CARD_HEIGHT = 750; // Reference height for virtual spacers
 
   let scrollContainer: HTMLElement | null = null;
   let activeIndex = 0;
@@ -53,14 +53,32 @@
     isJumping = true;
     await tick();
     if (!scrollContainer) return;
+
+    // Approximate initial scroll position
     const vh = scrollContainer.clientHeight || 750;
     const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
     const targetScroll = Math.max(0, targetIdx * CARD_HEIGHT - centerOffset);
     scrollContainer.scrollTop = targetScroll;
     scrollTop = targetScroll;
+
+    // Ensure DOM is fully mounted, then compute exact pixel-perfect vertical centering
+    await tick();
+    const targetMem = $filteredMemories[targetIdx];
+    if (targetMem && scrollContainer) {
+      const cardEl = document.getElementById(`feed-card-${targetMem.id}`);
+      if (cardEl) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const cardRect = cardEl.getBoundingClientRect();
+        const currentCardTopRelativeToContainer = cardRect.top - containerRect.top + scrollContainer.scrollTop;
+        const perfectCenterScroll = Math.max(0, currentCardTopRelativeToContainer - (containerRect.height - cardRect.height) / 2);
+        scrollContainer.scrollTop = perfectCenterScroll;
+        scrollTop = perfectCenterScroll;
+      }
+    }
+
     setTimeout(() => {
       isJumping = false;
-    }, 60);
+    }, 80);
   }
 
   function handleScroll(e: Event) {
@@ -81,6 +99,18 @@
   function scrollToIndex(idx: number) {
     if (idx < 0 || idx >= $filteredMemories.length || !scrollContainer) return;
     activeIndex = idx;
+    const targetMem = $filteredMemories[idx];
+    if (targetMem) {
+      const cardEl = document.getElementById(`feed-card-${targetMem.id}`);
+      if (cardEl && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const cardRect = cardEl.getBoundingClientRect();
+        const currentCardTopRelativeToContainer = cardRect.top - containerRect.top + scrollContainer.scrollTop;
+        const perfectCenterScroll = Math.max(0, currentCardTopRelativeToContainer - (containerRect.height - cardRect.height) / 2);
+        scrollContainer.scrollTo({ top: perfectCenterScroll, behavior: 'smooth' });
+        return;
+      }
+    }
     const vh = scrollContainer.clientHeight || 750;
     const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
     const targetScroll = Math.max(0, idx * CARD_HEIGHT - centerOffset);
