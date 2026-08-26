@@ -53,6 +53,33 @@
     return filePath.split(/[/\\]/).pop() || `${memory.takenAt.slice(0, 10)}_bereal.jpg`;
   }
 
+  function getFormattedOutputFilename(mem: ExplorerMemory, exportType: string = 'combined_pip', ext: string = 'jpg'): string {
+    let timeTag = mem.takenAt
+      ? mem.takenAt.replace(/[:]/g, '-').replace(/\.\d+Z?$/, '').replace(/Z$/, '')
+      : `${mem.year}-${String(mem.month).padStart(2, '0')}-${String(mem.day).padStart(2, '0')}`;
+
+    if (!timeTag.includes('T')) {
+      timeTag = `${timeTag}T${mem.timeFormatted ? mem.timeFormatted.replace(':', '-') : '12-00-00'}`;
+    }
+
+    const suffix = exportType === 'combined_pip' || exportType === 'combined'
+      ? '_combined'
+      : exportType === 'combined_sidebyside'
+      ? '_combined_sidebyside'
+      : exportType === 'primary_only'
+      ? '_primary'
+      : exportType === 'secondary_only'
+      ? '_secondary'
+      : exportType === 'bts_only'
+      ? '_bts'
+      : exportType === 'motion_photo'
+      ? '_motion'
+      : `_${exportType}`;
+
+    const extension = exportType === 'bts_only' ? 'mp4' : ext;
+    return `${timeTag}${suffix}.${extension}`;
+  }
+
   async function handleQuickDownload() {
     closeMenu();
     await handleExport('combined_pip');
@@ -227,10 +254,20 @@
       <div class="menu-section">
         <span class="menu-header">Copy Info</span>
 
+        <!-- Output Filename in properly formatted Toolkit convention -->
+        <button
+          type="button"
+          class="menu-item"
+          on:click={() => copyToClipboard(getFormattedOutputFilename(memory), 'Output Filename')}
+        >
+          <FileText size={15} class="text-emerald-400" />
+          <span>Copy Output Filename</span>
+        </button>
+
         {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'File Name')}>
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Source Filename')}>
             <FileText size={15} class="text-cyan-400" />
-            <span>Copy File Name</span>
+            <span>Copy Source Filename</span>
           </button>
         {/if}
 
