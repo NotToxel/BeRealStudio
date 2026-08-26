@@ -1368,4 +1368,43 @@ mod tests {
         assert_eq!(p.retake_counter, Some(3));
         assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
     }
+
+    #[test]
+    fn test_merge_exact_user_samples() {
+        let mem_json = r#"{
+            "frontImage": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/FXZtPxP7F6fBqNna.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "backImage": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "caption": "I may have had a dream BeReal went off",
+            "isLate": true,
+            "date": "2025-06-18T00:00:00.000Z",
+            "takenTime": "2025-06-18T12:03:26.815Z",
+            "berealMoment": "2025-06-18T11:40:05.293Z",
+            "location": {"latitude": 51.462059020996094, "longitude": -0.2528020143508911}
+        }"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+        assert_eq!(mem_post.is_late, Some(true));
+        assert_eq!(mem_post.taken_at, "2025-06-18T12:03:26.815Z");
+        assert_eq!(mem_post.notification_at.as_deref(), Some("2025-06-18T11:40:05.293Z"));
+        assert!(mem_post.primary.is_some());
+        assert_eq!(mem_post.primary.as_ref().unwrap().path, "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp");
+
+        let post_json = r#"{
+            "primary": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "secondary": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/FXZtPxP7F6fBqNna.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "retakeCounter": 0,
+            "caption": "I may have had a dream BeReal went off",
+            "location": {"latitude": 51.462059020996094, "longitude": -0.2528020143508911},
+            "visibility": ["friends"],
+            "takenAt": "2025-06-18T12:03:26.815Z"
+        }"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+
+        let merged = merge_posts_and_memories(vec![(mem_post, mem_json.to_string())], vec![(post_item, post_json.to_string())]);
+        assert_eq!(merged.len(), 1);
+        let (p, _) = &merged[0];
+        assert_eq!(p.is_late, Some(true));
+        assert_eq!(p.notification_at.as_deref(), Some("2025-06-18T11:40:05.293Z"));
+        assert_eq!(p.retake_counter, Some(0));
+        assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
+    }
 }

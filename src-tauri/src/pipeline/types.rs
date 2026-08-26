@@ -65,8 +65,9 @@ pub struct BeRealPost {
     pub secondary: Option<MediaAsset>,
     pub secondary_placeholder: Option<MediaAsset>,
     pub bts_media: Option<MediaAsset>,
-    #[serde(alias = "takenTime", alias = "taken_time", alias = "takenAt", alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate", alias = "creation_date", alias = "createdAt", alias = "created_at", alias = "date")]
+    #[serde(default, alias = "takenTime", alias = "taken_time", alias = "takenAt", alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate", alias = "creation_date", alias = "createdAt", alias = "created_at")]
     pub taken_at: String,
+    pub date: Option<String>,
     pub location: Option<Location>,
     pub caption: Option<String>,
     pub retake_counter: Option<u32>,

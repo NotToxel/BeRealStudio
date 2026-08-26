@@ -152,18 +152,19 @@ fn load_explorer_memories_inner(
         let dest_dir = cache_root.join(hash);
         fs::create_dir_all(&dest_dir)?;
 
-        // Instant Cache Hit: Return cached explorer JSON if available, already geocoded, and contains raw_json
+        // Instant Cache Hit: Return cached explorer JSON if available, already geocoded, contains raw_json, and has evaluated late metadata
         let cache_json_file = dest_dir.join("explorer_cache.json");
         if cache_json_file.exists() {
             if let Ok(file) = File::open(&cache_json_file) {
                 let reader = BufReader::with_capacity(128 * 1024, file);
                 if let Ok(cached_data) = serde_json::from_reader::<_, ExplorerData>(reader) {
                     let has_valid_raw_json = cached_data.memories.first().and_then(|m| m.raw_json.as_ref()).is_some();
+                    let has_late_evaluated = cached_data.memories.iter().any(|m| m.is_late || m.late_duration.is_some());
                     let needs_regeocode = cached_data.memories.iter().any(|m| {
                         m.location.is_some() && (m.city.is_none() || m.location_name.as_deref().unwrap_or("").contains('°'))
                     });
 
-                    if has_valid_raw_json && !needs_regeocode && !cached_data.memories.is_empty() {
+                    if has_valid_raw_json && has_late_evaluated && !needs_regeocode && !cached_data.memories.is_empty() {
                         return Ok(cached_data);
                     }
                 }
@@ -792,6 +793,11 @@ fn parse_posts_from_path(path: &Path) -> Result<Vec<(BeRealPost, String)>> {
     for val in raw_posts {
         let raw_str = serde_json::to_string(&val).unwrap_or_default();
         if let Ok(mut p) = serde_json::from_value::<BeRealPost>(val.clone()) {
+            if p.taken_at.is_empty() {
+                if let Some(ref d) = p.date {
+                    p.taken_at = d.clone();
+                }
+            }
             // Check direct raw field fallbacks if serde left something as None
             if p.is_late.is_none() {
                 if let Some(val_late) = val.get("isLate")
