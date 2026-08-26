@@ -287,9 +287,15 @@ fn load_explorer_memories_inner(
             let dt = parse_taken_at(&post.taken_at).unwrap_or_else(Utc::now);
             let local_dt: DateTime<Local> = DateTime::from(dt);
 
-            let year = local_dt.year();
-            let month = local_dt.month();
-            let day = local_dt.day();
+            // Use the BeReal moment cycle date (from post.date) if available to anchor the BeReal to its true calendar day
+            let cycle_dt: DateTime<Local> = post.date.as_deref()
+                .and_then(parse_taken_at)
+                .map(DateTime::from)
+                .unwrap_or(local_dt);
+
+            let year = cycle_dt.year();
+            let month = cycle_dt.month();
+            let day = cycle_dt.day();
             let month_key = format!("{:04}-{:02}", year, month);
 
             // Fast indexed media lookup
@@ -348,7 +354,7 @@ fn load_explorer_memories_inner(
                 }
             }
 
-            let date_formatted = local_dt.format("%d %B %Y").to_string();
+            let date_formatted = cycle_dt.format("%d %B %Y").to_string();
             let day_number = format!("{}", day);
             let time_formatted = local_dt.format("%H:%M").to_string();
 

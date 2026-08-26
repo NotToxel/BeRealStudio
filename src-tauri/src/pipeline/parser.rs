@@ -1066,6 +1066,18 @@ pub fn merge_posts_and_memories(
         }
     }
 
+    // Extract chronological BeReal moment cycle registry from memories before consuming
+    let mut moments: Vec<(DateTime<Utc>, String, Option<String>)> = Vec::new();
+    for (m, _) in &memories_posts {
+        if let Some(ref notif_str) = m.notification_at {
+            if let Some(dt) = parse_taken_at(notif_str) {
+                moments.push((dt, notif_str.clone(), m.date.clone()));
+            }
+        }
+    }
+    moments.sort_by_key(|k| k.0);
+    moments.dedup_by(|a, b| a.1 == b.1);
+
     let mut merged = Vec::with_capacity(memories_posts.len() + 10);
     let mut used_post_times = HashSet::new();
 
@@ -1114,9 +1126,28 @@ pub fn merge_posts_and_memories(
         merged.push((mem_post, mem_raw));
     }
 
-    // Append any extra posts from posts.json that were not in memories.json
-    for (p_time, (extra_post, extra_raw)) in posts_by_time {
+    // Append any extra posts from posts.json that were not in memories.json and resolve their cycle info
+    for (p_time, (mut extra_post, extra_raw)) in posts_by_time {
         if !used_post_times.contains(&p_time) {
+            if let Some(post_dt) = parse_taken_at(&extra_post.taken_at) {
+                // Find closest moment <= post_dt (the moment this post belongs to)
+                let matched_moment = moments.iter().rev().find(|m| m.0 <= post_dt);
+                if let Some((m_dt, m_str, m_date)) = matched_moment {
+                    let diff_sec = (post_dt - *m_dt).num_seconds();
+                    if extra_post.notification_at.is_none() {
+                        extra_post.notification_at = Some(m_str.clone());
+                    }
+                    if extra_post.is_late.is_none() {
+                        extra_post.is_late = Some(diff_sec > 120);
+                    }
+                    if extra_post.late_in_seconds.is_none() && diff_sec > 120 {
+                        extra_post.late_in_seconds = Some(diff_sec);
+                    }
+                    if extra_post.date.is_none() && m_date.is_some() {
+                        extra_post.date = m_date.clone();
+                    }
+                }
+            }
             merged.push((extra_post, extra_raw));
         }
     }
@@ -1406,5 +1437,38 @@ mod tests {
         assert_eq!(p.notification_at.as_deref(), Some("2025-06-18T11:40:05.293Z"));
         assert_eq!(p.retake_counter, Some(0));
         assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
+    }
+
+    #[test]
+    fn test_merge_unindexed_ontime_post() {
+        // An existing memory from that day sets the daily berealMoment to 14:22:05
+        let mem_json = r#"{
+            "takenTime": "2025-12-21T17:28:59.814Z",
+            "berealMoment": "2025-12-21T14:22:05.244Z",
+            "date": "2025-12-21T00:00:00.000Z",
+            "isLate": true
+        }"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+
+        // An unindexed on-time post present in posts.json taken at 14:23:15 (70 seconds after the moment)
+        let post_json = r#"{
+            "takenAt": "2025-12-21T14:23:15.671Z",
+            "retakeCounter": 0,
+            "visibility": ["friends"]
+        }"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+
+        let merged = merge_posts_and_memories(
+            vec![(mem_post, mem_json.to_string())],
+            vec![(post_item, post_json.to_string())],
+        );
+
+        assert_eq!(merged.len(), 2);
+        // Find the unindexed post in merged
+        let unindexed = merged.iter().find(|(p, _)| p.taken_at == "2025-12-21T14:23:15.671Z").unwrap();
+        let (p, _) = unindexed;
+        assert_eq!(p.notification_at.as_deref(), Some("2025-12-21T14:22:05.244Z"));
+        assert_eq!(p.is_late, Some(false)); // 70s <= 120s => ON TIME
+        assert_eq!(p.date.as_deref(), Some("2025-12-21T00:00:00.000Z"));
     }
 }
