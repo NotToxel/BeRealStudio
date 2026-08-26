@@ -152,25 +152,27 @@ fn load_explorer_memories_inner(
         let dest_dir = cache_root.join(hash);
         fs::create_dir_all(&dest_dir)?;
 
-        // Instant Cache Hit: Return cached explorer JSON if available and already geocoded
+        // Instant Cache Hit: Return cached explorer JSON if available, already geocoded, and contains raw_json
         let cache_json_file = dest_dir.join("explorer_cache.json");
         if cache_json_file.exists() {
             if let Ok(file) = File::open(&cache_json_file) {
                 let reader = BufReader::with_capacity(128 * 1024, file);
                 if let Ok(cached_data) = serde_json::from_reader::<_, ExplorerData>(reader) {
+                    let has_valid_raw_json = cached_data.memories.first().and_then(|m| m.raw_json.as_ref()).is_some();
                     let needs_regeocode = cached_data.memories.iter().any(|m| {
                         m.location.is_some() && (m.city.is_none() || m.location_name.as_deref().unwrap_or("").contains('°'))
                     });
 
-                    if !needs_regeocode && !cached_data.memories.is_empty() {
+                    if has_valid_raw_json && !needs_regeocode && !cached_data.memories.is_empty() {
                         return Ok(cached_data);
                     }
                 }
             }
         }
 
-        let posts_json_candidate = dest_dir.join("posts.json");
         let memories_json_candidate = dest_dir.join("memories.json");
+        let memory_json_candidate = dest_dir.join("memory.json");
+        let posts_json_candidate = dest_dir.join("posts.json");
 
         // Extract archive files into cache
         let zip_file = File::open(input_path)?;
@@ -197,10 +199,12 @@ fn load_explorer_memories_inner(
         }
 
         let archive_info = parser::scan_archive(&dest_dir.to_string_lossy())?;
-        let posts_file = if posts_json_candidate.exists() {
-            posts_json_candidate
-        } else if memories_json_candidate.exists() {
+        let posts_file = if memories_json_candidate.exists() {
             memories_json_candidate
+        } else if memory_json_candidate.exists() {
+            memory_json_candidate
+        } else if posts_json_candidate.exists() {
+            posts_json_candidate
         } else {
             find_json_in_dir(&dest_dir)?
         };
@@ -687,15 +691,21 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
     Ok(out_dest.to_string_lossy().to_string())
 }
 
-/// Helper: Find posts.json or memories.json in extracted directory
+/// Helper: Find memories.json or posts.json in directory
 fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
-    let posts = dir.join("posts.json");
-    if posts.exists() {
-        return Ok(posts);
+    // 1. Direct priority check: memories.json / memory.json
+    for name in &["memories.json", "memory.json", "Memories.json", "Memory.json"] {
+        let cand = dir.join(name);
+        if cand.exists() {
+            return Ok(cand);
+        }
     }
-    let memories = dir.join("memories.json");
-    if memories.exists() {
-        return Ok(memories);
+    // 2. Direct fallback check: posts.json
+    for name in &["posts.json", "Posts.json"] {
+        let cand = dir.join(name);
+        if cand.exists() {
+            return Ok(cand);
+        }
     }
 
     if let Ok(entries) = fs::read_dir(dir) {
@@ -703,20 +713,43 @@ fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
             let path = entry.path();
             if path.is_file() {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.eq_ignore_ascii_case("posts.json") || name.eq_ignore_ascii_case("memories.json") {
+                    if name.eq_ignore_ascii_case("memories.json") || name.eq_ignore_ascii_case("memory.json") {
                         return Ok(path);
                     }
                 }
             } else if path.is_dir() {
-                let sub_posts = path.join("posts.json");
-                if sub_posts.exists() {
-                    return Ok(sub_posts);
+                for sub_name in &["memories.json", "memory.json", "Memories.json", "Memory.json"] {
+                    let sub_cand = path.join(sub_name);
+                    if sub_cand.exists() {
+                        return Ok(sub_cand);
+                    }
                 }
             }
         }
     }
 
-    anyhow::bail!("Could not find posts.json or memories.json in {}", dir.display())
+    // Fallback: search for posts.json in subdirectories
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.eq_ignore_ascii_case("posts.json") {
+                        return Ok(path);
+                    }
+                }
+            } else if path.is_dir() {
+                for sub_name in &["posts.json", "Posts.json"] {
+                    let sub_posts = path.join(sub_name);
+                    if sub_posts.exists() {
+                        return Ok(sub_posts);
+                    }
+                }
+            }
+        }
+    }
+
+    anyhow::bail!("Could not find memories.json or posts.json in {}", dir.display())
 }
 
 /// Helper: Parse BeRealPost vector with raw JSON strings from a JSON file path

@@ -145,7 +145,9 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
             let norm = name.replace('\\', "/");
             let norm_lower = norm.to_lowercase();
 
-            if norm_lower.ends_with("posts.json") && posts_entry_name.is_none() {
+            if norm_lower.ends_with("memories.json") || norm_lower.ends_with("memory.json") {
+                posts_entry_name = Some(name.clone());
+            } else if norm_lower.ends_with("posts.json") && posts_entry_name.is_none() {
                 posts_entry_name = Some(name.clone());
             }
             if norm_lower.ends_with("user.json") && user_entry_name.is_none() {
@@ -957,39 +959,36 @@ fn check_disk_media_presence(
     (total, found, missing, missing_sample)
 }
 
-/// Find posts.json by searching common locations in the archive directory.
+/// Find memories.json or posts.json by searching common locations in the archive directory.
 pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
-    // Direct: base/posts.json
-    let direct = base.join("posts.json");
-    if direct.exists() {
-        return Ok(direct);
+    // 1. Direct: base/memories.json or base/memory.json (Highest priority for rich metadata)
+    for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
+        let direct = base.join(name);
+        if direct.exists() {
+            return Ok(direct);
+        }
     }
-    // Direct case-insensitive
-    let direct_upper = base.join("Posts.json");
-    if direct_upper.exists() {
-        return Ok(direct_upper);
-    }
-    // One or two levels deep
+    // 2. One or two levels deep
     if let Ok(entries) = std::fs::read_dir(base) {
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
-                let candidate = p.join("posts.json");
-                if candidate.exists() {
-                    return Ok(candidate);
-                }
-                let candidate_upper = p.join("Posts.json");
-                if candidate_upper.exists() {
-                    return Ok(candidate_upper);
+                for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
+                    let candidate = p.join(name);
+                    if candidate.exists() {
+                        return Ok(candidate);
+                    }
                 }
                 // Two levels deep
                 if let Ok(sub_entries) = std::fs::read_dir(&p) {
                     for sub in sub_entries.flatten() {
                         let sub_p = sub.path();
                         if sub_p.is_dir() {
-                            let sub_cand = sub_p.join("posts.json");
-                            if sub_cand.exists() {
-                                return Ok(sub_cand);
+                            for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
+                                let sub_cand = sub_p.join(name);
+                                if sub_cand.exists() {
+                                    return Ok(sub_cand);
+                                }
                             }
                         }
                     }
@@ -998,17 +997,29 @@ pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
         }
     }
     anyhow::bail!(
-        "Could not find posts.json in '{}'. Make sure you selected the correct folder from your BeReal data export.",
+        "Could not find memories.json or posts.json in '{}'. Make sure you selected the correct folder from your BeReal data export.",
         base.display()
     )
 }
 
-/// Parse posts.json into a vector of BeRealPost structs.
+/// Parse posts/memories JSON into a vector of BeRealPost structs.
 pub fn parse_posts(json_path: &Path) -> Result<Vec<BeRealPost>> {
     let data = std::fs::read_to_string(json_path)
         .with_context(|| format!("Failed to read {}", json_path.display()))?;
-    let posts: Vec<serde_json::Value> = serde_json::from_str(&data)
-        .with_context(|| "posts.json is not valid JSON")?;
+    let root_val: serde_json::Value = serde_json::from_str(&data)
+        .with_context(|| "Data file is not valid JSON")?;
+
+    let posts: Vec<serde_json::Value> = match root_val {
+        serde_json::Value::Array(arr) => arr,
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
+                arr.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
 
     let mut result = Vec::with_capacity(posts.len());
     for (i, val) in posts.into_iter().enumerate() {

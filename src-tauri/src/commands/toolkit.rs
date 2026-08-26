@@ -87,15 +87,38 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
         if let Ok(file) = File::open(input_path) {
             if let Ok(mut archive) = ZipArchive::new(file) {
                 let mut found_posts = Vec::new();
+                let mut best_entry_idx = None;
                 for i in 0..archive.len() {
-                    if let Ok(mut entry) = archive.by_index(i) {
-                        let name = entry.name().to_string();
-                        if name.ends_with("posts.json") || name.ends_with("memories.json") {
-                            let mut buf = Vec::new();
-                            if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
-                                if let Ok(posts) = serde_json::from_slice::<Vec<BeRealPost>>(&buf) {
-                                    found_posts = posts;
-                                    break;
+                    if let Ok(entry) = archive.by_index(i) {
+                        let name = entry.name().to_lowercase();
+                        if name.ends_with("memories.json") || name.ends_with("memory.json") {
+                            best_entry_idx = Some(i);
+                            break;
+                        } else if name.ends_with("posts.json") && best_entry_idx.is_none() {
+                            best_entry_idx = Some(i);
+                        }
+                    }
+                }
+                if let Some(idx) = best_entry_idx {
+                    if let Ok(mut entry) = archive.by_index(idx) {
+                        let mut buf = Vec::new();
+                        if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
+                            if let Ok(root_val) = serde_json::from_slice::<serde_json::Value>(&buf) {
+                                let raw_posts: Vec<serde_json::Value> = match root_val {
+                                    serde_json::Value::Array(arr) => arr,
+                                    serde_json::Value::Object(map) => {
+                                        if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
+                                            arr.clone()
+                                        } else {
+                                            Vec::new()
+                                        }
+                                    }
+                                    _ => Vec::new(),
+                                };
+                                for val in raw_posts {
+                                    if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
+                                        found_posts.push(p);
+                                    }
                                 }
                             }
                         }
@@ -109,12 +132,17 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
             Vec::new()
         }
     } else {
-        let json_path = input_path.join("posts.json");
-        let alt_json_path = input_path.join("memories.json");
-        if json_path.exists() {
-            parser::parse_posts(&json_path).unwrap_or_default()
-        } else if alt_json_path.exists() {
-            parser::parse_posts(&alt_json_path).unwrap_or_default()
+        let memories_json = input_path.join("memories.json");
+        let memory_json = input_path.join("memory.json");
+        let posts_json = input_path.join("posts.json");
+        if memories_json.exists() {
+            parser::parse_posts(&memories_json).unwrap_or_default()
+        } else if memory_json.exists() {
+            parser::parse_posts(&memory_json).unwrap_or_default()
+        } else if posts_json.exists() {
+            parser::parse_posts(&posts_json).unwrap_or_default()
+        } else if let Ok(found_p) = parser::find_posts_json(input_path) {
+            parser::parse_posts(&found_p).unwrap_or_default()
         } else {
             Vec::new()
         }
