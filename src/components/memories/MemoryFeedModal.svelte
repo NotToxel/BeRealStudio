@@ -21,75 +21,70 @@
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Download from 'lucide-svelte/icons/download';
 
+  const CARD_HEIGHT = 700; // Estimated card slot height for smooth virtual spacing
+
   let scrollContainer: HTMLElement | null = null;
   let activeIndex = 0;
+  let scrollTop = 0;
   let lastJumpedId: string | null = null;
-  let scrollTimeout: any = null;
+  let isJumping = false;
+
+  // Windowed virtual rendering: Render 2 items before and 2 items ahead (max 5 cards in DOM)
+  $: windowStart = Math.max(0, activeIndex - 2);
+  $: windowEnd = Math.min($filteredMemories.length, activeIndex + 3);
+  $: visibleSlice = $filteredMemories.slice(windowStart, windowEnd);
+
+  $: topSpacerHeight = windowStart * CARD_HEIGHT;
+  $: bottomSpacerHeight = Math.max(0, ($filteredMemories.length - windowEnd) * CARD_HEIGHT);
 
   $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
 
-  // Jump to active memory ONLY when the active memory ID changes
+  // Trigger jump only once per memory opening to avoid recursive loops
   $: if ($activeFeedMemory && scrollContainer && $activeFeedMemory.id !== lastJumpedId) {
     lastJumpedId = $activeFeedMemory.id;
     const targetIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
     if (targetIdx !== -1) {
       activeIndex = targetIdx;
+      jumpToActiveMemory(targetIdx);
     }
-    jumpToActiveMemory($activeFeedMemory.id);
   }
 
-  async function jumpToActiveMemory(id: string) {
+  async function jumpToActiveMemory(targetIdx: number) {
+    isJumping = true;
     await tick();
     if (!scrollContainer) return;
-    const el = document.getElementById(`feed-card-${id}`);
-    if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
-    }
+    const vh = scrollContainer.clientHeight || 750;
+    const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
+    const targetScroll = Math.max(0, targetIdx * CARD_HEIGHT - centerOffset);
+    scrollContainer.scrollTop = targetScroll;
+    scrollTop = targetScroll;
+    setTimeout(() => {
+      isJumping = false;
+    }, 60);
   }
 
-  function handleScroll() {
-    if (!scrollContainer) return;
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      updateActiveIndexFromScroll();
-    }, 40);
-  }
-
-  function updateActiveIndexFromScroll() {
-    if (!scrollContainer) return;
-    const containerRect = scrollContainer.getBoundingClientRect();
-    const centerY = containerRect.top + containerRect.height / 2;
-
-    let closestIdx = activeIndex;
-    let minDistance = Infinity;
-
-    for (let i = 0; i < $filteredMemories.length; i++) {
-      const mem = $filteredMemories[i];
-      const el = document.getElementById(`feed-card-${mem.id}`);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        const cardCenterY = rect.top + rect.height / 2;
-        const dist = Math.abs(centerY - cardCenterY);
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestIdx = i;
-        }
+  function handleScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (!el) return;
+    scrollTop = el.scrollTop;
+    if (!isJumping) {
+      const newIdx = Math.min(
+        $filteredMemories.length - 1,
+        Math.max(0, Math.round((scrollTop + CARD_HEIGHT * 0.35) / CARD_HEIGHT))
+      );
+      if (newIdx !== activeIndex) {
+        activeIndex = newIdx;
       }
-    }
-
-    if (closestIdx !== activeIndex) {
-      activeIndex = closestIdx;
     }
   }
 
   function scrollToIndex(idx: number) {
     if (idx < 0 || idx >= $filteredMemories.length || !scrollContainer) return;
-    const mem = $filteredMemories[idx];
-    const el = document.getElementById(`feed-card-${mem.id}`);
-    if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      activeIndex = idx;
-    }
+    activeIndex = idx;
+    const vh = scrollContainer.clientHeight || 750;
+    const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
+    const targetScroll = Math.max(0, idx * CARD_HEIGHT - centerOffset);
+    scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -152,13 +147,8 @@
 
   function handleClose() {
     lastJumpedId = null;
-    clearTimeout(scrollTimeout);
     closeFeed();
   }
-
-  onDestroy(() => {
-    clearTimeout(scrollTimeout);
-  });
 
   $: userName = $explorerData?.userName || 'toxel';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
@@ -169,7 +159,7 @@
 {#if $activeFeedMemory && currentMemory}
   <div
     class="feed-modal-backdrop"
-    transition:fade={{ duration: 200 }}
+    transition:fade={{ duration: 180 }}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -213,19 +203,24 @@
         </div>
       </div>
 
-      <!-- Natural Flow Infinite Scroll Viewport with Zero Clipping / Overlaps -->
+      <!-- High-Performance Windowed Infinite Scroll Viewport -->
       <div
         bind:this={scrollContainer}
         class="feed-scroll-viewport custom-thick-scrollbar"
         on:scroll={handleScroll}
       >
+        <!-- Top Virtual Spacer (preserves scroll position without rendering off-screen DOM nodes) -->
+        {#if topSpacerHeight > 0}
+          <div class="virtual-spacer" style="height: {topSpacerHeight}px;"></div>
+        {/if}
+
         <div class="feed-cards-container">
-          {#each $filteredMemories as memory (memory.id)}
+          {#each visibleSlice as memory (memory.id)}
             {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
             {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
 
             <article id="feed-card-{memory.id}" class="feed-post-card">
-              <!-- Post Header Row -->
+              <!-- Post Header Row with Avatar, Name, Location/Time, Download & Action Menu -->
               <div class="post-header-row">
                 <div class="user-avatar-wrap">
                   {#if profilePic}
@@ -265,6 +260,20 @@
                     </div>
                   {/if}
                 </div>
+
+                <!-- Action Buttons directly on each memory post -->
+                <div class="post-header-actions">
+                  <button
+                    type="button"
+                    class="quick-download-btn"
+                    on:click|stopPropagation={() => handleQuickDownload(memory)}
+                    title="Export / Download this memory"
+                    aria-label="Download memory"
+                  >
+                    <Download size={14} />
+                  </button>
+                  <MemoryActionMenu {memory} />
+                </div>
               </div>
 
               <!-- Caption -->
@@ -292,6 +301,11 @@
             </article>
           {/each}
         </div>
+
+        <!-- Bottom Virtual Spacer -->
+        {#if bottomSpacerHeight > 0}
+          <div class="virtual-spacer" style="height: {bottomSpacerHeight}px;"></div>
+        {/if}
       </div>
     </div>
   </div>
@@ -347,9 +361,13 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
     padding: 20px 16px 48px 16px;
-    scroll-snap-type: y proximity;
+  }
+
+  .virtual-spacer {
+    width: 100%;
+    flex-shrink: 0;
   }
 
   .feed-cards-container {
@@ -367,7 +385,6 @@
     gap: 12px;
     width: 100%;
     max-width: 480px;
-    scroll-snap-align: center;
     box-sizing: border-box;
   }
 
@@ -415,6 +432,13 @@
   }
 
   .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .post-header-actions {
+    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 6px;
