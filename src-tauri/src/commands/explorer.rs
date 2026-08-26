@@ -323,15 +323,29 @@ fn load_explorer_memories_inner(
 
             let retake_counter = post.retake_counter.unwrap_or(0);
             
-            // Strictly check is_late from memories.json (or fallback to late_in_seconds > 120)
+            // A post is determined to be late when the boolean tag is true (or fallback if absent)
             let is_late = match post.is_late {
                 Some(b) => b,
-                None => post.late_in_seconds.map(|s| s > 120).unwrap_or(false),
+                None => post.late_in_seconds.map(|s| s > 0).unwrap_or(false),
             };
 
-            let late_sec = post.late_in_seconds.unwrap_or(0);
+            let (late_duration, late_exact, late_seconds) = if is_late {
+                // Calculate how late based on BeReal moment time (notification_at) vs actual post time (taken_at)
+                let notif_dt = post.notification_at.as_deref().and_then(parser::parse_taken_at);
+                let post_dt = parser::parse_taken_at(&post.taken_at);
 
-            let (late_duration, late_exact) = if is_late {
+                let late_sec = match (notif_dt, post_dt) {
+                    (Some(n), Some(p)) => {
+                        let diff = (p - n).num_seconds();
+                        if diff > 0 {
+                            diff
+                        } else {
+                            post.late_in_seconds.unwrap_or(0).max(0)
+                        }
+                    }
+                    _ => post.late_in_seconds.unwrap_or(0).max(0),
+                };
+
                 if late_sec > 0 {
                     let hrs = late_sec / 3600;
                     let mins = (late_sec % 3600) / 60;
@@ -357,12 +371,12 @@ fn load_explorer_memories_inner(
                         format!("{} sec late", secs)
                     };
 
-                    (Some(dur_str), Some(exact_str))
+                    (Some(dur_str), Some(exact_str), Some(late_sec))
                 } else {
-                    (Some("Late".to_string()), Some("Posted after notification window".to_string()))
+                    (Some("Late".to_string()), Some("Posted after BeReal moment".to_string()), Some(0))
                 }
             } else {
-                (None, None)
+                (None, None, None)
             };
 
             ExplorerMemory {
@@ -379,7 +393,7 @@ fn load_explorer_memories_inner(
                 is_late,
                 late_duration,
                 late_exact,
-                late_in_seconds: post.late_in_seconds,
+                late_in_seconds: late_seconds.or(post.late_in_seconds),
                 retake_counter,
                 caption: post.caption.clone(),
                 location: post.location.clone(),
