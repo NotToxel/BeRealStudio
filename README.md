@@ -112,7 +112,7 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 
 ## 📋 How to Download Your Archive from BeReal
  
-1. Open the **BeReal** mobile app and tap your **Profile icon** (top-right).
+1. Open the **BeReal** mobile app and tap your **Profile icon** (bottom-right).
 2. Tap **Help** &rarr; Select **Contact Us**.
 3. Select **Ask a Question** &rarr; Tap **Troubleshooting** &rarr; Tap **Other**.
 4. Tap **Contact Us** at the bottom &rarr; Select the **Topic** dropdown.
@@ -302,7 +302,7 @@ BeRealStudio/
 
 It unifies, rewrites, and modernizes the core capabilities of three pioneer open-source projects into a single, high-performance desktop application:
 
-- **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator and reverse-geocoding rules engine.
+- **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator.
 - **[BeReal-GDPR-Photo-Toolkit](https://github.com/hatobi/bereal-gdpr-photo-toolkit)** *(by [@hatobi](https://github.com/hatobi))* — Pioneer of BeReal GDPR archive extraction, EXIF metadata restoration, and Picture-in-Picture photo compositing.
 - **[makelive (Make Live)](https://github.com/mifi/makelive)** *(by [@mifi](https://github.com/mifi))* — Pioneer of Apple Photos Live Photo generation, inspiring our native Rust binary muxing of paired still photos (`.jpg`) and Behind-the-Scenes micro-videos (`.mov`) with synchronized Apple Content Identifier UUIDs (`MakerApple:17` EXIF & `com.apple.quicktime.content.identifier` QuickTime metadata).
 
