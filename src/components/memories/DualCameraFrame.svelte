@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { getSafeImageSrc, getMediaDataUrl } from '$lib/memoriesStore';
+  import { getSafeImageSrc, getMediaDataUrl, globalPerspective } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';
   import Repeat from 'lucide-svelte/icons/repeat';
@@ -20,9 +19,14 @@
   export let badgeText: string = '';
   export let size: 'sm' | 'md' | 'lg' = 'md';
   export let allowPreviewSwap: boolean = true;
+  export let forceSwapped: boolean | undefined = undefined;
 
-  // Camera perspective state: if swapped is true, secondary is large base, primary is small PIP
-  let swapped = false;
+  // Local user toggle override; if null, defaults to $globalPerspective
+  let localSwappedOverride: boolean | null = null;
+  $: swapped = forceSwapped !== undefined
+    ? forceSwapped
+    : (localSwappedOverride !== null ? localSwappedOverride : $globalPerspective === 'secondary');
+
   let isPlayingBts = false;
   let isBtsMuted = false;
   let btsVideoEl: HTMLVideoElement | null = null;
@@ -51,7 +55,7 @@
   function toggleSwap(e?: Event) {
     if ((!interactive && !allowPreviewSwap) || isDragging || wasDragged) return;
     e?.stopPropagation();
-    swapped = !swapped;
+    localSwappedOverride = !swapped;
   }
 
   async function toggleBts(e: MouseEvent) {

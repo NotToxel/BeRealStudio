@@ -15,6 +15,7 @@
   import CalendarGrid from '$components/memories/CalendarGrid.svelte';
   import MemoryFeedModal from '$components/memories/MemoryFeedModal.svelte';
   import MemoryFilterBar from '$components/memories/MemoryFilterBar.svelte';
+  import PerspectiveSwitcher from '$components/memories/PerspectiveSwitcher.svelte';
   import FilePicker from '$components/FilePicker.svelte';
 
   import Images from 'lucide-svelte/icons/images';
@@ -170,6 +171,9 @@
           <CalendarGrid />
         {/if}
       </div>
+
+      <!-- Floating Bottom-Left Perspective Toggle Pill -->
+      <PerspectiveSwitcher />
     </div>
   {/if}
 

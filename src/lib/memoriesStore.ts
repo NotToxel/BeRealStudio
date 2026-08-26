@@ -29,6 +29,13 @@ export const activeFeedIndex = writable<number | null>(null);
 
 export const explorerFilter = writable<ExplorerFilterState>({ ...initialFilterState });
 
+// Global perspective toggle ('primary' = main camera large | 'secondary' = selfie camera large)
+export const globalPerspective = writable<'primary' | 'secondary'>('primary');
+
+export function toggleGlobalPerspective() {
+  globalPerspective.update((p) => (p === 'primary' ? 'secondary' : 'primary'));
+}
+
 // Current month viewed in the Calendar view ("YYYY-MM")
 export const calendarCurrentMonth = writable<string>('');
 
