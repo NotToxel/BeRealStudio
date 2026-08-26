@@ -558,11 +558,50 @@ export function formatShortDate(memory: ExplorerMemory): string {
   return `${d} ${m} ${y}`;
 }
 
+export function replaceLocationPlaceholders(template: string, memory: ExplorerMemory): string {
+  if (!template) return '';
+  let result = template
+    .replace(/\{city\}/gi, memory.city || '')
+    .replace(/\{suburb\}|\{area\}/gi, memory.suburb || '')
+    .replace(/\{country\}/gi, memory.country || '')
+    .replace(/\{location\}|\{locationName\}/gi, memory.locationName || '')
+    .replace(/\{lat\}|\{latitude\}/gi, memory.location ? memory.location.latitude.toFixed(4) : '')
+    .replace(/\{lng\}|\{lon\}|\{longitude\}/gi, memory.location ? memory.location.longitude.toFixed(4) : '');
+
+  return result
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/^\s*,\s*|\s*,\s*$/g, '')
+    .trim();
+}
+
+export function replaceTimeTagPlaceholders(template: string, memory: ExplorerMemory): string {
+  if (!template) return '';
+  const shortDate = formatShortDate(memory);
+  const lateStr = memory.isLate ? (memory.lateDuration || 'Late') : 'On time';
+  const lateExactStr = memory.isLate ? (memory.lateExact || memory.lateDuration || 'Late') : 'On time';
+
+  let result = template
+    .replace(/\{time\}/gi, memory.timeFormatted || '')
+    .replace(/\{date\}/gi, shortDate)
+    .replace(/\{full_date\}|\{dateFormatted\}/gi, memory.dateFormatted || '')
+    .replace(/\{day\}/gi, String(memory.day || ''))
+    .replace(/\{month\}/gi, MONTH_ABBRS[(memory.month || 1) - 1] || '')
+    .replace(/\{year\}/gi, String(memory.year || ''))
+    .replace(/\{late\}|\{lateDuration\}/gi, lateStr)
+    .replace(/\{late_exact\}|\{lateExact\}/gi, lateExactStr)
+    .replace(/\{caption\}/gi, memory.caption || '');
+
+  return result
+    .replace(/\s*•\s*•\s*/g, ' • ')
+    .replace(/^\s*•\s*|\s*•\s*$/g, '')
+    .trim();
+}
+
 export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showLocation) return '';
 
   if (settings.locationFormat === 'custom') {
-    return settings.customLocationText?.trim() || '';
+    return replaceLocationPlaceholders(settings.customLocationText?.trim() || '', memory);
   }
 
   if (settings.locationFormat === 'city_country') {
@@ -594,7 +633,7 @@ export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHead
   if (!settings.showTimeTag) return '';
 
   if (settings.timeTagFormat === 'custom') {
-    return settings.customTimeTagText?.trim() || '';
+    return replaceTimeTagPlaceholders(settings.customTimeTagText?.trim() || '', memory);
   }
 
   const dateStr = formatShortDate(memory);

@@ -52,7 +52,38 @@
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Copy from 'lucide-svelte/icons/copy';
   import VolumeIcon from '$components/common/VolumeIcon.svelte';
-  import { memoryHeaderSettings, globalAudioSettings } from '$lib/memoriesStore';
+  import {
+    memoryHeaderSettings,
+    globalAudioSettings,
+    replaceLocationPlaceholders,
+    replaceTimeTagPlaceholders,
+  } from '$lib/memoriesStore';
+  import type { ExplorerMemory } from '$lib/types';
+
+  const samplePreviewMemory: ExplorerMemory = {
+    id: 'sample-preview',
+    index: 0,
+    takenAt: '2024-08-26T14:20:00.000Z',
+    dateFormatted: '26 August 2024',
+    dayNumber: '26',
+    monthKey: '2024-08',
+    year: 2024,
+    month: 8,
+    day: 26,
+    timeFormatted: '14:20',
+    isLate: true,
+    lateDuration: '45m late',
+    lateExact: '45 min late',
+    lateInSeconds: 2700,
+    retakeCounter: 0,
+    caption: 'Great afternoon!',
+    location: { latitude: 51.5136, longitude: -0.1365 },
+    locationName: 'Soho, London, England',
+    suburb: 'Soho',
+    city: 'London',
+    country: 'England',
+    isVideo: false,
+  };
 
   let statusMessage = '';
   let isSuccessStatus = true;
@@ -710,9 +741,18 @@
                   <input
                     type="text"
                     class="input custom-text-field"
-                    placeholder="e.g. London, UK or Home 🏠"
+                    placeholder="e.g. {suburb}, {city} or {city}, {country}"
                     bind:value={$memoryHeaderSettings.customLocationText}
                   />
+                  <div class="placeholder-chips-row">
+                    <span class="placeholder-label">Insert:</span>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{suburb}')}>{'{suburb}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{city}')}>{'{city}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{country}')}>{'{country}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{location}')}>{'{location}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{lat}')}>{'{lat}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{lng}')}>{'{lng}'}</button>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -767,7 +807,7 @@
                 <input type="radio" name="timeFormat" value="custom" bind:group={$memoryHeaderSettings.timeTagFormat} />
                 <div class="choice-text">
                   <span class="choice-title">Custom Subtitle Text</span>
-                  <span class="choice-sample">Display custom text everywhere</span>
+                  <span class="choice-sample">Use placeholders like {'{late}'} • {'{date}'}</span>
                 </div>
               </label>
 
@@ -776,9 +816,18 @@
                   <input
                     type="text"
                     class="input custom-text-field"
-                    placeholder="e.g. Summer '24 or 10:45 PM"
+                    placeholder="e.g. {late} • {date} or {time} • {date}"
                     bind:value={$memoryHeaderSettings.customTimeTagText}
                   />
+                  <div class="placeholder-chips-row">
+                    <span class="placeholder-label">Insert:</span>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{date}')}>{'{date}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{time}')}>{'{time}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{late}')}>{'{late}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{late_exact}')}>{'{late_exact}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{full_date}')}>{'{full_date}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{year}')}>{'{year}'}</button>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -799,7 +848,7 @@
               {#if $memoryHeaderSettings.showLocation}
                 <span class="preview-loc">
                   {#if $memoryHeaderSettings.locationFormat === 'custom'}
-                    {$memoryHeaderSettings.customLocationText || 'Custom Location'}
+                    {replaceLocationPlaceholders($memoryHeaderSettings.customLocationText || '', samplePreviewMemory) || 'Custom Location'}
                   {:else if $memoryHeaderSettings.locationFormat === 'city_country'}
                     London, England
                   {:else if $memoryHeaderSettings.locationFormat === 'suburb_city_country'}
@@ -819,7 +868,7 @@
               {#if $memoryHeaderSettings.showTimeTag}
                 <span class="preview-time">
                   {#if $memoryHeaderSettings.timeTagFormat === 'custom'}
-                    {$memoryHeaderSettings.customTimeTagText || 'Custom Subtitle'}
+                    {replaceTimeTagPlaceholders($memoryHeaderSettings.customTimeTagText || '', samplePreviewMemory) || 'Custom Subtitle'}
                   {:else if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
                     45m late • 26 Aug
                   {:else if $memoryHeaderSettings.timeTagFormat === 'datetime'}
@@ -1355,6 +1404,38 @@
     border-color: #38bdf8;
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
     outline: none;
+  }
+
+  .placeholder-chips-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .placeholder-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .placeholder-chip {
+    padding: 2px 6px;
+    background: #181824;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: #38bdf8;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .placeholder-chip:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    transform: scale(1.04);
   }
 
   .header-live-preview-box {
