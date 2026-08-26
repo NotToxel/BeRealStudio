@@ -50,12 +50,12 @@
 
 | Platform | Format / File | Size | Description |
 | :--- | :--- | :--- | :--- |
-| **Windows (x64)** | [`BeReal.Studio_2.3.0_x64-setup.exe`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_x64-setup.exe) | 7.41 MB | Windows 64-bit NSIS Setup Installer |
-| **Windows (x64)** | [`bereal-studio.exe`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/bereal-studio.exe) | 26.37 MB | Standalone Portable Windows Binary |
-| **macOS (Apple Silicon)** | [`BeReal.Studio_2.3.0_aarch64.dmg`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_aarch64.dmg) | 11.29 MB | Apple Silicon DMG (M1 / M2 / M3 / M4) |
-| **macOS (Universal)** | [`BeReal-Studio-macOS.app.tar.gz`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal-Studio-macOS.app.tar.gz) | 11.21 MB | Standalone `.app` Application Archive |
-| **Linux (x86_64)** | [`BeReal.Studio_2.3.0_amd64.AppImage`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_amd64.AppImage) | 87.98 MB | Universal Linux AppImage |
-| **Linux (x86_64)** | [`BeReal.Studio_2.3.0_amd64.deb`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_amd64.deb) | 13.19 MB | Ubuntu / Debian `.deb` Package |
+| <img src="https://cdn.simpleicons.org/windows/0078D4" height="14" alt="Windows" /> **Windows (x64)** | [`BeReal.Studio_2.3.0_x64-setup.exe`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_x64-setup.exe) | 7.41 MB | Windows 64-bit NSIS Setup Installer |
+| <img src="https://cdn.simpleicons.org/windows/0078D4" height="14" alt="Windows" /> **Windows (x64)** | [`bereal-studio.exe`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/bereal-studio.exe) | 26.37 MB | Standalone Portable Windows Binary |
+| <img src="https://cdn.simpleicons.org/apple/white" height="14" alt="macOS" /> **macOS (Apple Silicon)** | [`BeReal.Studio_2.3.0_aarch64.dmg`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_aarch64.dmg) | 11.29 MB | Apple Silicon DMG (M1 / M2 / M3 / M4) |
+| <img src="https://cdn.simpleicons.org/apple/white" height="14" alt="macOS" /> **macOS (Universal)** | [`BeReal-Studio-macOS.app.tar.gz`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal-Studio-macOS.app.tar.gz) | 11.21 MB | Standalone `.app` Application Archive |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" height="14" alt="Linux" /> **Linux (x86_64)** | [`BeReal.Studio_2.3.0_amd64.AppImage`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_amd64.AppImage) | 87.98 MB | Universal Linux AppImage |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" height="14" alt="Linux" /> **Linux (x86_64)** | [`BeReal.Studio_2.3.0_amd64.deb`](https://github.com/NotToxel/BeRealStudio/releases/download/v2.3.0/BeReal.Studio_2.3.0_amd64.deb) | 13.19 MB | Ubuntu / Debian `.deb` Package |
 
 ---
 

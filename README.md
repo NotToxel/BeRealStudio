@@ -20,12 +20,12 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format / Architecture | Direct Download Link |
 | :--- | :--- | :--- |
-| **🪟 Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64-setup.exe) |
-| **🪟 Windows** | `.exe` (64-bit Standalone) | [⬇️ **Download for Windows (Portable)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio.exe) |
-| **🍎 macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_aarch64.dmg) |
-| **🍎 macOS** | `.app.tar.gz` (Universal .app Bundle) | [⬇️ **Download for macOS (.app Bundle)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal-Studio-macOS.app.tar.gz) |
-| **🐧 Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.AppImage) |
-| **🐧 Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.deb) |
+| <img src="https://cdn.simpleicons.org/windows/0078D4" height="16" alt="Windows" /> **Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64-setup.exe) |
+| <img src="https://cdn.simpleicons.org/windows/0078D4" height="16" alt="Windows" /> **Windows** | `.exe` (64-bit Standalone) | [⬇️ **Download for Windows (Portable)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio.exe) |
+| <img src="https://cdn.simpleicons.org/apple/white" height="16" alt="macOS" /> **macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_aarch64.dmg) |
+| <img src="https://cdn.simpleicons.org/apple/white" height="16" alt="macOS" /> **macOS** | `.app.tar.gz` (Universal .app Bundle) | [⬇️ **Download for macOS (.app Bundle)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal-Studio-macOS.app.tar.gz) |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" height="16" alt="Linux" /> **Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.AppImage) |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" height="16" alt="Linux" /> **Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
@@ -37,8 +37,8 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 
 | Tool | Status | Purpose | Installation |
 | :--- | :--- | :--- | :--- |
-| **FFmpeg** | **Required for Videos** | Rendering recap videos (`.mp4`), audio sync, and video PIP compositing. | • **Windows**: `winget install Gyan.FFmpeg`<br>• **macOS**: `brew install ffmpeg`<br>• **Linux**: `sudo apt install ffmpeg` |
-| **ExifTool** | **Optional / Recommended** | Extended video metadata & QuickTime `.mov` ContentIdentifier tagging.<br>*(**Note**: Photos, EXIF/IPTC restoration, Samsung motion photos, and Apple Live Photos use our built-in 100% pure Rust engine and do not require ExifTool).* | • **Windows**: `winget install OliverBetz.ExifTool`<br>• **macOS**: `brew install exiftool`<br>• **Linux**: `sudo apt install libimage-exiftool-perl` |
+| **FFmpeg** | **Required for Videos** | Rendering recap videos (`.mp4`), audio sync, and video PIP compositing. | • <img src="https://cdn.simpleicons.org/windows/0078D4" height="13" /> **Windows**: `winget install Gyan.FFmpeg`<br>• <img src="https://cdn.simpleicons.org/apple/white" height="13" /> **macOS**: `brew install ffmpeg`<br>• <img src="https://cdn.simpleicons.org/linux/FCC624" height="13" /> **Linux**: `sudo apt install ffmpeg` |
+| **ExifTool** | **Optional / Recommended** | Extended video metadata & QuickTime `.mov` ContentIdentifier tagging.<br>*(**Note**: Photos, EXIF/IPTC restoration, Samsung motion photos, and Apple Live Photos use our built-in 100% pure Rust engine and do not require ExifTool).* | • <img src="https://cdn.simpleicons.org/windows/0078D4" height="13" /> **Windows**: `winget install OliverBetz.ExifTool`<br>• <img src="https://cdn.simpleicons.org/apple/white" height="13" /> **macOS**: `brew install exiftool`<br>• <img src="https://cdn.simpleicons.org/linux/FCC624" height="13" /> **Linux**: `sudo apt install libimage-exiftool-perl` |
 
 > 🔍 *You can check and verify your system's FFmpeg and ExifTool status anytime inside BeReal Studio under **Settings ⚙️ &rarr; System & Dependencies**.*
 
