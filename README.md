@@ -31,6 +31,19 @@ Download the official standalone release for your platform from the [Latest Rele
 
 ---
 
+## ⚡ Prerequisites & External Tools
+
+BeReal Studio is engineered with native Rust algorithms to minimize dependencies. Depending on the features you use:
+
+| Tool | Status | Purpose | Installation |
+| :--- | :--- | :--- | :--- |
+| **FFmpeg** | **Required for Videos** | Rendering recap videos (`.mp4`), audio sync, and video PIP compositing. | • **Windows**: `winget install Gyan.FFmpeg`<br>• **macOS**: `brew install ffmpeg`<br>• **Linux**: `sudo apt install ffmpeg` |
+| **ExifTool** | **Optional / Recommended** | Extended video metadata & QuickTime `.mov` ContentIdentifier tagging.<br>*(**Note**: Photos, EXIF/IPTC restoration, Samsung motion photos, and Apple Live Photos use our built-in 100% pure Rust engine and do not require ExifTool).* | • **Windows**: `winget install OliverBetz.ExifTool`<br>• **macOS**: `brew install exiftool`<br>• **Linux**: `sudo apt install libimage-exiftool-perl` |
+
+> 🔍 *You can check and verify your system's FFmpeg and ExifTool status anytime inside BeReal Studio under **Settings ⚙️ &rarr; System & Dependencies**.*
+
+---
+
 ## 🖼️ Application Showcase
 
 <div align="center">
