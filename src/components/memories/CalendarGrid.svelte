@@ -365,7 +365,9 @@
         {@const isFilterMatch = isFiltering && hasMatchingPost}
         {@const isFocusedMatch = focusedMatchingDate === dateStr}
         {@const primaryPost = hasMatchingPost ? dayPosts[0] : (hasRawPost ? rawPosts[0] : null)}
-        {@const isOnTime = hasMatchingPost && primaryPost ? !primaryPost.isLate : false}
+        {@const isOnTime = hasRawPost && primaryPost ? !primaryPost.isLate : false}
+        {@const isLate = hasRawPost && primaryPost ? primaryPost.isLate : false}
+        {@const lateTooltip = primaryPost ? (primaryPost.lateExact ? `${primaryPost.lateExact} (${primaryPost.timeFormatted})` : (primaryPost.lateDuration ? `${primaryPost.lateDuration} (${primaryPost.timeFormatted})` : 'Posted late')) : ''}
 
         <div
           class="day-cell"
@@ -379,7 +381,7 @@
           on:click={() => hasRawPost && handleDayClick(dayNum)}
           on:contextmenu={(e) => hasRawPost && primaryPost && openContextMenu(e, primaryPost)}
           on:keydown={(e) => hasRawPost && (e.key === 'Enter' || e.key === ' ') && handleDayClick(dayNum)}
-          title={isFilteredOut ? `Excluded by filters (${rawPosts.length} BeReal)` : (isFilterMatch ? `Matches filter (${dayPosts.length} BeReal)` : '')}
+          title={isFilteredOut ? `Excluded by filters (${rawPosts.length} BeReal)` : (isFilterMatch ? `Matches filter (${dayPosts.length} BeReal)` : (isLate ? lateTooltip : (hasRawPost ? `On Time • ${primaryPost?.timeFormatted}` : '')))}
         >
           {#if hasRawPost && primaryPost}
             <div class="active-day-card">
@@ -393,6 +395,13 @@
                 size="sm"
                 interactive={false}
               />
+
+              <!-- Late indicator badge if isLate is true -->
+              {#if isLate}
+                <div class="day-late-badge" title={lateTooltip}>
+                  <span>{primaryPost.lateDuration || 'Late'}</span>
+                </div>
+              {/if}
 
               <!-- Top-right corner BeReal count badge -->
               {#if isFilterMatch && dayPosts.length > 1}
@@ -814,6 +823,34 @@
     background: #38bdf8;
     color: #000000;
     box-shadow: 0 2px 8px rgba(56, 189, 248, 0.6);
+  }
+
+  /* Bottom-right late badge on day cell */
+  .day-late-badge {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #f4f4f5;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+    z-index: 10;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .day-late-badge:hover {
+    background: rgba(0, 0, 0, 0.95);
+    border-color: #38bdf8;
+    transform: scale(1.08);
   }
 
   .filtered-out-indicator {

@@ -36,6 +36,8 @@ pub struct ExplorerMemory {
     pub time_formatted: String,
     pub is_late: bool,
     pub late_duration: Option<String>,
+    pub late_exact: Option<String>,
+    pub late_in_seconds: Option<i64>,
     pub retake_counter: u32,
     pub caption: Option<String>,
     pub location: Option<Location>,
@@ -320,23 +322,41 @@ fn load_explorer_memories_inner(
             let time_formatted = local_dt.format("%H:%M").to_string();
 
             let retake_counter = post.retake_counter.unwrap_or(0);
-            let (is_late, late_duration) = if let Some(sec) = post.late_in_seconds {
-                if sec > 120 {
-                    let mins = sec / 60;
-                    let hrs = mins / 60;
-                    let dur_str = if hrs > 0 {
-                        format!("{}h late", hrs)
-                    } else {
-                        format!("{}m late", mins)
-                    };
-                    (true, Some(dur_str))
+            let late_sec = post.late_in_seconds.unwrap_or(0);
+            let raw_is_late = post.is_late.unwrap_or(false) || late_sec > 120;
+
+            let (is_late, late_duration, late_exact) = if !raw_is_late || (post.is_late == Some(false) && late_sec <= 120) {
+                (false, None, None)
+            } else if late_sec > 0 {
+                let hrs = late_sec / 3600;
+                let mins = (late_sec % 3600) / 60;
+                let secs = late_sec % 60;
+
+                let dur_str = if hrs > 0 {
+                    format!("{}h late", hrs)
+                } else if mins > 0 {
+                    format!("{}m late", mins)
                 } else {
-                    (false, None)
-                }
-            } else if let Some(late_bool) = post.is_late {
-                (late_bool, if late_bool { Some("Late".to_string()) } else { None })
+                    format!("{}s late", secs)
+                };
+
+                let exact_str = if hrs > 0 && mins > 0 {
+                    format!("{} hr {} min late", hrs, mins)
+                } else if hrs > 0 {
+                    format!("{} hr late", hrs)
+                } else if mins > 0 && secs > 0 {
+                    format!("{} min {} sec late", mins, secs)
+                } else if mins > 0 {
+                    format!("{} min late", mins)
+                } else {
+                    format!("{} sec late", secs)
+                };
+
+                (true, Some(dur_str), Some(exact_str))
+            } else if post.is_late == Some(true) {
+                (true, Some("Late".to_string()), Some("Posted after notification window".to_string()))
             } else {
-                (false, None)
+                (false, None, None)
             };
 
             ExplorerMemory {
@@ -352,6 +372,8 @@ fn load_explorer_memories_inner(
                 time_formatted,
                 is_late,
                 late_duration,
+                late_exact,
+                late_in_seconds: post.late_in_seconds,
                 retake_counter,
                 caption: post.caption.clone(),
                 location: post.location.clone(),

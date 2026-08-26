@@ -263,12 +263,22 @@
                   <!-- Hover Overlay Subtext info -->
                   <div class="card-caption-strip">
                     <span class="card-date-text">{memory.dateFormatted}</span>
-                    {#if memory.locationName}
-                      <div class="card-loc-pill" title={memory.locationName}>
-                        <MapPin size={10} />
-                        <span>{memory.city || memory.locationName}</span>
-                      </div>
-                    {/if}
+                    <div class="card-meta-right">
+                      {#if memory.isLate}
+                        <span
+                          class="card-late-pill"
+                          title={memory.lateExact ? `${memory.lateExact} (Posted ${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (Posted ${memory.timeFormatted})` : 'Posted late')}
+                        >
+                          {memory.lateDuration || 'Late'}
+                        </span>
+                      {/if}
+                      {#if memory.locationName}
+                        <div class="card-loc-pill" title={memory.locationName}>
+                          <MapPin size={10} />
+                          <span>{memory.city || memory.locationName}</span>
+                        </div>
+                      {/if}
+                    </div>
                   </div>
                 </div>
               {/each}
@@ -435,6 +445,35 @@
     text-overflow: ellipsis;
   }
 
+  .card-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .card-late-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    font-size: 9.5px;
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+    cursor: help;
+    transition: all 0.15s ease;
+  }
+
+  .card-late-pill:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #ef4444;
+    color: #ffffff;
+    transform: scale(1.05);
+  }
+
   .card-loc-pill {
     display: inline-flex;
     align-items: center;
@@ -444,7 +483,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 90px;
+    max-width: 80px;
   }
 
   /* Fixed Vertical Timeline Fast Scrubber Track */

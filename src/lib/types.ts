@@ -294,6 +294,8 @@ export interface ExplorerMemory {
   timeFormatted: string;
   isLate: boolean;
   lateDuration?: string;
+  lateExact?: string;
+  lateInSeconds?: number;
   retakeCounter: number;
   caption?: string;
   location?: {
