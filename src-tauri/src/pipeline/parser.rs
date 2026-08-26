@@ -1038,6 +1038,92 @@ pub fn parse_posts(json_path: &Path) -> Result<Vec<BeRealPost>> {
     Ok(result)
 }
 
+/// Intelligently merge a primary list of posts (e.g. from memories.json) and secondary list (from posts.json)
+pub fn merge_posts_and_memories(
+    memories_posts: Vec<(BeRealPost, String)>,
+    posts_json_posts: Vec<(BeRealPost, String)>,
+) -> Vec<(BeRealPost, String)> {
+    if memories_posts.is_empty() {
+        return posts_json_posts;
+    }
+    if posts_json_posts.is_empty() {
+        return memories_posts;
+    }
+
+    let mut posts_by_time: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut posts_by_minute: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut posts_by_media: HashMap<String, (BeRealPost, String)> = HashMap::new();
+
+    for (p, raw) in posts_json_posts {
+        posts_by_time.insert(p.taken_at.clone(), (p.clone(), raw.clone()));
+        if p.taken_at.len() >= 16 {
+            posts_by_minute.insert(p.taken_at[..16].to_string(), (p.clone(), raw.clone()));
+        }
+        if let Some(ref prim) = p.primary {
+            if let Some(fname) = Path::new(&prim.path).file_name().and_then(|n| n.to_str()) {
+                posts_by_media.insert(fname.to_lowercase(), (p.clone(), raw.clone()));
+            }
+        }
+    }
+
+    let mut merged = Vec::with_capacity(memories_posts.len() + 10);
+    let mut used_post_times = HashSet::new();
+
+    for (mut mem_post, mem_raw) in memories_posts {
+        let matched = posts_by_time.get(&mem_post.taken_at)
+            .or_else(|| {
+                if mem_post.taken_at.len() >= 16 {
+                    posts_by_minute.get(&mem_post.taken_at[..16])
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                mem_post.primary.as_ref().and_then(|prim| {
+                    Path::new(&prim.path).file_name().and_then(|n| n.to_str()).and_then(|fname| {
+                        posts_by_media.get(&fname.to_lowercase())
+                    })
+                })
+            });
+
+        if let Some((post_match, _)) = matched {
+            used_post_times.insert(post_match.taken_at.clone());
+            if mem_post.retake_counter.is_none() {
+                mem_post.retake_counter = post_match.retake_counter;
+            }
+            if mem_post.visibility.is_none() {
+                mem_post.visibility = post_match.visibility.clone();
+            }
+            if mem_post.primary.is_none() {
+                mem_post.primary = post_match.primary.clone();
+            }
+            if mem_post.secondary.is_none() {
+                mem_post.secondary = post_match.secondary.clone();
+            }
+            if mem_post.caption.is_none() {
+                mem_post.caption = post_match.caption.clone();
+            }
+            if mem_post.location.is_none() {
+                mem_post.location = post_match.location.clone();
+            }
+            if mem_post.bts_media.is_none() {
+                mem_post.bts_media = post_match.bts_media.clone();
+            }
+        }
+
+        merged.push((mem_post, mem_raw));
+    }
+
+    // Append any extra posts from posts.json that were not in memories.json
+    for (p_time, (extra_post, extra_raw)) in posts_by_time {
+        if !used_post_times.contains(&p_time) {
+            merged.push((extra_post, extra_raw));
+        }
+    }
+
+    merged
+}
+
 /// Compute a per-month histogram of BeReal counts.
 pub fn compute_monthly_histogram(posts: &[BeRealPost]) -> Vec<MonthCount> {
     let mut counts: HashMap<String, u32> = HashMap::new();
@@ -1262,5 +1348,24 @@ mod tests {
         let json6 = r#"{"taken_at": "2024-08-26T14:02:00Z", "is_late": false}"#;
         let p6: BeRealPost = serde_json::from_str(json6).unwrap();
         assert_eq!(p6.is_late, Some(false));
+    }
+
+    #[test]
+    fn test_merge_posts_and_memories() {
+        let mem_json = r#"{"takenTime": "2026-01-01T12:31:24.396Z", "berealMoment": "2026-01-01T12:31:05.229Z", "isLate": false}"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+        let mem_list = vec![(mem_post, mem_json.to_string())];
+
+        let post_json = r#"{"takenAt": "2026-01-01T12:31:24.396Z", "retakeCounter": 3, "visibility": ["friends"]}"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+        let post_list = vec![(post_item, post_json.to_string())];
+
+        let merged = merge_posts_and_memories(mem_list, post_list);
+        assert_eq!(merged.len(), 1);
+        let (p, _) = &merged[0];
+        assert_eq!(p.is_late, Some(false));
+        assert_eq!(p.notification_at.as_deref(), Some("2026-01-01T12:31:05.229Z"));
+        assert_eq!(p.retake_counter, Some(3));
+        assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
     }
 }

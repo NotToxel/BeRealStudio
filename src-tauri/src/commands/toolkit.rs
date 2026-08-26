@@ -86,45 +86,64 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
     let all_posts = if is_zip {
         if let Ok(file) = File::open(input_path) {
             if let Ok(mut archive) = ZipArchive::new(file) {
-                let mut found_posts = Vec::new();
-                let mut best_entry_idx = None;
+                let mut memories_posts = Vec::new();
+                let mut posts_json_posts = Vec::new();
+
                 for i in 0..archive.len() {
-                    if let Ok(entry) = archive.by_index(i) {
+                    if let Ok(mut entry) = archive.by_index(i) {
                         let name = entry.name().to_lowercase();
                         if name.ends_with("memories.json") {
-                            best_entry_idx = Some(i);
-                            break;
-                        } else if name.ends_with("posts.json") && best_entry_idx.is_none() {
-                            best_entry_idx = Some(i);
-                        }
-                    }
-                }
-                if let Some(idx) = best_entry_idx {
-                    if let Ok(mut entry) = archive.by_index(idx) {
-                        let mut buf = Vec::new();
-                        if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
-                            if let Ok(root_val) = serde_json::from_slice::<serde_json::Value>(&buf) {
-                                let raw_posts: Vec<serde_json::Value> = match root_val {
-                                    serde_json::Value::Array(arr) => arr,
-                                    serde_json::Value::Object(map) => {
-                                        if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
-                                            arr.clone()
-                                        } else {
-                                            Vec::new()
+                            let mut buf = Vec::new();
+                            if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
+                                if let Ok(root_val) = serde_json::from_slice::<serde_json::Value>(&buf) {
+                                    let raw_posts: Vec<serde_json::Value> = match root_val {
+                                        serde_json::Value::Array(arr) => arr,
+                                        serde_json::Value::Object(map) => {
+                                            if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
+                                                arr.clone()
+                                            } else {
+                                                Vec::new()
+                                            }
+                                        }
+                                        _ => Vec::new(),
+                                    };
+                                    for val in raw_posts {
+                                        let raw_str = serde_json::to_string(&val).unwrap_or_default();
+                                        if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
+                                            memories_posts.push((p, raw_str));
                                         }
                                     }
-                                    _ => Vec::new(),
-                                };
-                                for val in raw_posts {
-                                    if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
-                                        found_posts.push(p);
+                                }
+                            }
+                        } else if name.ends_with("posts.json") {
+                            let mut buf = Vec::new();
+                            if std::io::Read::read_to_end(&mut entry, &mut buf).is_ok() {
+                                if let Ok(root_val) = serde_json::from_slice::<serde_json::Value>(&buf) {
+                                    let raw_posts: Vec<serde_json::Value> = match root_val {
+                                        serde_json::Value::Array(arr) => arr,
+                                        serde_json::Value::Object(map) => {
+                                            if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
+                                                arr.clone()
+                                            } else {
+                                                Vec::new()
+                                            }
+                                        }
+                                        _ => Vec::new(),
+                                    };
+                                    for val in raw_posts {
+                                        let raw_str = serde_json::to_string(&val).unwrap_or_default();
+                                        if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
+                                            posts_json_posts.push((p, raw_str));
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                found_posts
+
+                let merged = parser::merge_posts_and_memories(memories_posts, posts_json_posts);
+                merged.into_iter().map(|(p, _)| p).collect()
             } else {
                 Vec::new()
             }
@@ -134,10 +153,20 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
     } else {
         let memories_json = input_path.join("memories.json");
         let posts_json = input_path.join("posts.json");
-        if memories_json.exists() {
-            parser::parse_posts(&memories_json).unwrap_or_default()
-        } else if posts_json.exists() {
-            parser::parse_posts(&posts_json).unwrap_or_default()
+        let memories_posts: Vec<(BeRealPost, String)> = if memories_json.exists() {
+            parser::parse_posts(&memories_json).unwrap_or_default().into_iter().map(|p| (p, String::new())).collect()
+        } else {
+            Vec::new()
+        };
+        let posts_json_posts: Vec<(BeRealPost, String)> = if posts_json.exists() {
+            parser::parse_posts(&posts_json).unwrap_or_default().into_iter().map(|p| (p, String::new())).collect()
+        } else {
+            Vec::new()
+        };
+
+        if !memories_posts.is_empty() || !posts_json_posts.is_empty() {
+            let merged = parser::merge_posts_and_memories(memories_posts, posts_json_posts);
+            merged.into_iter().map(|(p, _)| p).collect()
         } else if let Ok(found_p) = parser::find_posts_json(input_path) {
             parser::parse_posts(&found_p).unwrap_or_default()
         } else {

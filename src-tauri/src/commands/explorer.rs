@@ -198,15 +198,24 @@ fn load_explorer_memories_inner(
         }
 
         let archive_info = parser::scan_archive(&dest_dir.to_string_lossy())?;
-        let posts_file = if memories_json_candidate.exists() {
-            memories_json_candidate
-        } else if posts_json_candidate.exists() {
-            posts_json_candidate
+        let memories_posts = if memories_json_candidate.exists() {
+            parse_posts_from_path(&memories_json_candidate).unwrap_or_default()
         } else {
-            find_json_in_dir(&dest_dir)?
+            Vec::new()
+        };
+        let posts_json_posts = if posts_json_candidate.exists() {
+            parse_posts_from_path(&posts_json_candidate).unwrap_or_default()
+        } else {
+            Vec::new()
         };
 
-        let raw_posts = parse_posts_from_path(&posts_file)?;
+        let raw_posts = if !memories_posts.is_empty() || !posts_json_posts.is_empty() {
+            parser::merge_posts_and_memories(memories_posts, posts_json_posts)
+        } else {
+            let fallback_file = find_json_in_dir(&dest_dir)?;
+            parse_posts_from_path(&fallback_file)?
+        };
+
         (
             dest_dir,
             raw_posts,
@@ -217,8 +226,26 @@ fn load_explorer_memories_inner(
     } else {
         // Directory
         let archive_info = parser::scan_archive(archive_path_str)?;
-        let posts_file = find_json_in_dir(input_path)?;
-        let raw_posts = parse_posts_from_path(&posts_file)?;
+        let mem_cand = input_path.join("memories.json");
+        let post_cand = input_path.join("posts.json");
+        let memories_posts = if mem_cand.exists() {
+            parse_posts_from_path(&mem_cand).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let posts_json_posts = if post_cand.exists() {
+            parse_posts_from_path(&post_cand).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        let raw_posts = if !memories_posts.is_empty() || !posts_json_posts.is_empty() {
+            parser::merge_posts_and_memories(memories_posts, posts_json_posts)
+        } else {
+            let fallback_file = find_json_in_dir(input_path)?;
+            parse_posts_from_path(&fallback_file)?
+        };
+
         (
             input_path.to_path_buf(),
             raw_posts,
