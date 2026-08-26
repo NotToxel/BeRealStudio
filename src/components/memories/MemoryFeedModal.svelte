@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, onMount, onDestroy } from 'svelte';
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import {
@@ -20,48 +20,60 @@
   import MemoryActionMenu from './MemoryActionMenu.svelte';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Download from 'lucide-svelte/icons/download';
+  import ChevronUp from 'lucide-svelte/icons/chevron-up';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import ChevronLeft from 'lucide-svelte/icons/chevron-left';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
 
-  const CARD_HEIGHT = 700; // Total height per card slot (Header + 3:4 Frame + Caption + Spacing)
-
-  let scrollContainer: HTMLElement | null = null;
-  let scrollTop = 0;
   let activeIndex = 0;
+  let lastMemoryId = '';
 
-  $: totalVirtualHeight = $filteredMemories.length * CARD_HEIGHT;
-
-  // Windowed range: Render 1 card before and 3 cards ahead (max 5 in DOM)
-  $: windowStartIndex = Math.max(0, Math.floor(scrollTop / CARD_HEIGHT) - 1);
-  $: windowEndIndex = Math.min($filteredMemories.length, windowStartIndex + 4);
-  $: visibleSlice = $filteredMemories.slice(windowStartIndex, windowEndIndex);
-
-  $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
-
-  // When activeFeedMemory is set, immediately position virtual scroll container at target index centered
-  $: if ($activeFeedMemory && scrollContainer) {
-    jumpToActiveMemory();
-  }
-
-  async function jumpToActiveMemory() {
-    const targetIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
-    if (targetIdx !== -1 && scrollContainer) {
-      activeIndex = targetIdx;
-      await tick();
-      const vh = scrollContainer.clientHeight || 750;
-      const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
-      const targetScroll = Math.max(0, (targetIdx * CARD_HEIGHT) - centerOffset);
-      scrollTop = targetScroll;
-      scrollContainer.scrollTop = targetScroll;
+  // Sync activeIndex whenever activeFeedMemory changes
+  $: if ($activeFeedMemory && $activeFeedMemory.id !== lastMemoryId) {
+    lastMemoryId = $activeFeedMemory.id;
+    const foundIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
+    if (foundIdx !== -1) {
+      activeIndex = foundIdx;
     }
   }
 
-  function handleScroll(e: Event) {
-    const el = e.currentTarget as HTMLElement;
-    if (!el) return;
-    scrollTop = el.scrollTop;
-    // Pure mathematical index (zero layout queries)
-    const newIdx = Math.min($filteredMemories.length - 1, Math.max(0, Math.round(scrollTop / CARD_HEIGHT)));
-    if (newIdx !== activeIndex) {
-      activeIndex = newIdx;
+  $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
+
+  function goToIndex(idx: number) {
+    if (idx < 0 || idx >= $filteredMemories.length) return;
+    activeIndex = idx;
+    const target = $filteredMemories[idx];
+    if (target) {
+      lastMemoryId = target.id;
+      activeFeedMemory.set(target);
+    }
+  }
+
+  function handlePrev() {
+    if (activeIndex > 0) {
+      goToIndex(activeIndex - 1);
+    }
+  }
+
+  function handleNext() {
+    if (activeIndex < $filteredMemories.length - 1) {
+      goToIndex(activeIndex + 1);
+    }
+  }
+
+  let wheelCooldown = false;
+  function handleWheel(e: WheelEvent) {
+    if (wheelCooldown) return;
+    if (Math.abs(e.deltaY) > 28) {
+      wheelCooldown = true;
+      if (e.deltaY > 0) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+      setTimeout(() => {
+        wheelCooldown = false;
+      }, 260);
     }
   }
 
@@ -69,14 +81,12 @@
     if (!$activeFeedMemory) return;
     if (e.key === 'Escape') {
       closeFeed();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      if (scrollContainer && activeIndex > 0) {
-        scrollContainer.scrollBy({ top: -CARD_HEIGHT, behavior: 'smooth' });
-      }
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      if (scrollContainer && activeIndex < $filteredMemories.length - 1) {
-        scrollContainer.scrollBy({ top: CARD_HEIGHT, behavior: 'smooth' });
-      }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k') {
+      e.preventDefault();
+      handlePrev();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j' || e.key === ' ') {
+      e.preventDefault();
+      handleNext();
     }
   }
 
@@ -123,6 +133,8 @@
 
   $: userName = $explorerData?.userName || 'toxel';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
+  $: locText = currentMemory ? formatMemoryLocation(currentMemory, $memoryHeaderSettings) : '';
+  $: timeText = currentMemory ? formatMemoryTimeTag(currentMemory, $memoryHeaderSettings) : '';
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -130,19 +142,46 @@
 {#if $activeFeedMemory && currentMemory}
   <div
     class="feed-modal-backdrop"
-    transition:fade={{ duration: 220 }}
+    transition:fade={{ duration: 180 }}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     on:click={(e) => e.target === e.currentTarget && closeFeed()}
     on:keydown={(e) => e.key === 'Escape' && closeFeed()}
+    on:wheel={handleWheel}
   >
+    <!-- Left / Prev Desktop Floating Button -->
+    {#if activeIndex > 0}
+      <button
+        type="button"
+        class="floating-nav-btn nav-left"
+        on:click={handlePrev}
+        title="Previous Memory (← or ↑)"
+        aria-label="Previous Memory"
+      >
+        <ChevronLeft size={24} />
+      </button>
+    {/if}
+
+    <!-- Right / Next Desktop Floating Button -->
+    {#if activeIndex < $filteredMemories.length - 1}
+      <button
+        type="button"
+        class="floating-nav-btn nav-right"
+        on:click={handleNext}
+        title="Next Memory (→ or ↓)"
+        aria-label="Next Memory"
+      >
+        <ChevronRight size={24} />
+      </button>
+    {/if}
+
     <div
       class="feed-modal-shell"
-      transition:scale={{ start: 0.93, duration: 250, opacity: 0, easing: cubicOut }}
+      transition:scale={{ start: 0.95, duration: 200, opacity: 0, easing: cubicOut }}
       role="document"
     >
-      <!-- Sticky Top Header -->
+      <!-- Top Bar -->
       <div class="feed-top-bar">
         <button
           type="button"
@@ -174,81 +213,91 @@
         </div>
       </div>
 
-      <!-- High-Performance Virtual Scroll Viewport -->
-      <div
-        bind:this={scrollContainer}
-        class="feed-virtual-viewport"
-        on:scroll={handleScroll}
-      >
-        <!-- Virtual Spacer representing total scroll height -->
-        <div class="virtual-canvas" style="height: {totalVirtualHeight}px;">
-          {#each visibleSlice as memory, i (memory.id)}
-            {@const globalIdx = windowStartIndex + i}
-            {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
-            {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
-
-            <article
-              class="virtual-feed-card"
-              style="top: {globalIdx * CARD_HEIGHT}px; height: {CARD_HEIGHT}px;"
-            >
-              <!-- Post Header -->
-              <div class="post-header-row">
-                <div class="user-avatar-wrap">
-                  {#if profilePic}
-                    <img src={profilePic} alt={userName} class="user-avatar-img" />
-                  {:else}
-                    <div class="user-avatar-placeholder">
-                      <span>{userName.charAt(0).toUpperCase()}</span>
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="user-meta-column">
-                  <div class="user-name-row">
-                    <span class="user-name">{userName}</span>
-                  </div>
-
-                  {#if locText || timeText}
-                    <div class="user-subtitle-row">
-                      {#if locText}
-                        <span class="location-text">{locText}</span>
-                      {/if}
-                      {#if locText && timeText}
-                        <span class="subtitle-bullet">•</span>
-                      {/if}
-                      {#if timeText}
-                        <span class="time-text">{timeText}</span>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
-              </div>
-
-              <!-- Caption -->
-              {#if memory.caption}
-                <div class="post-header-caption-wrap">
-                  <p class="post-header-caption-text">{memory.caption}</p>
+      <!-- Feed Content Stage -->
+      <div class="feed-stage-viewport">
+        <article class="feed-card">
+          <!-- Post Header -->
+          <div class="post-header-row">
+            <div class="user-avatar-wrap">
+              {#if profilePic}
+                <img src={profilePic} alt={userName} class="user-avatar-img" />
+              {:else}
+                <div class="user-avatar-placeholder">
+                  <span>{userName.charAt(0).toUpperCase()}</span>
                 </div>
               {/if}
+            </div>
 
-              <!-- BeReal Dual Camera Frame (Full size, with placeholder fallback while loading) -->
-              <div class="dual-frame-wrapper">
-                <DualCameraFrame
-                  primarySrc={memory.primaryPath}
-                  secondarySrc={memory.secondaryPath}
-                  btsSrc={memory.btsPath}
-                  isVideo={memory.isVideo}
-                  alt="BeReal {memory.dateFormatted}"
-                  size="lg"
-                  interactive={true}
-                />
+            <div class="user-meta-column">
+              <div class="user-name-row">
+                <span class="user-name">{userName}</span>
               </div>
 
-              <!-- Divider between items -->
-              <div class="virtual-card-divider"></div>
-            </article>
-          {/each}
-        </div>
+              {#if locText || timeText}
+                <div class="user-subtitle-row">
+                  {#if locText}
+                    <span class="location-text">{locText}</span>
+                  {/if}
+                  {#if locText && timeText}
+                    <span class="subtitle-bullet">•</span>
+                  {/if}
+                  {#if timeText}
+                    <span class="time-text">{timeText}</span>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Caption -->
+          {#if currentMemory.caption}
+            <div class="post-header-caption-wrap">
+              <p class="post-header-caption-text">{currentMemory.caption}</p>
+            </div>
+          {/if}
+
+          <!-- Dual Camera Frame -->
+          <div class="dual-frame-wrapper">
+            {#key currentMemory.id}
+              <DualCameraFrame
+                primarySrc={currentMemory.primaryPath}
+                secondarySrc={currentMemory.secondaryPath}
+                btsSrc={currentMemory.btsPath}
+                isVideo={currentMemory.isVideo}
+                alt="BeReal {currentMemory.dateFormatted}"
+                size="lg"
+                interactive={true}
+              />
+            {/key}
+          </div>
+        </article>
+      </div>
+
+      <!-- Bottom Quick-Bar & Stepper -->
+      <div class="feed-bottom-bar">
+        <button
+          type="button"
+          class="bottom-step-btn"
+          disabled={activeIndex === 0}
+          on:click={handlePrev}
+          title="Previous Memory"
+        >
+          <ChevronUp size={16} />
+          <span>Previous</span>
+        </button>
+
+        <span class="stepper-count-pill">{activeIndex + 1} / {$filteredMemories.length}</span>
+
+        <button
+          type="button"
+          class="bottom-step-btn"
+          disabled={activeIndex >= $filteredMemories.length - 1}
+          on:click={handleNext}
+          title="Next Memory"
+        >
+          <span>Next</span>
+          <ChevronDown size={16} />
+        </button>
       </div>
     </div>
   </div>
@@ -266,11 +315,51 @@
     z-index: 500;
   }
 
+  .floating-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(26, 26, 36, 0.85);
+    border: 1px solid var(--border-medium);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 510;
+    transition: all var(--transition-fast);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .floating-nav-btn:hover {
+    background: #252536;
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-50%) scale(1.08);
+  }
+
+  .nav-left {
+    left: 24px;
+  }
+
+  .nav-right {
+    right: 24px;
+  }
+
+  @media (max-width: 768px) {
+    .floating-nav-btn {
+      display: none;
+    }
+  }
+
   .feed-modal-shell {
     position: relative;
     width: 100%;
     max-width: 530px;
-    height: 96vh;
+    height: 94vh;
+    max-height: 900px;
     display: flex;
     flex-direction: column;
     background: #000000;
@@ -287,50 +376,48 @@
   }
 
   .feed-top-bar {
-    position: sticky;
-    top: 0;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
-    background: rgba(0, 0, 0, 0.88);
+    padding: 12px 18px;
+    background: rgba(0, 0, 0, 0.92);
     backdrop-filter: blur(14px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     z-index: 40;
     flex-shrink: 0;
   }
 
-  .feed-virtual-viewport {
+  .feed-stage-viewport {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    scroll-behavior: auto;
-    position: relative;
-  }
-
-  .virtual-canvas {
-    position: relative;
-    width: 100%;
-  }
-
-  .virtual-feed-card {
-    position: absolute;
-    left: 0;
-    right: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 16px 20px 16px;
-    gap: 10px;
-    box-sizing: border-box;
+    justify-content: center;
+    padding: 12px 16px;
   }
 
-  .virtual-card-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.08);
-    margin-top: 14px;
+  .feed-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
     width: 100%;
     max-width: 480px;
+    animation: cardFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes cardFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .back-nav-btn {
@@ -343,7 +430,7 @@
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border-radius: var(--radius-full);
     transition: background var(--transition-fast);
   }
@@ -375,12 +462,30 @@
     gap: 6px;
   }
 
+  .quick-download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #14141e;
+    border: 1px solid var(--border-medium);
+    color: #ffffff;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .quick-download-btn:hover {
+    background: #252536;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
   .post-header-row {
     display: flex;
     align-items: center;
     gap: 10px;
     width: 100%;
-    max-width: 480px;
   }
 
   .user-avatar-wrap {
@@ -405,27 +510,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, #2a2a3c, #161622);
     color: #ffffff;
     font-weight: 700;
     font-size: 14px;
-    background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
   }
 
   .user-meta-column {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    flex: 1;
-  }
-
-  .user-name-row {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
+    gap: 1px;
+    min-width: 0;
   }
 
   .user-name {
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: -0.01em;
@@ -435,76 +534,75 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #a1a1aa;
-    line-height: 1.3;
-  }
-
-  .location-text {
-    color: #d4d4d8;
-    font-weight: 500;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .subtitle-bullet {
-    color: #71717a;
-    font-size: 10px;
-  }
-
-  .time-text {
-    color: #a1a1aa;
-    font-weight: 400;
-  }
-
-  .quick-download-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    background: #181824;
-    border: 1px solid var(--border-subtle);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .quick-download-btn:hover {
-    background: rgba(56, 189, 248, 0.15);
-    border-color: #38bdf8;
-    color: #38bdf8;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
+    opacity: 0.5;
   }
 
   .post-header-caption-wrap {
     width: 100%;
-    max-width: 480px;
     padding: 0 4px;
   }
 
   .post-header-caption-text {
-    font-size: 14px;
-    font-weight: 500;
-    color: #f4f4f5;
+    font-size: 13.5px;
     line-height: 1.4;
+    color: #ffffff;
+    margin: 0;
     word-break: break-word;
   }
 
   .dual-frame-wrapper {
     width: 100%;
-    max-width: 480px;
     display: flex;
     justify-content: center;
   }
 
-  @media (max-width: 600px) {
-    .feed-modal-shell {
-      height: 100vh;
-      max-height: 100vh;
-      border-radius: 0;
-      border: none;
-    }
+  .feed-bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    background: rgba(0, 0, 0, 0.92);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+  }
+
+  .bottom-step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    background: #14141e;
+    border: 1px solid var(--border-medium);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .bottom-step-btn:hover:not(:disabled) {
+    background: #252536;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .bottom-step-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .stepper-count-pill {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
   }
 </style>

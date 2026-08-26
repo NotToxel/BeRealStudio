@@ -50,6 +50,10 @@
     return groups;
   })();
 
+  let renderedMonthCount = 4;
+
+  $: visibleMonthGroups = monthGroups.slice(0, renderedMonthCount);
+
   function handleMemoryClick(memory: ExplorerMemory) {
     openFeedAt(memory);
   }
@@ -64,8 +68,8 @@
 
     // Find the month currently visible in viewport
     const containerTop = scrollContainer.getBoundingClientRect().top;
-    for (let i = monthGroups.length - 1; i >= 0; i--) {
-      const group = monthGroups[i];
+    for (let i = visibleMonthGroups.length - 1; i >= 0; i--) {
+      const group = visibleMonthGroups[i];
       const el = document.getElementById(`month-group-${group.key}`);
       if (el) {
         const elTop = el.getBoundingClientRect().top;
@@ -76,9 +80,9 @@
         }
       }
     }
-    if (!activeScrubMonth && monthGroups.length > 0) {
-      activeScrubMonth = monthGroups[0].title;
-      activeScrubKey = monthGroups[0].key;
+    if (!activeScrubMonth && visibleMonthGroups.length > 0) {
+      activeScrubMonth = visibleMonthGroups[0].title;
+      activeScrubKey = visibleMonthGroups[0].key;
     }
   }
 
@@ -91,9 +95,25 @@
         isScrolling = false;
       }
     }, 1400);
+
+    // Progressive infinite scroll: render next batch when near bottom
+    if (scrollContainer) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      if (scrollHeight - (scrollTop + clientHeight) < 700) {
+        if (renderedMonthCount < monthGroups.length) {
+          renderedMonthCount = Math.min(monthGroups.length, renderedMonthCount + 3);
+        }
+      }
+    }
   }
 
-  function scrollToMonth(key: string, title: string) {
+  async function scrollToMonth(key: string, title: string) {
+    const targetIdx = monthGroups.findIndex((g) => g.key === key);
+    if (targetIdx !== -1 && targetIdx >= renderedMonthCount) {
+      renderedMonthCount = Math.min(monthGroups.length, targetIdx + 2);
+      await tick();
+    }
+
     activeScrubMonth = title;
     activeScrubKey = key;
     isScrolling = true;
@@ -172,7 +192,7 @@
       on:scroll={handleScroll}
     >
       <div class="memories-groups-container">
-        {#each monthGroups as group (group.key)}
+        {#each visibleMonthGroups as group (group.key)}
           <section id="month-group-{group.key}" class="month-section">
             <!-- BeReal-Style Month Spacer Header -->
             <div class="month-section-header">

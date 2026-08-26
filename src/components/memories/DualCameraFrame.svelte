@@ -301,6 +301,7 @@
         {alt}
         class="media-layer base-image"
         loading="lazy"
+        decoding="async"
         on:error={swapped ? handleSecondaryImgError : handlePrimaryImgError}
       />
     {:else}
@@ -371,6 +372,7 @@
               alt=""
               class="pip-image"
               loading="lazy"
+              decoding="async"
               on:error={swapped ? handlePrimaryImgError : handleSecondaryImgError}
             />
           {/if}
