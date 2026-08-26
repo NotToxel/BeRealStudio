@@ -19,12 +19,12 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format | Direct Download Link |
 | :--- | :--- | :--- |
-| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64-setup.exe) |
-| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64_en-US.msi) |
-| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_aarch64.dmg) |
-| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.0.0_x64.dmg) |
-| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.AppImage) |
-| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.0.0_amd64.deb) |
+| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.0_x64-setup.exe) |
+| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.0_x64_en-US.msi) |
+| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.0_aarch64.dmg) |
+| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.0_x64.dmg) |
+| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.0_amd64.AppImage) |
+| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.0_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
@@ -54,16 +54,17 @@ Download the official standalone release for your platform from the [Latest Rele
 
 ### 📱 1. Native Memories & Calendar Explorer
 - **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
+- **0ms Instantaneous Tab Switching**: Dual-stage DOM retention preserves exact scroll position and active memory state with zero lag.
+- **Sticky Glassmorphic Header**: Keeps navigation, search bar, and multi-dimensional filters pinned at the top on scroll.
 - **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** and an interactive **Monthly Calendar Matrix**.
 - **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
-- **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
 - **Interactive Dual-Camera Frame**:
   - **Click-to-Swap**: Flip front and back cameras instantly.
   - **Movable PIP**: Drag and reposition the selfie PIP anywhere or snap to the 4 corners.
   - **Inline BTS Player**: Stream Behind-the-Scenes live video micro-clips with a single click.
 - **Smart Search & Hierarchical Filtering**: Filter posts by text query, GPS location, BTS clips, captions, retakes, year, month, city, and country.
 - **Single-Memory Instant Export Dialog**: Export individual memories as Combined PIP, Side-by-Side, Front/Back only, MP4 video clip, or Motion Photo with customizable defaults.
-- **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
+- **Theme-Matched Late Indicators & Settings**: Dedicated toggles for header timestamps, late addition tags, and calendar late badges.
 
 ---
 
