@@ -145,7 +145,7 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
             let norm = name.replace('\\', "/");
             let norm_lower = norm.to_lowercase();
 
-            if norm_lower.ends_with("memories.json") || norm_lower.ends_with("memory.json") {
+            if norm_lower.ends_with("memories.json") {
                 posts_entry_name = Some(name.clone());
             } else if norm_lower.ends_with("posts.json") && posts_entry_name.is_none() {
                 posts_entry_name = Some(name.clone());
@@ -961,19 +961,24 @@ fn check_disk_media_presence(
 
 /// Find memories.json or posts.json by searching common locations in the archive directory.
 pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
-    // 1. Direct: base/memories.json or base/memory.json (Highest priority for rich metadata)
-    for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
-        let direct = base.join(name);
-        if direct.exists() {
-            return Ok(direct);
-        }
+    // 1. Direct: base/memories.json (Highest priority for rich metadata)
+    let direct_memories = base.join("memories.json");
+    if direct_memories.exists() {
+        return Ok(direct_memories);
     }
-    // 2. One or two levels deep
+
+    // 2. Direct: base/posts.json
+    let direct_posts = base.join("posts.json");
+    if direct_posts.exists() {
+        return Ok(direct_posts);
+    }
+
+    // 3. One or two levels deep
     if let Ok(entries) = std::fs::read_dir(base) {
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
-                for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
+                for name in &["memories.json", "posts.json"] {
                     let candidate = p.join(name);
                     if candidate.exists() {
                         return Ok(candidate);
@@ -984,7 +989,7 @@ pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
                     for sub in sub_entries.flatten() {
                         let sub_p = sub.path();
                         if sub_p.is_dir() {
-                            for name in &["memories.json", "memory.json", "Memories.json", "Memory.json", "posts.json", "Posts.json"] {
+                            for name in &["memories.json", "posts.json"] {
                                 let sub_cand = sub_p.join(name);
                                 if sub_cand.exists() {
                                     return Ok(sub_cand);

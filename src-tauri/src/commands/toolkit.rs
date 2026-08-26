@@ -91,7 +91,7 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
                 for i in 0..archive.len() {
                     if let Ok(entry) = archive.by_index(i) {
                         let name = entry.name().to_lowercase();
-                        if name.ends_with("memories.json") || name.ends_with("memory.json") {
+                        if name.ends_with("memories.json") {
                             best_entry_idx = Some(i);
                             break;
                         } else if name.ends_with("posts.json") && best_entry_idx.is_none() {
@@ -133,12 +133,9 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
         }
     } else {
         let memories_json = input_path.join("memories.json");
-        let memory_json = input_path.join("memory.json");
         let posts_json = input_path.join("posts.json");
         if memories_json.exists() {
             parser::parse_posts(&memories_json).unwrap_or_default()
-        } else if memory_json.exists() {
-            parser::parse_posts(&memory_json).unwrap_or_default()
         } else if posts_json.exists() {
             parser::parse_posts(&posts_json).unwrap_or_default()
         } else if let Ok(found_p) = parser::find_posts_json(input_path) {

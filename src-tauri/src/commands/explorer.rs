@@ -171,7 +171,6 @@ fn load_explorer_memories_inner(
         }
 
         let memories_json_candidate = dest_dir.join("memories.json");
-        let memory_json_candidate = dest_dir.join("memory.json");
         let posts_json_candidate = dest_dir.join("posts.json");
 
         // Extract archive files into cache
@@ -201,8 +200,6 @@ fn load_explorer_memories_inner(
         let archive_info = parser::scan_archive(&dest_dir.to_string_lossy())?;
         let posts_file = if memories_json_candidate.exists() {
             memories_json_candidate
-        } else if memory_json_candidate.exists() {
-            memory_json_candidate
         } else if posts_json_candidate.exists() {
             posts_json_candidate
         } else {
@@ -693,36 +690,32 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
 
 /// Helper: Find memories.json or posts.json in directory
 fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
-    // 1. Direct priority check: memories.json / memory.json
-    for name in &["memories.json", "memory.json", "Memories.json", "Memory.json"] {
-        let cand = dir.join(name);
-        if cand.exists() {
-            return Ok(cand);
-        }
-    }
-    // 2. Direct fallback check: posts.json
-    for name in &["posts.json", "Posts.json"] {
-        let cand = dir.join(name);
-        if cand.exists() {
-            return Ok(cand);
-        }
+    // 1. Direct priority check: memories.json
+    let memories = dir.join("memories.json");
+    if memories.exists() {
+        return Ok(memories);
     }
 
+    // 2. Direct fallback check: posts.json
+    let posts = dir.join("posts.json");
+    if posts.exists() {
+        return Ok(posts);
+    }
+
+    // Search immediate subdirectories for memories.json first
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.eq_ignore_ascii_case("memories.json") || name.eq_ignore_ascii_case("memory.json") {
+                    if name.eq_ignore_ascii_case("memories.json") {
                         return Ok(path);
                     }
                 }
             } else if path.is_dir() {
-                for sub_name in &["memories.json", "memory.json", "Memories.json", "Memory.json"] {
-                    let sub_cand = path.join(sub_name);
-                    if sub_cand.exists() {
-                        return Ok(sub_cand);
-                    }
+                let sub_memories = path.join("memories.json");
+                if sub_memories.exists() {
+                    return Ok(sub_memories);
                 }
             }
         }
@@ -739,11 +732,9 @@ fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
                     }
                 }
             } else if path.is_dir() {
-                for sub_name in &["posts.json", "Posts.json"] {
-                    let sub_posts = path.join(sub_name);
-                    if sub_posts.exists() {
-                        return Ok(sub_posts);
-                    }
+                let sub_posts = path.join("posts.json");
+                if sub_posts.exists() {
+                    return Ok(sub_posts);
                 }
             }
         }
