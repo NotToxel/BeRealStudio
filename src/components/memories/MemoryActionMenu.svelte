@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fade } from 'svelte/transition';
   import type { ExplorerMemory } from '$lib/types';
   import { openExportModal } from '$lib/memoriesStore';
   import { exportSingleMemory, revealInFolder, isTauri } from '$lib/tauri';
@@ -14,7 +15,7 @@
   import Check from 'lucide-svelte/icons/check';
   import Layers from 'lucide-svelte/icons/layers';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
-
+  import Clock from 'lucide-svelte/icons/clock';
   import Share2 from 'lucide-svelte/icons/share-2';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import FileText from 'lucide-svelte/icons/file-text';
@@ -24,7 +25,7 @@
 
   let isOpen = false;
   let isExporting = false;
-  let copiedText = '';
+  let copiedInfo: { label: string; text: string } | null = null;
 
   function toggleMenu(e: MouseEvent) {
     e.stopPropagation();
@@ -103,16 +104,43 @@
     }
   }
 
+  async function performWriteToClipboard(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Standard clipboard write failed, trying fallback:', e);
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      textarea.style.top = '-999999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return success;
+    } catch (err) {
+      console.error('Fallback clipboard copy failed:', err);
+      return false;
+    }
+  }
+
   async function copyToClipboard(text: string, label: string) {
     closeMenu();
-    try {
-      await navigator.clipboard.writeText(text);
-      copiedText = label;
+    if (!text) return;
+    const success = await performWriteToClipboard(text);
+    if (success) {
+      copiedInfo = { label, text };
       setTimeout(() => {
-        copiedText = '';
-      }, 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
+        copiedInfo = null;
+      }, 2500);
     }
   }
 </script>
@@ -145,48 +173,47 @@
           <span>Download</span>
         </button>
 
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Filename')}>
-          <Copy size={16} class="text-indigo-400" />
-          <span>Copy Filename</span>
-        </button>
-
         {#if memory.primaryPath}
           <button type="button" class="menu-item" on:click={handleOpenExplorer}>
             <FolderOpen size={16} class="text-amber-400" />
-            <span>Show in Explorer</span>
+            <span>Reveal in Folder</span>
           </button>
         {/if}
       </div>
 
       <div class="menu-divider"></div>
 
-      <!-- Secondary Camera & Media Exports -->
+      <!-- Quick Export Variations -->
       <div class="menu-section">
-        <span class="menu-header">Perspectives &amp; Motion</span>
+        <span class="menu-header">Export Variations</span>
 
-        {#if memory.secondaryPath}
-          <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
-            <Layers size={15} class="text-purple-400" />
-            <span>Save Side-by-Side</span>
-          </button>
+        <button type="button" class="menu-item" on:click={() => handleExport('combined_pip')}>
+          <Layers size={15} class="text-blue-400" />
+          <span>Save Picture-in-Picture</span>
+        </button>
 
-          <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
-            <User size={15} class="text-cyan-400" />
-            <span>Save Front Camera</span>
-          </button>
-        {/if}
+        <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
+          <SlidersHorizontal size={15} class="text-purple-400" />
+          <span>Save Side-by-Side</span>
+        </button>
 
         <button type="button" class="menu-item" on:click={() => handleExport('primary_only')}>
-          <Camera size={15} class="text-emerald-400" />
+          <Camera size={15} class="text-teal-400" />
           <span>Save Main Camera</span>
         </button>
+
+        {#if memory.secondaryPath}
+          <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
+            <User size={15} class="text-rose-400" />
+            <span>Save Selfie Camera</span>
+          </button>
+        {/if}
 
         {#if memory.btsPath}
           <button type="button" class="menu-item" on:click={() => handleExport('bts_only')}>
             <Film size={15} class="text-amber-400" />
-            <span>Save BTS Video (.mp4)</span>
+            <span>Save BTS Clip (Video)</span>
           </button>
-
           <button type="button" class="menu-item" on:click={() => handleExport('motion_photo')}>
             <Sparkles size={15} class="text-emerald-400" />
             <span>Save Motion Photo (Live)</span>
@@ -200,12 +227,29 @@
       <div class="menu-section">
         <span class="menu-header">Copy Info</span>
 
-        {#if memory.caption}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
-            <FileText size={15} class="text-yellow-400" />
-            <span>Copy Caption</span>
+        {#if memory.primaryPath}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'File Name')}>
+            <FileText size={15} class="text-cyan-400" />
+            <span>Copy File Name</span>
           </button>
         {/if}
+
+        {#if memory.primaryPath}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}>
+            <FolderOpen size={15} class="text-slate-400" />
+            <span>Copy Full File Path</span>
+          </button>
+        {/if}
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Timestamp')}>
+          <Clock size={15} class="text-blue-400" />
+          <span>Copy Timestamp ({memory.timeFormatted})</span>
+        </button>
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(`${memory.dateFormatted} • ${memory.timeFormatted}`, 'Formatted Date')}>
+          <Copy size={15} class="text-indigo-400" />
+          <span>Copy Formatted Date</span>
+        </button>
 
         {#if memory.locationName || memory.location}
           <button
@@ -229,7 +273,7 @@
             on:click={() =>
               copyToClipboard(
                 `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
-                'GPS'
+                'GPS Coordinates'
               )}
           >
             <Copy size={15} class="text-teal-400" />
@@ -237,25 +281,26 @@
           </button>
         {/if}
 
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Timestamp')}>
-          <Copy size={15} class="text-blue-400" />
-          <span>Copy Timestamp ({memory.dateFormatted})</span>
-        </button>
-
-        {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}>
-            <Copy size={15} class="text-slate-400" />
-            <span>Copy Full File Path</span>
+        {#if memory.caption}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
+            <FileText size={15} class="text-yellow-400" />
+            <span>Copy Caption</span>
           </button>
         {/if}
       </div>
     </div>
   {/if}
 
-  {#if copiedText}
-    <div class="toast-indicator">
-      <Check size={12} />
-      <span>{copiedText} copied!</span>
+  <!-- Live Toast Indicator with Copy Preview -->
+  {#if copiedInfo}
+    <div class="toast-preview-card" transition:fade={{ duration: 150 }}>
+      <div class="toast-preview-header">
+        <Check size={13} class="text-emerald-400" />
+        <span class="toast-preview-title">Copied {copiedInfo.label}</span>
+      </div>
+      <div class="toast-preview-snippet" title={copiedInfo.text}>
+        <code>{copiedInfo.text.length > 36 ? copiedInfo.text.slice(0, 36) + '...' : copiedInfo.text}</code>
+      </div>
     </div>
   {/if}
 </div>
@@ -354,22 +399,43 @@
     margin: 4px 0;
   }
 
-  .toast-indicator {
+  .toast-preview-card {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     z-index: 250;
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(12, 12, 18, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+    white-space: nowrap;
+    min-width: 170px;
+    max-width: 280px;
+    animation: popoverIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .toast-preview-header {
+    display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 12px;
-    background: #059669;
-    color: #ffffff;
-    border-radius: var(--radius-full);
+    gap: 6px;
     font-size: 11.5px;
     font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
-    animation: popoverIn 0.15s ease-out;
+    color: #34d399;
+  }
+
+  .toast-preview-snippet {
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: #cbd5e1;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 3px 6px;
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>
