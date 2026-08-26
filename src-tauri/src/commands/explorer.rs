@@ -51,6 +51,8 @@ pub struct ExplorerMemory {
     pub is_video: bool,
     pub width: Option<u32>,
     pub height: Option<u32>,
+    pub raw_json: Option<String>,
+    pub debug_info: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -228,12 +230,12 @@ fn load_explorer_memories_inner(
     // Deduplicate posts by taken_at timestamp and media paths
     let mut seen_keys = HashSet::new();
     let mut posts = Vec::with_capacity(all_raw_posts.len());
-    for p in all_raw_posts {
+    for (p, raw_json_str) in all_raw_posts {
         let prim_str = p.primary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
         let sec_str = p.secondary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
         let dedupe_key = format!("{}:{}:{}", p.taken_at, prim_str, sec_str);
         if seen_keys.insert(dedupe_key) {
-            posts.push(p);
+            posts.push((p, raw_json_str));
         }
     }
 
@@ -252,7 +254,7 @@ fn load_explorer_memories_inner(
     let memories: Vec<ExplorerMemory> = posts
         .par_iter()
         .enumerate()
-        .map(|(idx, post)| {
+        .map(|(idx, (post, raw_json_str))| {
             let dt = parse_taken_at(&post.taken_at).unwrap_or_else(Utc::now);
             let local_dt: DateTime<Local> = DateTime::from(dt);
 
@@ -387,6 +389,11 @@ fn load_explorer_memories_inner(
                 (None, None, None)
             };
 
+            let debug_info = format!(
+                "is_late: {:?} | raw_is_late: {:?} | late_sec: {:?} | notif: {:?} | taken: {}",
+                is_late, post.is_late, late_seconds, post.notification_at, post.taken_at
+            );
+
             if idx < 10 || is_late {
                 println!(
                     "[EXPLORER_DEBUG] Post #{}: taken_at='{}' raw_is_late={:?} raw_late_sec={:?} notif_at={:?} => IS_LATE={} late_dur={:?}",
@@ -422,6 +429,8 @@ fn load_explorer_memories_inner(
                 is_video,
                 width: post.primary.as_ref().and_then(|p| p.width),
                 height: post.primary.as_ref().and_then(|p| p.height),
+                raw_json: Some(raw_json_str.clone()),
+                debug_info: Some(debug_info),
             }
         })
         .collect();
@@ -710,16 +719,75 @@ fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
     anyhow::bail!("Could not find posts.json or memories.json in {}", dir.display())
 }
 
-/// Helper: Parse BeRealPost vector from a JSON file path
-fn parse_posts_from_path(path: &Path) -> Result<Vec<BeRealPost>> {
+/// Helper: Parse BeRealPost vector with raw JSON strings from a JSON file path
+fn parse_posts_from_path(path: &Path) -> Result<Vec<(BeRealPost, String)>> {
     let file = File::open(path)?;
     let reader = BufReader::with_capacity(128 * 1024, file);
-    let raw_posts: Vec<serde_json::Value> = serde_json::from_reader(reader)?;
+    let root_val: serde_json::Value = serde_json::from_reader(reader)?;
+
+    let raw_posts: Vec<serde_json::Value> = match root_val {
+        serde_json::Value::Array(arr) => arr,
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(arr)) = map.get("posts").or_else(|| map.get("memories")).or_else(|| map.get("data")) {
+                arr.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
 
     let mut posts = Vec::with_capacity(raw_posts.len());
     for val in raw_posts {
-        if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
-            posts.push(p);
+        let raw_str = serde_json::to_string(&val).unwrap_or_default();
+        if let Ok(mut p) = serde_json::from_value::<BeRealPost>(val.clone()) {
+            // Check direct raw field fallbacks if serde left something as None
+            if p.is_late.is_none() {
+                if let Some(val_late) = val.get("isLate")
+                    .or_else(|| val.get("is_late"))
+                    .or_else(|| val.get("late"))
+                    .or_else(|| val.get("wasLate"))
+                    .or_else(|| val.get("isLatePost"))
+                {
+                    if let Some(b) = val_late.as_bool() {
+                        p.is_late = Some(b);
+                    } else if let Some(i) = val_late.as_i64() {
+                        p.is_late = Some(i != 0);
+                    } else if let Some(s) = val_late.as_str() {
+                        p.is_late = Some(s.eq_ignore_ascii_case("true") || s == "1");
+                    }
+                }
+            }
+
+            if p.late_in_seconds.is_none() {
+                if let Some(val_sec) = val.get("lateInSeconds")
+                    .or_else(|| val.get("late_in_seconds"))
+                    .or_else(|| val.get("secondsLate"))
+                    .or_else(|| val.get("lateSeconds"))
+                    .or_else(|| val.get("lateTime"))
+                {
+                    if let Some(i) = val_sec.as_i64() {
+                        p.late_in_seconds = Some(i);
+                    } else if let Some(s) = val_sec.as_str() {
+                        p.late_in_seconds = s.trim().parse::<i64>().ok();
+                    }
+                }
+            }
+
+            if p.notification_at.is_none() {
+                if let Some(val_notif) = val.get("notificationAt")
+                    .or_else(|| val.get("momentAt"))
+                    .or_else(|| val.get("notification_at"))
+                    .or_else(|| val.get("berealMoment"))
+                    .or_else(|| val.get("notificationDate"))
+                {
+                    if let Some(s) = val_notif.as_str() {
+                        p.notification_at = Some(s.to_string());
+                    }
+                }
+            }
+
+            posts.push((p, raw_str));
         }
     }
     Ok(posts)

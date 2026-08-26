@@ -20,6 +20,13 @@
   export let size: 'sm' | 'md' | 'lg' = 'md';
   export let allowPreviewSwap: boolean = true;
   export let forceSwapped: boolean | undefined = undefined;
+  export let isLate: boolean | undefined = undefined;
+  export let lateDuration: string | undefined = undefined;
+  export let lateExact: string | undefined = undefined;
+  export let takenAt: string = '';
+  export let rawJson: string | undefined = undefined;
+  export let debugInfo: string | undefined = undefined;
+  export let showDebugBadge: boolean = true;
 
   // Local user toggle override; if null, defaults to $globalPerspective
   let localSwappedOverride: boolean | null = null;
@@ -381,6 +388,19 @@
       </div>
     {/if}
 
+    <!-- Dev Debug Extraction Overlay on Post -->
+    {#if showDebugBadge && (isLate !== undefined || debugInfo || rawJson)}
+      <div class="post-dev-debug-badge" title={lateExact ? `${lateExact} • ${rawJson || debugInfo}` : (rawJson || debugInfo)}>
+        <div class="debug-badge-inner {isLate ? 'is-late' : 'is-ontime'}">
+          <span class="debug-icon">{isLate ? '⚠️' : '✓'}</span>
+          <span class="debug-text">{isLate ? `LATE (${lateDuration || 'Late'})` : 'ON TIME'}</span>
+          {#if takenAt}
+            <span class="debug-time">{takenAt.slice(11, 16)}</span>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
     <!-- Small Inset PIP (Selfie / Secondary camera) - Hidden during BTS playback -->
     {#if smallPipImage && !isPlayingBts}
       <div
@@ -579,6 +599,54 @@
     font-weight: 700;
     color: #ffffff;
     z-index: 15;
+  }
+
+  /* On-Post Dev Debug Extraction Badge */
+  .post-dev-debug-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 25;
+    pointer-events: auto;
+    cursor: help;
+  }
+
+  .debug-badge-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    font-size: 9.5px;
+    font-weight: 800;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .debug-badge-inner.is-late {
+    background: rgba(220, 38, 38, 0.88);
+    border: 1px solid rgba(248, 113, 113, 0.8);
+    color: #ffffff;
+  }
+
+  .debug-badge-inner.is-ontime {
+    background: rgba(5, 150, 105, 0.88);
+    border: 1px solid rgba(52, 211, 153, 0.8);
+    color: #ffffff;
+  }
+
+  .debug-time {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    opacity: 0.85;
+    padding-left: 2px;
+  }
+
+  .size-sm .debug-badge-inner {
+    font-size: 8px;
+    padding: 1px 5px;
   }
 
   /* Video indicator badge when idle */

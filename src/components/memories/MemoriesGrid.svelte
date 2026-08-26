@@ -258,6 +258,12 @@
                     size="md"
                     interactive={false}
                     allowPreviewSwap={true}
+                    isLate={memory.isLate}
+                    lateDuration={memory.lateDuration}
+                    lateExact={memory.lateExact}
+                    takenAt={memory.takenAt}
+                    rawJson={memory.rawJson}
+                    debugInfo={memory.debugInfo}
                   />
 
                   <!-- Hover Overlay Subtext info -->

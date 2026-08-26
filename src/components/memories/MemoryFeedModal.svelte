@@ -324,8 +324,44 @@
                   alt="BeReal {memory.dateFormatted}"
                   size="lg"
                   interactive={true}
+                  isLate={memory.isLate}
+                  lateDuration={memory.lateDuration}
+                  lateExact={memory.lateExact}
+                  takenAt={memory.takenAt}
+                  rawJson={memory.rawJson}
+                  debugInfo={memory.debugInfo}
                 />
               </div>
+
+              <!-- Dev Debug JSON & Extraction Inspector -->
+              {#if memory.rawJson || memory.debugInfo}
+                <details class="feed-dev-debug-accordion">
+                  <summary class="debug-accordion-summary">
+                    <span class="debug-tag {memory.isLate ? 'is-late' : 'is-ontime'}">
+                      {memory.isLate ? `⚠️ LATE (${memory.lateDuration || 'Late'})` : '✓ ON TIME'}
+                    </span>
+                    <span class="debug-summary-title">🐞 Dev Debug JSON &amp; Extraction</span>
+                  </summary>
+                  <div class="debug-accordion-body">
+                    <div class="debug-fields-grid">
+                      <div><span class="field-k">isLate:</span> <span class="field-v">{String(memory.isLate)}</span></div>
+                      <div><span class="field-k">lateDuration:</span> <span class="field-v">{memory.lateDuration || 'None'}</span></div>
+                      <div><span class="field-k">lateInSeconds:</span> <span class="field-v">{memory.lateInSeconds ?? 'None'}</span></div>
+                      <div><span class="field-k">takenAt:</span> <span class="field-v">{memory.takenAt}</span></div>
+                      <div><span class="field-k">location:</span> <span class="field-v">{memory.location ? `${memory.location.latitude.toFixed(4)}, ${memory.location.longitude.toFixed(4)}` : 'None'}</span></div>
+                      {#if memory.debugInfo}
+                        <div class="full-w"><span class="field-k">debugInfo:</span> <span class="field-v">{memory.debugInfo}</span></div>
+                      {/if}
+                    </div>
+                    {#if memory.rawJson}
+                      <div class="debug-raw-json-wrap">
+                        <span class="raw-json-heading">Raw Archive JSON:</span>
+                        <pre class="raw-json-pre"><code>{(() => { try { return JSON.stringify(JSON.parse(memory.rawJson), null, 2); } catch { return memory.rawJson; } })()}</code></pre>
+                      </div>
+                    {/if}
+                  </div>
+                </details>
+              {/if}
 
               <!-- Clean Spacing & Divider between items in infinite scroll -->
               <div class="feed-card-divider"></div>
@@ -605,5 +641,112 @@
     width: 100%;
     display: flex;
     justify-content: center;
+  }
+
+  /* Dev Debug Accordion Card on Feed */
+  .feed-dev-debug-accordion {
+    width: 100%;
+    margin-top: 8px;
+    background: rgba(18, 18, 26, 0.95);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    font-size: 11.5px;
+  }
+
+  .debug-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.04);
+    user-select: none;
+    transition: background 0.15s ease;
+  }
+
+  .debug-accordion-summary:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .debug-tag {
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    font-size: 9.5px;
+    font-weight: 800;
+  }
+
+  .debug-tag.is-late {
+    background: rgba(239, 68, 68, 0.25);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+  }
+
+  .debug-tag.is-ontime {
+    background: rgba(16, 185, 129, 0.25);
+    border: 1px solid #10b981;
+    color: #6ee7b7;
+  }
+
+  .debug-summary-title {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .debug-accordion-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .debug-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+
+  .debug-fields-grid .full-w {
+    grid-column: 1 / -1;
+  }
+
+  .field-k {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .field-v {
+    color: #38bdf8;
+  }
+
+  .debug-raw-json-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .raw-json-heading {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .raw-json-pre {
+    background: #09090d;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 </style>

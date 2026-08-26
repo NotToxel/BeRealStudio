@@ -425,6 +425,12 @@
                 dayNumberOverlay={String(dayNum)}
                 size="sm"
                 interactive={false}
+                isLate={primaryPost.isLate}
+                lateDuration={primaryPost.lateDuration}
+                lateExact={primaryPost.lateExact}
+                takenAt={primaryPost.takenAt}
+                rawJson={primaryPost.rawJson}
+                debugInfo={primaryPost.debugInfo}
               />
 
               <!-- Late indicator badge if isLate is true -->

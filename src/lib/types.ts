@@ -312,6 +312,8 @@ export interface ExplorerMemory {
   isVideo: boolean;
   width?: number;
   height?: number;
+  rawJson?: string;
+  debugInfo?: string;
 }
 
 export interface ExplorerData {
