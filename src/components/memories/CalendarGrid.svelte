@@ -792,6 +792,11 @@
     z-index: 5;
   }
 
+  .day-cell.has-memory:active {
+    transform: scale(0.96);
+    transition: transform 0.08s ease;
+  }
+
   .active-day-card {
     position: relative;
     width: 100%;

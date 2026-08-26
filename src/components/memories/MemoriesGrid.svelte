@@ -423,6 +423,11 @@
     z-index: 5;
   }
 
+  .grid-card-wrap:active {
+    transform: scale(0.96);
+    transition: transform 0.08s ease;
+  }
+
   .grid-card-wrap:focus-visible {
     box-shadow: 0 0 0 3px #38bdf8;
   }

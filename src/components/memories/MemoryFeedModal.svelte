@@ -189,7 +189,7 @@
 {#if $activeFeedMemory && currentMemory}
   <div
     class="feed-modal-backdrop"
-    transition:fade={{ duration: 180 }}
+    transition:fade={{ duration: 240, easing: cubicOut }}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -198,7 +198,8 @@
   >
     <div
       class="feed-modal-shell"
-      transition:scale={{ start: 0.94, duration: 220, opacity: 0, easing: cubicOut }}
+      in:scale={{ start: 0.88, duration: 280, opacity: 0, easing: cubicOut }}
+      out:scale={{ start: 0.94, duration: 200, opacity: 0, easing: cubicOut }}
       role="document"
     >
       <!-- Sticky Top Header -->
@@ -419,6 +420,19 @@
     width: 100%;
     max-width: 480px;
     box-sizing: border-box;
+    animation: feedCardReveal 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    will-change: transform, opacity;
+  }
+
+  @keyframes feedCardReveal {
+    0% {
+      opacity: 0.35;
+      transform: scale(0.96) translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
   }
 
   .feed-card-divider {
