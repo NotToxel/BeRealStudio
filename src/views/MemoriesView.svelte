@@ -301,9 +301,11 @@
   }
 
   .explorer-content-layout {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    width: 100%;
   }
 
   .active-view-frame {

@@ -44,9 +44,9 @@
 
 <style>
   .perspective-floating-pill {
-    position: fixed;
-    bottom: 24px;
-    left: 28px;
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
     display: inline-flex;
     align-items: center;
     background: rgba(14, 14, 22, 0.92);
