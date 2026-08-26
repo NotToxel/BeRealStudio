@@ -364,7 +364,10 @@ export interface MemoryHeaderSettings {
   locationFormat: 'city_country' | 'suburb_city_country' | 'suburb_city' | 'city_only' | 'full' | 'custom';
   customLocationText?: string;
   showTimeTag: boolean;
-  timeTagFormat: 'time_only' | 'date_only' | 'late_duration' | 'datetime' | 'custom';
+  timeTagFormat: 'time_only' | 'date_only' | 'late_duration' | 'datetime' | 'smart_progressive' | 'custom';
   customTimeTagText?: string;
+  showLateAddition: boolean;
+  showLatePillsInGrid: boolean;
+  showLatePillsInCalendar: boolean;
 }
 

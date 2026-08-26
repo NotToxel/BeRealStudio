@@ -2,6 +2,7 @@
   import { tick, onDestroy } from 'svelte';
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import type { ExplorerMemory } from '$lib/types';
   import {
     activeFeedMemory,
     closeFeed,
@@ -278,16 +279,14 @@
                         <span class="subtitle-bullet">•</span>
                       {/if}
                       {#if timeText}
-                        {#if memory.isLate}
-                          <span
-                            class="time-text is-late-time"
-                            title={memory.lateExact ? `${memory.lateExact} (${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (${memory.timeFormatted})` : 'Posted late')}
-                          >
-                            {timeText} <span class="late-tag-accent">({memory.lateDuration || 'Late'})</span>
-                          </span>
-                        {:else}
-                          <span class="time-text">{timeText}</span>
-                        {/if}
+                        <span
+                          class="time-text"
+                          title={memory.isLate
+                            ? (memory.lateExact ? `${memory.lateExact} (${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (${memory.timeFormatted})` : 'Posted late'))
+                            : `Taken at ${memory.timeFormatted}`}
+                        >
+                          {timeText}
+                        </span>
                       {/if}
                     </div>
                   {/if}
@@ -605,20 +604,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .is-late-time {
-    cursor: help;
-    transition: color 0.15s ease;
-  }
-
-  .is-late-time:hover {
-    color: #ffffff;
-  }
-
-  .late-tag-accent {
-    color: #f87171;
-    font-weight: 600;
   }
 
   .subtitle-bullet {

@@ -348,22 +348,25 @@ export async function loadMemories(path?: string): Promise<boolean> {
 }
 
 const mediaDataUrlCache = new Map<string, string>();
+const safeImageSrcCache = new Map<string, string>();
 
 /**
- * Resolve a local disk image path to a safe browser/Tauri file asset URL.
+ * Resolve a local disk image path to a safe browser/Tauri file asset URL with instant memoization.
  */
 export function getSafeImageSrc(filePath?: string): string {
   if (!filePath) return '';
   if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('data:')) {
     return filePath;
   }
+  if (safeImageSrcCache.has(filePath)) {
+    return safeImageSrcCache.get(filePath)!;
+  }
   if (mediaDataUrlCache.has(filePath)) {
     return mediaDataUrlCache.get(filePath)!;
   }
-  if (isTauri()) {
-    return convertFileSrc(filePath);
-  }
-  return filePath;
+  const result = isTauri() ? convertFileSrc(filePath) : filePath;
+  safeImageSrcCache.set(filePath, result);
+  return result;
 }
 
 /**
@@ -540,8 +543,11 @@ export const defaultMemoryHeaderSettings: MemoryHeaderSettings = {
   locationFormat: 'city_country',
   customLocationText: '',
   showTimeTag: true,
-  timeTagFormat: 'time_only',
+  timeTagFormat: 'late_duration',
   customTimeTagText: '',
+  showLateAddition: true,
+  showLatePillsInGrid: true,
+  showLatePillsInCalendar: true,
 };
 
 function loadMemoryHeaderSettings(): MemoryHeaderSettings {
@@ -653,17 +659,35 @@ export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHead
   if (!settings.showTimeTag) return '';
 
   if (settings.timeTagFormat === 'custom') {
-    return replaceTimeTagPlaceholders(settings.customTimeTagText?.trim() || '', memory);
+    let customFormatted = replaceTimeTagPlaceholders(settings.customTimeTagText?.trim() || '', memory);
+    if (settings.showLateAddition && memory.isLate && !customFormatted.includes(memory.lateDuration || 'Late')) {
+      const lateStr = memory.lateDuration || 'Late';
+      customFormatted = customFormatted ? `${customFormatted} • ${lateStr}` : lateStr;
+    }
+    return customFormatted;
   }
 
   const dateStr = formatShortDate(memory);
+  const timeFormatted = memory.timeFormatted || '12:00';
+  let baseTime = '';
 
-  if (settings.timeTagFormat === 'late_duration' && memory.lateDuration) {
-    return `${dateStr} • ${memory.lateDuration}`;
-  }
   if (settings.timeTagFormat === 'date_only') {
-    return dateStr;
+    baseTime = dateStr;
+  } else if (settings.timeTagFormat === 'time_only') {
+    baseTime = timeFormatted;
+  } else if (settings.timeTagFormat === 'datetime') {
+    baseTime = `${dateStr} • ${timeFormatted}`;
+  } else {
+    // Default / Smart Progressive ('late_duration' or 'smart_progressive'):
+    // Always shows the date and timestamp by default even if late
+    baseTime = `${dateStr} • ${timeFormatted}`;
   }
 
-  return `${dateStr} • ${memory.timeFormatted}`;
+  // Show how late you were as an addition separated by a dot if enabled, matching theme text
+  if (settings.showLateAddition && memory.isLate && (memory.lateDuration || memory.lateExact)) {
+    const lateStr = memory.lateDuration || 'Late';
+    return `${baseTime} • ${lateStr}`;
+  }
+
+  return baseTime;
 }

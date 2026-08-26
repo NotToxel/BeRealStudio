@@ -174,9 +174,10 @@ fn load_explorer_memories_inner(
         let memories_json_candidate = dest_dir.join("memories.json");
         let posts_json_candidate = dest_dir.join("posts.json");
 
-        // Extract archive files into cache
+        // Extract archive files into cache with high-throughput buffered streams
         let zip_file = File::open(input_path)?;
-        let mut archive = ZipArchive::new(zip_file)?;
+        let buffered_zip = BufReader::with_capacity(512 * 1024, zip_file);
+        let mut archive = ZipArchive::new(buffered_zip)?;
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)?;
@@ -191,8 +192,9 @@ fn load_explorer_memories_inner(
                     if let Some(parent) = out_path.parent() {
                         let _ = fs::create_dir_all(parent);
                     }
-                    if let Ok(mut out) = File::create(&out_path) {
-                        let _ = std::io::copy(&mut entry, &mut out);
+                    if let Ok(out) = File::create(&out_path) {
+                        let mut buffered_out = std::io::BufWriter::with_capacity(128 * 1024, out);
+                        let _ = std::io::copy(&mut entry, &mut buffered_out);
                     }
                 }
             }
@@ -429,13 +431,6 @@ fn load_explorer_memories_inner(
                 is_late, post.is_late, late_seconds, post.notification_at, post.taken_at
             );
 
-            if idx < 10 || is_late {
-                println!(
-                    "[EXPLORER_DEBUG] Post #{}: taken_at='{}' raw_is_late={:?} raw_late_sec={:?} notif_at={:?} => IS_LATE={} late_dur={:?}",
-                    idx, post.taken_at, post.is_late, post.late_in_seconds, post.notification_at, is_late, late_duration
-                );
-            }
-
             ExplorerMemory {
                 id: format!("bereal-{}", idx),
                 index: idx,
@@ -523,8 +518,9 @@ fn load_explorer_memories_inner(
 
     // Cache computed data to disk for instant sub-millisecond retrieval on next launch
     let cache_file = working_dir.join("explorer_cache.json");
-    if let Ok(serialized) = serde_json::to_string(&data) {
-        let _ = fs::write(cache_file, serialized);
+    if let Ok(file) = File::create(&cache_file) {
+        let mut writer = std::io::BufWriter::with_capacity(256 * 1024, file);
+        let _ = serde_json::to_writer(&mut writer, &data);
     }
 
     Ok(data)

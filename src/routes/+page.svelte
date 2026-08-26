@@ -107,31 +107,47 @@
 
 <svelte:window on:beforeunload={persistSettingsNow} />
 
-{#key $currentView}
-  <div class="view-transition-stage" in:fly={{ y: 6, duration: 220, easing: cubicOut }}>
-    {#if $currentView === 'home'}
-      <Home />
-    {:else if $currentView === 'toolkit-config'}
-      <ToolkitConfig />
-    {:else if $currentView === 'recapper-config'}
-      <RecapperConfig />
-    {:else if $currentView === 'memories'}
-      <MemoriesView />
-    {:else if $currentView === 'processing'}
-      <Processing />
-    {:else if $currentView === 'complete'}
-      <Complete />
-    {:else if $currentView === 'activity'}
-      <Activity />
-    {:else if $currentView === 'settings'}
-      <Settings />
-    {:else if $currentView === 'about'}
-      <About />
-    {/if}
-  </div>
-{/key}
+<!-- Retained Memories View (Kept alive in DOM for 0ms instantaneous tab switching) -->
+<div class="retained-view-stage" class:is-active={$currentView === 'memories'} aria-hidden={$currentView !== 'memories'}>
+  <MemoriesView />
+</div>
+
+<!-- Dynamic Views Stage (Home, Configs, Settings, Activity, About) -->
+{#if $currentView !== 'memories'}
+  {#key $currentView}
+    <div class="view-transition-stage" in:fly={{ y: 6, duration: 180, easing: cubicOut }}>
+      {#if $currentView === 'home'}
+        <Home />
+      {:else if $currentView === 'toolkit-config'}
+        <ToolkitConfig />
+      {:else if $currentView === 'recapper-config'}
+        <RecapperConfig />
+      {:else if $currentView === 'processing'}
+        <Processing />
+      {:else if $currentView === 'complete'}
+        <Complete />
+      {:else if $currentView === 'activity'}
+        <Activity />
+      {:else if $currentView === 'settings'}
+        <Settings />
+      {:else if $currentView === 'about'}
+        <About />
+      {/if}
+    </div>
+  {/key}
+{/if}
 
 <style>
+  .retained-view-stage {
+    width: 100%;
+    height: 100%;
+    display: none;
+  }
+
+  .retained-view-stage.is-active {
+    display: block;
+  }
+
   .view-transition-stage {
     width: 100%;
     height: 100%;

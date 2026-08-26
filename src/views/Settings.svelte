@@ -3,6 +3,7 @@
   import Modal from '$components/Modal.svelte';
   import Toggle from '$components/Toggle.svelte';
   import { APP_VERSION } from '$lib/version';
+  import { isDev } from '$lib/devMode';
   import {
     toolkitConfig,
     recapperConfig,
@@ -53,12 +54,16 @@
   import Copy from 'lucide-svelte/icons/copy';
   import Bug from 'lucide-svelte/icons/bug';
   import VolumeIcon from '$components/common/VolumeIcon.svelte';
+  import Images from 'lucide-svelte/icons/images';
+  import Calendar from 'lucide-svelte/icons/calendar';
   import {
     memoryHeaderSettings,
     globalAudioSettings,
     showMemoryDebugBadges,
     replaceLocationPlaceholders,
     replaceTimeTagPlaceholders,
+    formatMemoryLocation,
+    formatMemoryTimeTag,
   } from '$lib/memoriesStore';
   import type { ExplorerMemory } from '$lib/types';
 
@@ -648,12 +653,12 @@
       {/if}
     </div>
 
-    <!-- 3. Memories & Feed Display Settings -->
+    <!-- 4. Memories & Feed Display Settings -->
     <div class="card section-card">
       <div class="card-head">
         <div class="head-title">
           <Eye size={18} class="text-sky-400" />
-          <h2 class="title-sm">3. Memories &amp; Feed Header Customization</h2>
+          <h2 class="title-sm">4. Memories &amp; Feed Header Customization</h2>
         </div>
         <span class="badge badge-sky font-mono text-xs">Feed View</span>
       </div>
@@ -720,7 +725,7 @@
                   <input
                     type="text"
                     class="input custom-text-field"
-                    placeholder="e.g. {suburb}, {city} or {city}, {country}"
+                    placeholder="e.g. {'{suburb}'}, {'{city}'} or {'{city}'}, {'{country}'}"
                     bind:value={$memoryHeaderSettings.customLocationText}
                   />
                   <div class="placeholder-chips-row">
@@ -754,7 +759,7 @@
                 <input type="radio" name="timeFormat" value="late_duration" bind:group={$memoryHeaderSettings.timeTagFormat} />
                 <div class="choice-text">
                   <span class="choice-title">Smart Progressive (Recommended)</span>
-                  <span class="choice-sample">45m late • 26 Aug (Current year) / Full date (Past years)</span>
+                  <span class="choice-sample">26 Aug • 14:20 (or full date for past years)</span>
                 </div>
               </label>
 
@@ -795,7 +800,7 @@
                   <input
                     type="text"
                     class="input custom-text-field"
-                    placeholder="e.g. {late} • {date} or {time} • {date}"
+                    placeholder="e.g. {'{late}'} • {'{date}'} or {'{time}'} • {'{date}'}"
                     bind:value={$memoryHeaderSettings.customTimeTagText}
                   />
                   <div class="placeholder-chips-row">
@@ -814,6 +819,34 @@
         </div>
       </div>
 
+      <!-- Additional Late Tag & Pill Visibility Toggles -->
+      <div class="setting-item-box" style="margin-top: 16px;">
+        <h3 class="title-xs" style="margin-bottom: 10px; color: var(--text-main); font-weight: 600;">Late Submission Indicators</h3>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <Toggle
+            label="Append Late Duration in Post Header"
+            description="Display how late you were next to the timestamp (e.g. • 45m late) matching standard theme text"
+            icon={Clock}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLateAddition}
+          />
+          <Toggle
+            label="Show Late Pills on Memories Grid"
+            description="Display the late duration badge on memory thumbnail cards in the grid view"
+            icon={Images}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLatePillsInGrid}
+          />
+          <Toggle
+            label="Show Late Pills in Calendar View"
+            description="Display the late submission pill directly inside calendar day cells"
+            icon={Calendar}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLatePillsInCalendar}
+          />
+        </div>
+      </div>
+
       <!-- Live Header Preview -->
       <div class="header-live-preview-box">
         <span class="preview-box-label">LIVE HEADER PREVIEW</span>
@@ -826,19 +859,7 @@
             <div class="preview-subtitle">
               {#if $memoryHeaderSettings.showLocation}
                 <span class="preview-loc">
-                  {#if $memoryHeaderSettings.locationFormat === 'custom'}
-                    {replaceLocationPlaceholders($memoryHeaderSettings.customLocationText || '', samplePreviewMemory) || 'Custom Location'}
-                  {:else if $memoryHeaderSettings.locationFormat === 'city_country'}
-                    London, England
-                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city_country'}
-                    Soho, London, England
-                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city'}
-                    Soho, London
-                  {:else if $memoryHeaderSettings.locationFormat === 'city_only'}
-                    London
-                  {:else}
-                    London, England
-                  {/if}
+                  {formatMemoryLocation(samplePreviewMemory, $memoryHeaderSettings) || 'London, England'}
                 </span>
               {/if}
               {#if $memoryHeaderSettings.showLocation && $memoryHeaderSettings.showTimeTag}
@@ -846,17 +867,7 @@
               {/if}
               {#if $memoryHeaderSettings.showTimeTag}
                 <span class="preview-time">
-                  {#if $memoryHeaderSettings.timeTagFormat === 'custom'}
-                    {replaceTimeTagPlaceholders($memoryHeaderSettings.customTimeTagText || '', samplePreviewMemory) || 'Custom Subtitle'}
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
-                    45m late • 26 Aug
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'datetime'}
-                    26 Aug • 14:20
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'date_only'}
-                    26 Aug
-                  {:else}
-                    14:20
-                  {/if}
+                  {formatMemoryTimeTag(samplePreviewMemory, $memoryHeaderSettings) || '14:20'}
                 </span>
               {/if}
             </div>
@@ -865,11 +876,11 @@
       </div>
     </div>
 
-    <!-- 4. Memory Audio & Video Playback Settings Overhaul -->
+    <!-- 5. Memory Audio & Video Playback Settings Overhaul -->
     <div class="card section-card">
       <div class="head-title">
         <VolumeIcon size={18} className="text-sky-400" />
-        <h2 class="title-sm">4. Memory Audio &amp; Video Playback Defaults</h2>
+        <h2 class="title-sm">5. Memory Audio &amp; Video Playback Defaults</h2>
       </div>
 
       <p class="text-secondary text-desc">
@@ -938,7 +949,6 @@
                 min="0"
                 max="1"
                 step="0.01"
-                orient="vertical"
                 class="vertical-range-fader"
                 bind:value={$globalAudioSettings.volume}
                 aria-label="Master audio volume level"
@@ -1002,11 +1012,11 @@
       </div>
     </div>
 
-    <!-- 5. Local Storage & Privacy Management -->
+    <!-- 6. Local Storage & Privacy Management -->
     <div class="card section-card">
       <div class="head-title">
         <ShieldCheck size={18} class="text-emerald-400" />
-        <h2 class="title-sm">5. Local Storage &amp; Factory Reset</h2>
+        <h2 class="title-sm">6. Local Storage &amp; Factory Reset</h2>
       </div>
 
       <p class="text-secondary text-desc">
@@ -1026,29 +1036,31 @@
       </div>
     </div>
 
-    <!-- 6. Developer Tools & Diagnostics -->
-    <div class="card section-card">
-      <div class="head-title">
-        <Bug size={18} class="text-amber-400" />
-        <h2 class="title-sm">6. Developer Tools &amp; Metadata Inspector</h2>
-      </div>
+    {#if isDev}
+      <!-- 7. Developer Tools & Diagnostics (Dev Mode Only) -->
+      <div class="card section-card">
+        <div class="head-title">
+          <Bug size={18} class="text-amber-400" />
+          <h2 class="title-sm">7. Developer Tools &amp; Metadata Inspector</h2>
+        </div>
 
-      <p class="text-secondary text-desc">
-        Feature flags and advanced metadata inspection tools for troubleshooting and dataset analysis.
-      </p>
+        <p class="text-secondary text-desc">
+          Feature flags and advanced metadata inspection tools for troubleshooting and dataset analysis. (Only visible in development environment).
+        </p>
 
-      <div class="settings-grid-2col">
-        <div class="setting-item-box">
-          <Toggle
-            label="Memory Timing &amp; Metadata Inspector"
-            description="Display interactive badges on memory cards with live BeReal moment alerts, timing offsets, and JSON inspector tooltips"
-            icon={Bug}
-            accentColor="cyan"
-            bind:checked={$showMemoryDebugBadges}
-          />
+        <div class="settings-grid-2col">
+          <div class="setting-item-box">
+            <Toggle
+              label="Memory Timing &amp; Metadata Inspector"
+              description="Display interactive badges on memory cards with live BeReal moment alerts, timing offsets, and JSON inspector tooltips"
+              icon={Bug}
+              accentColor="cyan"
+              bind:checked={$showMemoryDebugBadges}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    {/if}
   </div>
 
   <Modal bind:open={showResetModal} title="Reset All Settings?" maxWidth="440px">

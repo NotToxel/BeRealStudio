@@ -12,6 +12,7 @@
     activeFilterCount,
     resetFilters,
     showMemoryDebugBadges,
+    memoryHeaderSettings,
   } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
@@ -409,7 +410,7 @@
               />
 
               <!-- Late indicator badge if isLate is true -->
-              {#if isLate}
+              {#if isLate && ($memoryHeaderSettings.showLatePillsInCalendar ?? true)}
                 <div class="day-late-badge" title={lateTooltip}>
                   <span>{primaryPost.lateDuration || 'Late'}</span>
                 </div>

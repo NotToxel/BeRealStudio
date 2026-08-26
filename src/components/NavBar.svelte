@@ -14,8 +14,6 @@
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Sparkles from 'lucide-svelte/icons/sparkles';
 
-  let showDevMenu = false;
-
   function navigate(mode: ViewMode) {
     currentView.set(mode);
   }
@@ -69,9 +67,10 @@
           class="core-nav-btn photos-btn"
           class:active={$currentView === 'toolkit-config'}
           on:click={() => navigate('toolkit-config')}
+          title="Photos Processing Suite"
         >
           <Images size={15} />
-          <span>Photos Suite</span>
+          <span class="core-btn-label">Photos<span class="core-btn-sub"> Suite</span></span>
         </button>
 
         <button
@@ -79,9 +78,10 @@
           class="core-nav-btn memories-btn"
           class:active={$currentView === 'memories'}
           on:click={() => navigate('memories')}
+          title="Memories Explorer"
         >
           <Calendar size={15} />
-          <span>Memories</span>
+          <span class="core-btn-label">Memories</span>
         </button>
 
         <button
@@ -89,9 +89,10 @@
           class="core-nav-btn recap-btn"
           class:active={$currentView === 'recapper-config'}
           on:click={() => navigate('recapper-config')}
+          title="Recap Video Generator"
         >
           <Film size={15} />
-          <span>Recap Video</span>
+          <span class="core-btn-label">Recap<span class="core-btn-sub"> Video</span></span>
         </button>
       </div>
     </div>
@@ -203,16 +204,19 @@
     position: sticky;
     top: 0;
     z-index: 100;
+    box-sizing: border-box;
   }
 
   .header-inner {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 8px 24px;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    padding: 6px 14px;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 16px;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
   }
 
   /* Zone 1: Left */
@@ -220,18 +224,21 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    flex-shrink: 0;
   }
 
   .brand-btn {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     background: transparent;
     border: none;
     cursor: pointer;
     padding: 4px 6px;
     border-radius: var(--radius-md);
     color: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: opacity var(--transition-fast);
   }
 
@@ -249,6 +256,7 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 0 10px rgba(255, 230, 0, 0.2);
+    flex-shrink: 0;
   }
 
   .logo-dot {
@@ -263,6 +271,7 @@
     display: flex;
     align-items: baseline;
     gap: 6px;
+    white-space: nowrap;
   }
 
   .brand-title {
@@ -270,12 +279,14 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--text-main);
+    white-space: nowrap;
   }
 
   .brand-ver {
     font-size: 9.5px;
     font-family: var(--font-mono);
     color: var(--text-muted);
+    white-space: nowrap;
   }
 
   /* Zone 2: Center - Prominent Core Workflows */
@@ -283,33 +294,42 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 1;
   }
 
   .primary-nav-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 3px;
     background: #111116;
     padding: 3px 4px;
     border-radius: var(--radius-full);
     border: 1px solid rgba(255, 255, 255, 0.07);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .core-nav-btn {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 6px 16px;
+    gap: 6px;
+    padding: 5px 13px;
     border-radius: var(--radius-full);
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--text-secondary);
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all var(--transition-fast);
+  }
+
+  .core-btn-label {
+    white-space: nowrap;
   }
 
   .core-nav-btn:hover:not(:disabled) {
@@ -343,19 +363,22 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 6px;
+    flex-shrink: 0;
   }
 
   .bg-queue-pill {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 10px;
+    gap: 6px;
+    padding: 4px 9px;
     background: rgba(245, 158, 11, 0.12);
     border: 1px solid rgba(245, 158, 11, 0.4);
     border-radius: var(--radius-full);
     color: #fbbf24;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all var(--transition-fast);
     animation: queuePulse 2s infinite ease-in-out;
   }
@@ -385,11 +408,16 @@
     gap: 5px;
     font-size: 11.5px;
     line-height: 1;
+    white-space: nowrap;
   }
 
   .queue-stage {
     font-weight: 500;
     color: #fef08a;
+    white-space: nowrap;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .queue-pct {
@@ -398,6 +426,7 @@
     background: rgba(0, 0, 0, 0.4);
     padding: 1px 4px;
     border-radius: 3px;
+    white-space: nowrap;
   }
 
   @keyframes queuePulse {
@@ -412,15 +441,16 @@
   .aux-nav-group {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     background: transparent;
+    flex-shrink: 0;
   }
 
   .aux-nav-item {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 10px;
+    padding: 5px 8px;
     border-radius: var(--radius-md);
     font-size: 12px;
     font-weight: 500;
@@ -428,6 +458,8 @@
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all var(--transition-fast);
   }
 
@@ -452,6 +484,17 @@
     font-weight: 700;
   }
 
+  /* Textual labels on Aux items are hidden by default to keep the bar compact & avoid clipping */
+  .aux-label {
+    display: none;
+  }
+
+  @media (min-width: 1320px) {
+    .aux-label {
+      display: inline;
+    }
+  }
+
   .core-nav-btn:disabled,
   .aux-nav-item:disabled,
   .brand-btn:disabled {
@@ -459,18 +502,41 @@
     cursor: not-allowed;
   }
 
-  @media (max-width: 768px) {
-    .header-inner {
-      grid-template-columns: auto 1fr auto;
-      padding: 8px 14px;
-    }
-
-    .aux-label {
+  @media (max-width: 1080px) {
+    .brand-ver {
       display: none;
     }
+  }
 
+  @media (max-width: 950px) {
+    .core-btn-sub {
+      display: none;
+    }
+    .header-inner {
+      padding: 6px 10px;
+    }
+  }
+
+  @media (max-width: 820px) {
     .brand-title {
       display: none;
+    }
+    .queue-stage {
+      display: none;
+    }
+    .core-nav-btn {
+      padding: 5px 9px;
+      font-size: 12px;
+      gap: 5px;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .core-btn-label {
+      display: none;
+    }
+    .core-nav-btn {
+      padding: 6px 8px;
     }
   }
 </style>

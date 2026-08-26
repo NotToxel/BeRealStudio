@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { getSafeImageSrc, getMediaDataUrl, globalPerspective, globalAudioSettings, showMemoryDebugBadges } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';

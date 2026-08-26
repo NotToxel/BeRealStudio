@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { filteredMemories, openFeedAt, openContextMenu } from '$lib/memoriesStore';
+  import { filteredMemories, openFeedAt, openContextMenu, memoryHeaderSettings } from '$lib/memoriesStore';
   import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import Images from 'lucide-svelte/icons/images';
@@ -51,10 +51,23 @@
     return groups;
   })();
 
+  let calcPositionsTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleCalculateMonthPositions() {
+    if (calcPositionsTimer) clearTimeout(calcPositionsTimer);
+    calcPositionsTimer = setTimeout(() => {
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(() => {
+          calculateMonthPositions();
+        });
+      } else {
+        calculateMonthPositions();
+      }
+    }, 60);
+  }
+
   $: if (monthGroups.length > 0) {
-    tick().then(() => {
-      calculateMonthPositions();
-    });
+    scheduleCalculateMonthPositions();
   }
 
   function handleMemoryClick(memory: ExplorerMemory) {
@@ -270,7 +283,7 @@
                   <div class="card-caption-strip">
                     <span class="card-date-text">{memory.dateFormatted}</span>
                     <div class="card-meta-right">
-                      {#if memory.isLate}
+                      {#if memory.isLate && ($memoryHeaderSettings.showLatePillsInGrid ?? true)}
                         <span
                           class="card-late-pill"
                           title={memory.lateExact ? `${memory.lateExact} (Posted ${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (Posted ${memory.timeFormatted})` : 'Posted late')}
@@ -375,6 +388,9 @@
     flex-direction: column;
     gap: 14px;
     width: 100%;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 380px;
+    contain: layout style;
   }
 
   /* BeReal Style Month Spacers / Divider */
@@ -421,6 +437,9 @@
     border-radius: 18px;
     transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
     outline: none;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+    contain: layout style paint;
   }
 
   .grid-card-wrap:hover {
