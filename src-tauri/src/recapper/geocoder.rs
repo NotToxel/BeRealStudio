@@ -43,6 +43,66 @@ pub struct GeoCity {
     pub admin1_code: String,
 }
 
+pub fn country_code_to_name(code: &str) -> &'static str {
+    match code.trim().to_uppercase().as_str() {
+        "GB" | "UK" => "United Kingdom",
+        "US" => "United States",
+        "RO" => "Romania",
+        "FR" => "France",
+        "DE" => "Germany",
+        "IT" => "Italy",
+        "ES" => "Spain",
+        "PT" => "Portugal",
+        "NL" => "Netherlands",
+        "BE" => "Belgium",
+        "CH" => "Switzerland",
+        "AT" => "Austria",
+        "SE" => "Sweden",
+        "NO" => "Norway",
+        "DK" => "Denmark",
+        "FI" => "Finland",
+        "PL" => "Poland",
+        "CZ" => "Czech Republic",
+        "HU" => "Hungary",
+        "GR" => "Greece",
+        "TR" => "Turkey",
+        "IE" => "Ireland",
+        "CA" => "Canada",
+        "AU" => "Australia",
+        "NZ" => "New Zealand",
+        "JP" => "Japan",
+        "KR" => "South Korea",
+        "CN" => "China",
+        "IN" => "India",
+        "BR" => "Brazil",
+        "MX" => "Mexico",
+        "AR" => "Argentina",
+        "CL" => "Chile",
+        "ZA" => "South Africa",
+        "EG" => "Egypt",
+        "AE" => "United Arab Emirates",
+        "SA" => "Saudi Arabia",
+        "SG" => "Singapore",
+        "TH" => "Thailand",
+        "VN" => "Vietnam",
+        "ID" => "Indonesia",
+        "MY" => "Malaysia",
+        "PH" => "Philippines",
+        "IL" => "Israel",
+        "HR" => "Croatia",
+        "BG" => "Bulgaria",
+        "RS" => "Serbia",
+        "UA" => "Ukraine",
+        "MD" => "Moldova",
+        "IS" => "Iceland",
+        "LU" => "Luxembourg",
+        "MC" => "Monaco",
+        "CY" => "Cyprus",
+        "MT" => "Malta",
+        _ => "",
+    }
+}
+
 pub struct SpatialGrid {
     // Key: (floor(lat) as i16, floor(lon) as i16) -> cities in that 1°x1° cell (~111km)
     pub bins: HashMap<(i16, i16), Vec<GeoCity>>,
@@ -51,16 +111,102 @@ pub struct SpatialGrid {
 
 impl SpatialGrid {
     pub fn new() -> Self {
-        Self {
+        let mut grid = Self {
             bins: HashMap::new(),
             total_count: 0,
-        }
+        };
+        grid.load_embedded_baseline();
+        grid
     }
 
     pub fn insert(&mut self, city: GeoCity) {
         let key = (city.lat.floor() as i16, city.lon.floor() as i16);
         self.bins.entry(key).or_default().push(city);
         self.total_count += 1;
+    }
+
+    fn load_embedded_baseline(&mut self) {
+        // Embedded baseline of major world cities & locations
+        let baseline: &[(&str, f64, f64, &str, &str)] = &[
+            // UK & Ireland
+            ("London", 51.5074, -0.1278, "GB", "ENG"),
+            ("Manchester", 53.4808, -2.2426, "GB", "ENG"),
+            ("Birmingham", 52.4862, -1.8904, "GB", "ENG"),
+            ("Edinburgh", 55.9533, -3.1883, "GB", "SCT"),
+            ("Glasgow", 55.8642, -4.2518, "GB", "SCT"),
+            ("Liverpool", 53.4084, -2.9916, "GB", "ENG"),
+            ("Bristol", 51.4545, -2.5879, "GB", "ENG"),
+            ("Oxford", 51.7520, -1.2577, "GB", "ENG"),
+            ("Cambridge", 52.2053, 0.1218, "GB", "ENG"),
+            ("Dublin", 53.3498, -6.2603, "IE", "L"),
+            // Romania
+            ("Constanța", 44.1792, 28.6498, "RO", "CT"),
+            ("Bucharest", 44.4268, 26.1025, "RO", "B"),
+            ("Cluj-Napoca", 46.7712, 23.6236, "RO", "CJ"),
+            ("Timișoara", 45.7537, 21.2257, "RO", "TM"),
+            ("Iași", 47.1585, 27.6014, "RO", "IS"),
+            ("Brașov", 45.6579, 25.6012, "RO", "BV"),
+            ("Sibiu", 45.7983, 24.1256, "RO", "SB"),
+            ("Mamaia", 44.2464, 28.6200, "RO", "CT"),
+            // Western Europe
+            ("Paris", 48.8566, 2.3522, "FR", "IDF"),
+            ("Marseille", 43.2965, 5.3698, "FR", "PAC"),
+            ("Lyon", 45.7640, 4.8357, "FR", "ARA"),
+            ("Nice", 43.7102, 7.2620, "FR", "PAC"),
+            ("Berlin", 52.5200, 13.4050, "DE", "BE"),
+            ("Munich", 48.1351, 11.5820, "DE", "BY"),
+            ("Frankfurt", 50.1109, 8.6821, "DE", "HE"),
+            ("Hamburg", 53.5511, 9.9937, "DE", "HH"),
+            ("Amsterdam", 52.3676, 4.9041, "NL", "NH"),
+            ("Rotterdam", 51.9244, 4.4777, "NL", "ZH"),
+            ("Brussels", 50.8503, 4.3517, "BE", "BRU"),
+            ("Vienna", 48.2082, 16.3738, "AT", "W"),
+            ("Zurich", 47.3769, 8.5417, "CH", "ZH"),
+            ("Geneva", 46.2044, 6.1432, "CH", "GE"),
+            ("Rome", 41.9028, 12.4964, "IT", "LAZ"),
+            ("Milan", 45.4642, 9.1900, "IT", "LOM"),
+            ("Venice", 45.4408, 12.3155, "IT", "VEN"),
+            ("Florence", 43.7696, 11.2558, "IT", "TOS"),
+            ("Madrid", 40.4168, -3.7038, "ES", "MD"),
+            ("Barcelona", 41.3879, 2.1699, "ES", "CT"),
+            ("Lisbon", 38.7223, -9.1393, "PT", "11"),
+            ("Porto", 41.1579, -8.6291, "PT", "13"),
+            ("Stockholm", 59.3293, 18.0686, "SE", "AB"),
+            ("Oslo", 59.9139, 10.7522, "NO", "03"),
+            ("Copenhagen", 55.6761, 12.5683, "DK", "84"),
+            ("Helsinki", 60.1699, 24.9384, "FI", "18"),
+            ("Athens", 37.9838, 23.7275, "GR", "I"),
+            ("Prague", 50.0755, 14.4378, "CZ", "52"),
+            ("Budapest", 47.4979, 19.0402, "HU", "BU"),
+            ("Warsaw", 52.2297, 21.0122, "PL", "14"),
+            // North America
+            ("New York", 40.7128, -74.0060, "US", "NY"),
+            ("Los Angeles", 34.0522, -118.2437, "US", "CA"),
+            ("Chicago", 41.8781, -87.6298, "US", "IL"),
+            ("San Francisco", 37.7749, -122.4194, "US", "CA"),
+            ("Miami", 25.7617, -80.1918, "US", "FL"),
+            ("Seattle", 47.6062, -122.3321, "US", "WA"),
+            ("Toronto", 43.6532, -79.3832, "CA", "ON"),
+            ("Vancouver", 49.2827, -123.1207, "CA", "BC"),
+            ("Montreal", 45.5017, -73.5673, "CA", "QC"),
+            // Asia & Oceania
+            ("Tokyo", 35.6762, 139.6503, "JP", "13"),
+            ("Seoul", 37.5665, 126.9780, "KR", "11"),
+            ("Singapore", 1.3521, 103.8198, "SG", "00"),
+            ("Sydney", -33.8688, 151.2093, "AU", "NSW"),
+            ("Melbourne", -37.8136, 144.9631, "AU", "VIC"),
+            ("Dubai", 25.2048, 55.2708, "AE", "DU"),
+        ];
+
+        for &(name, lat, lon, country_code, admin1_code) in baseline {
+            self.insert(GeoCity {
+                name: name.to_string(),
+                lat,
+                lon,
+                country_code: country_code.to_string(),
+                admin1_code: admin1_code.to_string(),
+            });
+        }
     }
 
     pub fn find_nearest(&self, lat: f64, lon: f64) -> Option<&GeoCity> {
@@ -526,17 +672,26 @@ fn geocode_offline(lat: f64, lon: f64, rules: &[LocationRule], app: Option<&AppH
     if needs_load {
         if let Some(app_handle) = app {
             let _ = load_spatial_grid(app_handle, None);
+        } else if let Ok(mut store) = spatial_grid_store().lock() {
+            if store.is_none() {
+                *store = Some(SpatialGrid::new());
+            }
         }
     }
 
     if let Ok(store) = spatial_grid_store().lock() {
         if let Some(ref grid) = *store {
             if let Some(city) = grid.find_nearest(lat, lon) {
+                let country_name = country_code_to_name(&city.country_code);
                 let geocoded = GeocodedAddress {
                     city: city.name.clone(),
                     suburb: String::new(),
                     state: city.admin1_code.clone(),
-                    country: String::new(),
+                    country: if !country_name.is_empty() {
+                        country_name.to_string()
+                    } else {
+                        city.country_code.clone()
+                    },
                     country_code: city.country_code.clone(),
                     road: String::new(),
                 };
@@ -545,17 +700,26 @@ fn geocode_offline(lat: f64, lon: f64, rules: &[LocationRule], app: Option<&AppH
         }
     }
 
-    // If offline DB not loaded, format coordinates directly as fallback instead of blocking on 1.1s HTTP rate-limit
-    log::warn!("Offline geocoding DB not available. Returning formatted coordinates.");
-    let geocoded = GeocodedAddress {
-        city: format!("{:.2}°, {:.2}°", lat, lon),
-        suburb: String::new(),
-        state: String::new(),
-        country: String::new(),
-        country_code: String::new(),
-        road: String::new(),
-    };
-    Ok(apply_rules(&geocoded, rules))
+    // Baseline grid fallback
+    let baseline_grid = SpatialGrid::new();
+    if let Some(city) = baseline_grid.find_nearest(lat, lon) {
+        let country_name = country_code_to_name(&city.country_code);
+        let geocoded = GeocodedAddress {
+            city: city.name.clone(),
+            suburb: String::new(),
+            state: city.admin1_code.clone(),
+            country: if !country_name.is_empty() {
+                country_name.to_string()
+            } else {
+                city.country_code.clone()
+            },
+            country_code: city.country_code.clone(),
+            road: String::new(),
+        };
+        return Ok(apply_rules(&geocoded, rules));
+    }
+
+    Ok(String::new())
 }
 
 fn first_non_empty(options: &[Option<&str>]) -> String {

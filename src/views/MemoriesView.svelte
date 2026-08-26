@@ -3,6 +3,7 @@
   import {
     explorerData,
     isLoadingMemories,
+    memoriesLoadProgress,
     memoriesLoadError,
     activeExplorerView,
     activeFeedMemory,
@@ -90,12 +91,26 @@
     </div>
   </div>
 
-  <!-- Loading State -->
+  <!-- Loading State with Progress Bar -->
   {#if $isLoadingMemories}
     <div class="loading-state-card card">
-      <Loader2 size={36} class="animate-spin text-amber-400" />
-      <h3 class="loading-title">Loading Your BeReal Memories...</h3>
-      <p class="loading-subtitle">Extracting media cache and resolving geocoded locations</p>
+      <div class="loading-content-box">
+        <div class="loading-spinner-row">
+          <Loader2 size={32} class="animate-spin text-amber-400" />
+          <div class="loading-text-group">
+            <h3 class="loading-title">Loading Your BeReal Memories...</h3>
+            <p class="loading-subtitle">{$memoriesLoadProgress.stage}</p>
+          </div>
+          <span class="loading-pct-badge font-mono">{$memoriesLoadProgress.percentage}%</span>
+        </div>
+
+        <div class="loading-track">
+          <div
+            class="loading-bar-fill"
+            style="width: {$memoriesLoadProgress.percentage}%;"
+          ></div>
+        </div>
+      </div>
     </div>
 
   <!-- Error / Missing Archive Card -->
@@ -340,22 +355,72 @@
 
   .loading-state-card {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 80px 20px;
-    text-align: center;
-    gap: 12px;
+    background: #111116;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-lg);
+  }
+
+  .loading-content-box {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .loading-spinner-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .loading-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
   }
 
   .loading-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #ffffff;
+    margin: 0;
   }
 
   .loading-subtitle {
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .loading-pct-badge {
+    font-size: 13px;
+    font-weight: 800;
+    color: #ffe600;
+    background: rgba(255, 230, 0, 0.12);
+    border: 1px solid rgba(255, 230, 0, 0.25);
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+  }
+
+  .loading-track {
+    width: 100%;
+    height: 7px;
+    background: #09090e;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .loading-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #ffe600);
+    border-radius: 999px;
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.5);
+    transition: width 0.22s ease-out;
   }
 </style>

@@ -123,32 +123,35 @@ where
 
     let mut frames_written = 0u64;
 
-    while let Some((img, duration)) = frame_generator()? {
-        let n_frames = (duration * fps as f64).round() as u64;
-        let raw_bytes = img.as_raw();
+    let write_result: Result<()> = (|| {
+        while let Some((img, duration)) = frame_generator()? {
+            let n_frames = (duration * fps as f64).round() as u64;
+            let raw_bytes = img.as_raw();
 
-        for _ in 0..n_frames {
-            if let Err(e) = writer.write_all(raw_bytes) {
-                // If FFmpeg exited early, drop writer and wait for output to extract actual FFmpeg error log
-                drop(writer);
-                if let Ok(out) = child.wait_with_output() {
-                    let err_tail = String::from_utf8_lossy(&out.stderr);
-                    let last_lines = err_tail.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
-                    anyhow::bail!("FFmpeg aborted early: {}\n{}", e, last_lines);
+            for _ in 0..n_frames {
+                if let Err(e) = writer.write_all(raw_bytes) {
+                    return Err(e).context("Failed to stream frame bytes to FFmpeg stdin");
                 }
-                return Err(e).context("Failed to stream frame bytes to FFmpeg stdin");
-            }
-            frames_written += 1;
+                frames_written += 1;
 
-            if total_expected_frames > 0 {
-                let pct = (frames_written as f32 / total_expected_frames as f32).min(1.0);
-                progress_cb(pct);
+                if total_expected_frames > 0 {
+                    let pct = (frames_written as f32 / total_expected_frames as f32).min(1.0);
+                    progress_cb(pct);
+                }
             }
         }
-    }
+        let _ = writer.flush();
+        Ok(())
+    })();
 
-    let _ = writer.flush();
+    // Explicitly drop writer to close stdin and signal EOF to FFmpeg
     drop(writer);
+
+    if let Err(stream_err) = write_result {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(stream_err);
+    }
 
     let output = child.wait_with_output().context("FFmpeg encoding process failed")?;
     if !output.status.success() {

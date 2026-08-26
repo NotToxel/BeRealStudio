@@ -15,6 +15,12 @@
   import Layers from 'lucide-svelte/icons/layers';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import FileText from 'lucide-svelte/icons/file-text';
+  import Eye from 'lucide-svelte/icons/eye';
+
   export let memory: ExplorerMemory;
 
   let isOpen = false;
@@ -40,6 +46,16 @@
     if (memory.primaryPath) {
       await revealInFolder(memory.primaryPath);
     }
+  }
+
+  function getFilenameFromPath(filePath?: string): string {
+    if (!filePath) return `${memory.takenAt.slice(0, 10)}_bereal.jpg`;
+    return filePath.split(/[/\\]/).pop() || `${memory.takenAt.slice(0, 10)}_bereal.jpg`;
+  }
+
+  async function handleQuickDownload() {
+    closeMenu();
+    await handleExport('combined_pip');
   }
 
   async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
@@ -73,7 +89,7 @@
         outputPath: savePath,
         exportType,
         format: 'Jpeg',
-        quality: 92,
+        quality: 95,
         embedExif: true,
         takenAt: memory.takenAt,
         latitude: memory.location?.latitude,
@@ -110,7 +126,7 @@
     class="menu-trigger-btn"
     class:active={isOpen}
     on:click={toggleMenu}
-    title="Memory actions & export options"
+    title="Memory options"
     aria-label="Memory options"
   >
     <MoreHorizontal size={18} />
@@ -118,51 +134,62 @@
 
   {#if isOpen}
     <div class="menu-popover" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
+      <!-- Official BeReal Primary Actions -->
       <div class="menu-section">
-        <span class="menu-header">Open &amp; Export</span>
+        <button type="button" class="menu-item primary-action" on:click={handleOpenExportDialog}>
+          <Share2 size={16} class="text-sky-400" />
+          <span>Share BeReal.</span>
+        </button>
+
+        <button type="button" class="menu-item" on:click={handleQuickDownload}>
+          <Download size={16} class="text-emerald-400" />
+          <span>Download</span>
+        </button>
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Filename')}>
+          <Copy size={16} class="text-indigo-400" />
+          <span>Copy Filename</span>
+        </button>
 
         {#if memory.primaryPath}
           <button type="button" class="menu-item" on:click={handleOpenExplorer}>
-            <FolderOpen size={14} class="text-sky-400" />
-            <span>Reveal in File Explorer</span>
+            <FolderOpen size={16} class="text-amber-400" />
+            <span>Show in Explorer</span>
           </button>
         {/if}
+      </div>
 
-        <button type="button" class="menu-item" on:click={handleOpenExportDialog}>
-          <SlidersHorizontal size={14} class="text-sky-400" />
-          <span>Export Options &amp; Settings...</span>
-        </button>
+      <div class="menu-divider"></div>
 
-        <button type="button" class="menu-item" on:click={() => handleExport('combined_pip')}>
-          <Layers size={14} class="text-amber-400" />
-          <span>Save Combined Photo (PIP)</span>
-        </button>
+      <!-- Secondary Camera & Media Exports -->
+      <div class="menu-section">
+        <span class="menu-header">Perspectives &amp; Motion</span>
 
         {#if memory.secondaryPath}
           <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
-            <Download size={14} class="text-purple-400" />
-            <span>Save Side-by-Side Photo</span>
+            <Layers size={15} class="text-purple-400" />
+            <span>Save Side-by-Side</span>
           </button>
 
           <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
-            <User size={14} class="text-cyan-400" />
-            <span>Save Front / Selfie Camera</span>
+            <User size={15} class="text-cyan-400" />
+            <span>Save Front Camera</span>
           </button>
         {/if}
 
         <button type="button" class="menu-item" on:click={() => handleExport('primary_only')}>
-          <Camera size={14} class="text-emerald-400" />
+          <Camera size={15} class="text-emerald-400" />
           <span>Save Main Camera</span>
         </button>
 
         {#if memory.btsPath}
           <button type="button" class="menu-item" on:click={() => handleExport('bts_only')}>
-            <Film size={14} class="text-amber-400" />
+            <Film size={15} class="text-amber-400" />
             <span>Save BTS Video (.mp4)</span>
           </button>
 
           <button type="button" class="menu-item" on:click={() => handleExport('motion_photo')}>
-            <Sparkles size={14} class="text-emerald-400" />
+            <Sparkles size={15} class="text-emerald-400" />
             <span>Save Motion Photo (Live)</span>
           </button>
         {/if}
@@ -170,35 +197,41 @@
 
       <div class="menu-divider"></div>
 
+      <!-- Copy Details & Coordinates -->
       <div class="menu-section">
-        <span class="menu-header">Copy Details</span>
+        <span class="menu-header">Copy Info</span>
 
         {#if memory.caption}
           <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
-            <Copy size={14} />
+            <FileText size={15} class="text-yellow-400" />
             <span>Copy Caption</span>
           </button>
         {/if}
 
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Date')}>
-          <Copy size={14} />
-          <span>Copy Timestamp ({memory.dateFormatted})</span>
-        </button>
-
-        {#if memory.location}
+        {#if memory.locationName || memory.location}
           <button
             type="button"
             class="menu-item"
             on:click={() =>
               copyToClipboard(
-                `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
-                'GPS'
+                memory.locationName || `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
+                'Location'
               )}
           >
-            <Copy size={14} />
-            <span>Copy GPS Coordinates</span>
+            <MapPin size={15} class="text-rose-400" />
+            <span>Copy Location</span>
           </button>
         {/if}
+      </div>
+
+      <div class="menu-divider"></div>
+
+      <!-- Delete / Hide Danger Action (Red text matching BeReal app) -->
+      <div class="menu-section">
+        <button type="button" class="menu-item danger-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Deleted item ref')}>
+          <Trash2 size={16} class="text-rose-500" />
+          <span>Delete my BeReal.</span>
+        </button>
       </div>
     </div>
   {/if}
@@ -299,6 +332,16 @@
     color: #ffffff;
   }
 
+  .menu-item.danger-item {
+    color: #f87171;
+    font-weight: 600;
+  }
+
+  .menu-item.danger-item:hover {
+    background: rgba(244, 63, 94, 0.15);
+    color: #fb7185;
+  }
+
   .menu-divider {
     height: 1px;
     background: var(--border-subtle);
@@ -307,19 +350,20 @@
 
   .toast-indicator {
     position: absolute;
-    bottom: calc(100% + 8px);
+    top: calc(100% + 8px);
     right: 0;
+    z-index: 250;
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     background: #059669;
     color: #ffffff;
     border-radius: var(--radius-full);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
     animation: popoverIn 0.15s ease-out;
   }
 </style>

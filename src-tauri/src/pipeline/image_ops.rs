@@ -4,13 +4,6 @@ use std::path::Path;
 
 use crate::pipeline::types::OutputFormat;
 
-// PIP constants (matching the Python script values)
-const PIP_SCALE: f32 = 1.0 / 3.333_333;
-const PIP_CORNER_RADIUS: u32 = 60;
-const PIP_OUTLINE_SIZE: u32 = 7;
-const PIP_POSITION_X: u32 = 55;
-const PIP_POSITION_Y: u32 = 55;
-
 /// Convert an image file from its source format to the target format.
 pub fn convert_image(
     input: &Path,
@@ -61,7 +54,7 @@ pub fn copy_image(input: &Path, output: &Path, format: &OutputFormat, quality: u
 }
 
 /// Create a Picture-in-Picture composite: secondary camera overlaid on primary.
-/// Matches the Python script's combine_images() function exactly.
+/// Matches official BeReal aspect ratio, corner continuous radius, and positioning.
 pub fn combine_pip(primary_path: &Path, secondary_path: &Path) -> Result<DynamicImage> {
     let primary = image::open(primary_path)
         .with_context(|| format!("Failed to open primary: {}", primary_path.display()))?;
@@ -78,45 +71,62 @@ pub fn combine_pip(primary_path: &Path, secondary_path: &Path) -> Result<Dynamic
         anyhow::bail!("Secondary image has invalid zero dimensions: {}x{}", sw, sh);
     }
 
-    // Scale secondary down to 1/3.333
-    let new_sw = ((sw as f32 * PIP_SCALE) as u32).max(1);
-    let new_sh = ((sh as f32 * PIP_SCALE) as u32).max(1);
+    // 100% exact pixel parity ratios matching official BeReal layout
+    let outer_w = ((pw as f32 * 0.304688).round() as u32).max(1);
+    let outer_h = ((outer_w as f32 * (4.0 / 3.0)).round() as u32).max(1);
+    let outline_size = ((pw as f32 * 0.005208).round() as u32).max(4);
+    let outer_radius = ((outer_w as f32 * 0.1624).round() as u32).max(8);
+    let pos_x = ((pw as f32 * 0.037760).round() as u32).max(8);
+    let pos_y = ((pw as f32 * 0.037760).round() as u32).max(8);
+
+    let inner_w = outer_w.saturating_sub(outline_size * 2).max(1);
+    let inner_h = outer_h.saturating_sub(outline_size * 2).max(1);
+    let inner_radius = outer_radius.saturating_sub(outline_size).max(4);
+    let inner_x = pos_x + outline_size;
+    let inner_y = pos_y + outline_size;
+
     let secondary_resized = secondary
-        .resize_exact(new_sw, new_sh, image::imageops::FilterType::Triangle)
+        .resize_exact(inner_w, inner_h, image::imageops::FilterType::Lanczos3)
         .to_rgba8();
 
-    // Create rounded mask for secondary
-    let mask = create_rounded_mask(new_sw, new_sh, PIP_CORNER_RADIUS);
+    // Create anti-aliased rounded mask for secondary inner content
+    let mask = create_rounded_mask(inner_w, inner_h, inner_radius);
 
     // Start with primary as base canvas
     let mut canvas = primary.to_rgba8();
 
-    // Draw black outline (rounded rect) behind the secondary
-    let ol = PIP_OUTLINE_SIZE;
-    let ox = PIP_POSITION_X.saturating_sub(ol);
-    let oy = PIP_POSITION_Y.saturating_sub(ol);
+    // Draw smooth black outline (rounded rect) containing the secondary
     draw_rounded_rect_filled(
         &mut canvas,
-        ox,
-        oy,
-        new_sw + ol * 2,
-        new_sh + ol * 2,
-        PIP_CORNER_RADIUS + ol,
+        pos_x,
+        pos_y,
+        outer_w,
+        outer_h,
+        outer_radius,
         Rgba([0, 0, 0, 255]),
     );
 
-    // Composite secondary (with rounded mask) onto canvas at position
-    for y in 0..new_sh {
-        for x in 0..new_sw {
-            let mask_px = mask.get_pixel(x, y)[0];
-            if mask_px == 0 {
+    // Alpha-blend composite secondary onto canvas
+    for y in 0..inner_h {
+        for x in 0..inner_w {
+            let mask_alpha = mask.get_pixel(x, y)[0] as f32 / 255.0;
+            if mask_alpha <= 0.001 {
                 continue;
             }
             let src = secondary_resized.get_pixel(x, y);
-            let cx = PIP_POSITION_X + x;
-            let cy = PIP_POSITION_Y + y;
+            let cx = inner_x + x;
+            let cy = inner_y + y;
             if cx < pw && cy < ph {
-                canvas.put_pixel(cx, cy, *src);
+                if mask_alpha >= 0.999 {
+                    canvas.put_pixel(cx, cy, *src);
+                } else {
+                    let dst = canvas.get_pixel(cx, cy);
+                    let inv = 1.0 - mask_alpha;
+                    let r = (src[0] as f32 * mask_alpha + dst[0] as f32 * inv).round() as u8;
+                    let g = (src[1] as f32 * mask_alpha + dst[1] as f32 * inv).round() as u8;
+                    let b = (src[2] as f32 * mask_alpha + dst[2] as f32 * inv).round() as u8;
+                    canvas.put_pixel(cx, cy, Rgba([r, g, b, 255]));
+                }
             }
         }
     }
@@ -145,7 +155,7 @@ pub fn combine_side_by_side(primary_path: &Path, secondary_path: &Path) -> Resul
     // Scale secondary to same height as primary
     let new_sw = (sw.saturating_mul(target_h) / sh.max(1)).max(1);
     let secondary_resized = secondary
-        .resize_exact(new_sw, target_h, image::imageops::FilterType::Triangle)
+        .resize_exact(new_sw, target_h, image::imageops::FilterType::Lanczos3)
         .to_rgb8();
     let primary_rgb = primary.to_rgb8();
 
@@ -158,50 +168,55 @@ pub fn combine_side_by_side(primary_path: &Path, secondary_path: &Path) -> Resul
     Ok(DynamicImage::ImageRgb8(canvas))
 }
 
-/// Create an L-channel (grayscale) alpha mask with rounded corners.
+/// Create an anti-aliased L-channel alpha mask with continuous rounded corners.
 fn create_rounded_mask(w: u32, h: u32, radius: u32) -> image::GrayImage {
     let mut mask = image::GrayImage::new(w, h);
     let r = (radius.min(w / 2).min(h / 2)) as f64;
-    let r_sq = r * r;
     let wf = w as f64;
     let hf = h as f64;
 
     for y in 0..h {
-        let yf = y as f64;
+        let yf = y as f64 + 0.5;
         for x in 0..w {
-            let xf = x as f64;
-            // Check top-left corner
-            let outside = if xf < r && yf < r {
-                let dx = xf - r;
-                let dy = yf - r;
-                dx * dx + dy * dy > r_sq
-            } else if xf >= wf - r && yf < r {
-                // Top-right corner
-                let dx = xf - (wf - 1.0 - r);
-                let dy = yf - r;
-                dx * dx + dy * dy > r_sq
-            } else if xf < r && yf >= hf - r {
-                // Bottom-left corner
-                let dx = xf - r;
-                let dy = yf - (hf - 1.0 - r);
-                dx * dx + dy * dy > r_sq
-            } else if xf >= wf - r && yf >= hf - r {
-                // Bottom-right corner
-                let dx = xf - (wf - 1.0 - r);
-                let dy = yf - (hf - 1.0 - r);
-                dx * dx + dy * dy > r_sq
+            let xf = x as f64 + 0.5;
+
+            let dist = if xf < r && yf < r {
+                let dx = r - xf;
+                let dy = r - yf;
+                (dx * dx + dy * dy).sqrt()
+            } else if xf > wf - r && yf < r {
+                let dx = xf - (wf - r);
+                let dy = r - yf;
+                (dx * dx + dy * dy).sqrt()
+            } else if xf < r && yf > hf - r {
+                let dx = r - xf;
+                let dy = yf - (hf - r);
+                (dx * dx + dy * dy).sqrt()
+            } else if xf > wf - r && yf > hf - r {
+                let dx = xf - (wf - r);
+                let dy = yf - (hf - r);
+                (dx * dx + dy * dy).sqrt()
             } else {
-                false
+                0.0
             };
 
-            let val = if outside { 0u8 } else { 255u8 };
-            mask.put_pixel(x, y, image::Luma([val]));
+            let alpha = if dist <= 0.0 {
+                255u8
+            } else if dist <= r - 0.5 {
+                255u8
+            } else if dist >= r + 0.5 {
+                0u8
+            } else {
+                ((r + 0.5 - dist) * 255.0).clamp(0.0, 255.0).round() as u8
+            };
+
+            mask.put_pixel(x, y, image::Luma([alpha]));
         }
     }
     mask
 }
 
-/// Draw a filled rounded rectangle on an RGBA canvas.
+/// Draw a filled anti-aliased rounded rectangle on an RGBA canvas.
 fn draw_rounded_rect_filled(
     img: &mut RgbaImage,
     x: u32,
@@ -217,11 +232,21 @@ fn draw_rounded_rect_filled(
 
     for my in 0..h {
         for mx in 0..w {
-            if mask.get_pixel(mx, my)[0] > 0 {
+            let alpha = mask.get_pixel(mx, my)[0] as f32 / 255.0;
+            if alpha > 0.0 {
                 let target_x = x + mx;
                 let target_y = y + my;
                 if target_x < img_w && target_y < img_h {
-                    img.put_pixel(target_x, target_y, color);
+                    if alpha >= 0.999 {
+                        img.put_pixel(target_x, target_y, color);
+                    } else {
+                        let dst = img.get_pixel(target_x, target_y);
+                        let inv = 1.0 - alpha;
+                        let r = (color[0] as f32 * alpha + dst[0] as f32 * inv).round() as u8;
+                        let g = (color[1] as f32 * alpha + dst[1] as f32 * inv).round() as u8;
+                        let b = (color[2] as f32 * alpha + dst[2] as f32 * inv).round() as u8;
+                        img.put_pixel(target_x, target_y, Rgba([r, g, b, 255]));
+                    }
                 }
             }
         }

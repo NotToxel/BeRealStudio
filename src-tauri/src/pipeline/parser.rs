@@ -223,7 +223,7 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
                     let entry_name = entry.name();
                     if entry_name.ends_with(filename)
                         || entry_name.eq_ignore_ascii_case(filename)
-                        || (clean_tp.is_some() && entry_name.ends_with(clean_tp.unwrap()))
+                        || clean_tp.map(|tp| entry_name.ends_with(tp)).unwrap_or(false)
                     {
                         found_pic_entry = Some(entry_name.to_string());
                         break;

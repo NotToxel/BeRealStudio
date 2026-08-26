@@ -12,6 +12,7 @@ import type {
   OfflineGeoDbStatus,
   DownloadProgressEvent,
   ActivityRecord,
+  HardwareAccelerationInfo,
 } from './types';
 
 // Default configurations
@@ -362,3 +363,7 @@ export function clearActivityHistory() {
 export function deleteActivityRecord(id: string) {
   activityHistory.update((list) => list.filter((item) => item.id !== id));
 }
+
+// ─── Hardware Acceleration & System Tool Stores ──────────────────────────────
+export const hwInfoStore = writable<HardwareAccelerationInfo | null>(null);
+export const exiftoolStore = writable<{ path: string | null; checked: boolean }>({ path: null, checked: false });

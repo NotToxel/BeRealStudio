@@ -3,9 +3,14 @@
     explorerData,
     calendarCurrentMonth,
     memoriesByDate,
+    rawMemoriesByDate,
     openFeedAt,
     openContextMenu,
     activeExplorerView,
+    activeFeedMemory,
+    explorerFilterCounts,
+    activeFilterCount,
+    resetFilters,
   } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
@@ -21,9 +26,9 @@
   let isPickerOpen = false;
 
   // Parse active month key "YYYY-MM"
-  $: yearMonth = $calendarCurrentMonth || ($explorerData?.uniqueMonths[0] ?? '2024-08');
-  $: currentYear = parseInt(yearMonth.slice(0, 4), 10);
-  $: currentMonthNum = parseInt(yearMonth.slice(5, 7), 10); // 1-12
+  $: yearMonth = $calendarCurrentMonth || ($explorerData?.uniqueMonths && $explorerData.uniqueMonths.length > 0 ? $explorerData.uniqueMonths[$explorerData.uniqueMonths.length - 1] : '2024-08');
+  $: currentYear = parseInt(yearMonth.slice(0, 4), 10) || new Date().getFullYear();
+  $: currentMonthNum = parseInt(yearMonth.slice(5, 7), 10) || (new Date().getMonth() + 1); // 1-12
 
   // Selected year inside picker popover
   let pickerYear = 2024;
@@ -56,6 +61,66 @@
   $: hasPrevMonth = currentMonthIdx > 0;
   $: hasNextMonth = currentMonthIdx < availableMonths.length - 1;
 
+  $: activeFilters = $activeFilterCount;
+  $: isFiltering = activeFilters > 0;
+
+  // All dates with matching memories across the entire archive sorted chronologically
+  $: allMatchingDates = (() => {
+    const dates: string[] = [];
+    for (const [dateStr, posts] of $memoriesByDate.entries()) {
+      if (posts.length > 0) {
+        dates.push(dateStr);
+      }
+    }
+    dates.sort();
+    return dates;
+  })();
+
+  let focusedMatchingDate: string | null = null;
+  let focusedDateTimer: any = null;
+
+  function jumpToNextMatchingPost() {
+    if (allMatchingDates.length === 0) return;
+    const currentRef = focusedMatchingDate || `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-01`;
+    const nextDates = allMatchingDates.filter((d) => d > currentRef);
+    const targetDate = nextDates.length > 0 ? nextDates[0] : allMatchingDates[0];
+    jumpToSpecificDate(targetDate);
+  }
+
+  function jumpToPrevMatchingPost() {
+    if (allMatchingDates.length === 0) return;
+    const currentRef = focusedMatchingDate || `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-31`;
+    const prevDates = allMatchingDates.filter((d) => d < currentRef);
+    const targetDate = prevDates.length > 0 ? prevDates[prevDates.length - 1] : allMatchingDates[allMatchingDates.length - 1];
+    jumpToSpecificDate(targetDate);
+  }
+
+  function jumpToSpecificDate(targetDate: string) {
+    const targetMonth = targetDate.slice(0, 7);
+    if (targetMonth !== yearMonth) {
+      calendarCurrentMonth.set(targetMonth);
+    }
+    focusedMatchingDate = targetDate;
+    clearTimeout(focusedDateTimer);
+    focusedDateTimer = setTimeout(() => {
+      focusedMatchingDate = null;
+    }, 3200);
+  }
+
+  // Month matching statistics
+  $: monthStats = (() => {
+    let totalInMonth = 0;
+    let matchInMonth = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const raw = $rawMemoriesByDate.get(dStr) || [];
+      const match = $memoriesByDate.get(dStr) || [];
+      if (raw.length > 0) totalInMonth += raw.length;
+      if (match.length > 0) matchInMonth += match.length;
+    }
+    return { total: totalInMonth, matches: matchInMonth };
+  })();
+
   function prevMonth() {
     if (hasPrevMonth) {
       calendarCurrentMonth.set(availableMonths[currentMonthIdx - 1]);
@@ -86,28 +151,36 @@
     const posts = $memoriesByDate.get(dateStr);
     if (posts && posts.length > 0) {
       openFeedAt(posts[0]);
+    } else {
+      const raw = $rawMemoriesByDate.get(dateStr);
+      if (raw && raw.length > 0) {
+        openFeedAt(raw[0]);
+      }
     }
   }
 
-  let scrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  function handleKeydown(e: KeyboardEvent) {
+    if ($activeFeedMemory) return;
+    const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
-  function handleWheel(e: WheelEvent) {
-    if (isPickerOpen) return;
-    if (Math.abs(e.deltaY) > 20) {
-      if (scrollDebounceTimer) return;
-      if (e.deltaY > 0) {
-        if (hasNextMonth) nextMonth();
-      } else {
-        if (hasPrevMonth) prevMonth();
+    if (e.key === 'ArrowLeft') {
+      if (hasPrevMonth) {
+        e.preventDefault();
+        prevMonth();
       }
-      scrollDebounceTimer = setTimeout(() => {
-        scrollDebounceTimer = null;
-      }, 240);
+    } else if (e.key === 'ArrowRight') {
+      if (hasNextMonth) {
+        e.preventDefault();
+        nextMonth();
+      }
     }
   }
 </script>
 
-<div class="calendar-view-container" on:wheel={handleWheel}>
+<svelte:window on:keydown={handleKeydown} />
+
+<div class="calendar-view-container">
   <!-- Month Switcher Header with Centered Nav Cluster -->
   <div class="calendar-header-bar">
     <div class="calendar-nav-cluster">
@@ -164,6 +237,7 @@
                 {@const mKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`}
                 {@const isCurrent = mKey === yearMonth}
                 {@const hasData = availableMonths.includes(mKey)}
+                {@const cnt = $explorerFilterCounts?.byMonth.get(mKey) || 0}
 
                 <button
                   type="button"
@@ -171,9 +245,12 @@
                   class:is-selected={isCurrent}
                   class:has-memories={hasData}
                   on:click={() => selectMonthFromPicker(mIdx)}
+                  title="{mName} {pickerYear}: {cnt} BeReals"
                 >
-                  <span>{mName}</span>
-                  {#if hasData}
+                  <span class="month-name-text">{mName}</span>
+                  {#if cnt > 0}
+                    <span class="month-count-tag">{cnt}</span>
+                  {:else if hasData}
                     <span class="month-data-dot"></span>
                   {/if}
                 </button>
@@ -199,17 +276,64 @@
         class="month-nav-btn next-btn"
         disabled={!hasNextMonth}
         on:click={nextMonth}
-        title="Next Month (or scroll down)"
+        title="Next Month (Right arrow)"
         aria-label="Next month"
       >
         <ChevronRight size={16} />
       </button>
     </div>
 
-    <!-- Scroll Hint Badge -->
-    <div class="scroll-hint-tag" title="Use mouse wheel or trackpad to flip between months">
-      <span>Scroll to flip months</span>
-    </div>
+    <!-- Right Side: Filter Quick Control Panel or Key Hint -->
+    {#if isFiltering}
+      <div class="calendar-filter-control-panel">
+        <div class="filter-panel-meta">
+          <span class="filter-sparkle">✦</span>
+          <span class="filter-stats-text">
+            <strong>{allMatchingDates.length}</strong> matching {allMatchingDates.length === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+
+        <div class="filter-nav-btn-group">
+          <button
+            type="button"
+            class="filter-step-btn"
+            disabled={allMatchingDates.length <= 1}
+            on:click={jumpToPrevMatchingPost}
+            title="Jump to Previous Matching BeReal"
+            aria-label="Previous matching post"
+          >
+            <ChevronLeft size={12} />
+            <span>Prev</span>
+          </button>
+
+          <button
+            type="button"
+            class="filter-step-btn next-step-btn"
+            disabled={allMatchingDates.length <= 1}
+            on:click={jumpToNextMatchingPost}
+            title="Jump to Next Matching BeReal"
+            aria-label="Next matching post"
+          >
+            <span>Next</span>
+            <ChevronRight size={12} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="filter-clear-pill-btn"
+          on:click={resetFilters}
+          title="Reset all filters"
+        >
+          Reset
+        </button>
+      </div>
+    {:else}
+      <!-- Arrow Keys Navigation Hint Badge -->
+      <div class="scroll-hint-tag" title="Use Left / Right arrow keys to change months">
+        <span>← / → to flip months</span>
+      </div>
+    {/if}
   </div>
 
   <!-- Weekday Headers -->
@@ -221,60 +345,82 @@
     {/each}
   </div>
 
-  <!-- Calendar Days Grid -->
-  <div class="days-matrix-grid">
-    <!-- Empty offset cells before 1st of month -->
-    {#each Array(startDayOffset) as _, i}
-      <div class="day-cell empty-offset-cell"></div>
-    {/each}
+  <!-- Calendar Days Grid (Smooth transitions on filter toggles) -->
+  {#key yearMonth}
+    <div class="days-matrix-grid month-fade-in">
+      <!-- Empty offset cells before 1st of month -->
+      {#each Array(startDayOffset) as _, i}
+        <div class="day-cell empty-offset-cell"></div>
+      {/each}
 
-    <!-- Actual month days -->
-    {#each Array(daysInMonth) as _, i}
-      {@const dayNum = i + 1}
-      {@const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`}
-      {@const dayPosts = $memoriesByDate.get(dateStr) || []}
-      {@const hasPost = dayPosts.length > 0}
-      {@const primaryPost = hasPost ? dayPosts[0] : null}
-      {@const isOnTime = hasPost && primaryPost ? !primaryPost.isLate : false}
+      <!-- Actual month days -->
+      {#each Array(daysInMonth) as _, i}
+        {@const dayNum = i + 1}
+        {@const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`}
+        {@const rawPosts = $rawMemoriesByDate.get(dateStr) || []}
+        {@const dayPosts = $memoriesByDate.get(dateStr) || []}
+        {@const hasRawPost = rawPosts.length > 0}
+        {@const hasMatchingPost = dayPosts.length > 0}
+        {@const isFilteredOut = isFiltering && hasRawPost && !hasMatchingPost}
+        {@const isFilterMatch = isFiltering && hasMatchingPost}
+        {@const isFocusedMatch = focusedMatchingDate === dateStr}
+        {@const primaryPost = hasMatchingPost ? dayPosts[0] : (hasRawPost ? rawPosts[0] : null)}
+        {@const isOnTime = hasMatchingPost && primaryPost ? !primaryPost.isLate : false}
 
-      <div
-        class="day-cell"
-        class:has-memory={hasPost}
-        class:is-on-time={isOnTime}
-        role="button"
-        tabindex={hasPost ? 0 : -1}
-        on:click={() => hasPost && handleDayClick(dayNum)}
-        on:contextmenu={(e) => hasPost && primaryPost && openContextMenu(e, primaryPost)}
-        on:keydown={(e) => hasPost && (e.key === 'Enter' || e.key === ' ') && handleDayClick(dayNum)}
-      >
-        {#if hasPost && primaryPost}
-          <div class="active-day-card">
-            <DualCameraFrame
-              primarySrc={primaryPost.primaryPath}
-              secondarySrc={primaryPost.secondaryPath}
-              btsSrc={primaryPost.btsPath}
-              isVideo={primaryPost.isVideo}
-              alt="BeReal {primaryPost.dateFormatted}"
-              dayNumberOverlay={String(dayNum)}
-              size="sm"
-              interactive={false}
-            />
+        <div
+          class="day-cell"
+          class:has-memory={hasRawPost}
+          class:is-on-time={isOnTime}
+          class:is-filtered-out={isFilteredOut}
+          class:is-filter-match={isFilterMatch}
+          class:is-focused-match={isFocusedMatch}
+          role="button"
+          tabindex={hasRawPost ? 0 : -1}
+          on:click={() => hasRawPost && handleDayClick(dayNum)}
+          on:contextmenu={(e) => hasRawPost && primaryPost && openContextMenu(e, primaryPost)}
+          on:keydown={(e) => hasRawPost && (e.key === 'Enter' || e.key === ' ') && handleDayClick(dayNum)}
+          title={isFilteredOut ? `Excluded by filters (${rawPosts.length} BeReal)` : (isFilterMatch ? `Matches filter (${dayPosts.length} BeReal)` : '')}
+        >
+          {#if hasRawPost && primaryPost}
+            <div class="active-day-card">
+              <DualCameraFrame
+                primarySrc={primaryPost.primaryPath}
+                secondarySrc={primaryPost.secondaryPath}
+                btsSrc={primaryPost.btsPath}
+                isVideo={primaryPost.isVideo}
+                alt="BeReal {primaryPost.dateFormatted}"
+                dayNumberOverlay={String(dayNum)}
+                size="sm"
+                interactive={false}
+              />
 
-            <!-- Top-right corner BeReal count badge (white background, black text) -->
-            {#if dayPosts.length > 1}
-              <div class="day-count-badge" title="{dayPosts.length} BeReals on this day">
-                {dayPosts.length}
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <div class="empty-day-box">
-            <span class="empty-day-number">{dayNum}</span>
-          </div>
-        {/if}
-      </div>
-    {/each}
-  </div>
+              <!-- Top-right corner BeReal count badge -->
+              {#if isFilterMatch && dayPosts.length > 1}
+                <div class="day-count-badge is-matching-badge" title="{dayPosts.length} matching BeReals">
+                  {dayPosts.length}
+                </div>
+              {:else if !isFiltering && rawPosts.length > 1}
+                <div class="day-count-badge" title="{rawPosts.length} BeReals on this day">
+                  {rawPosts.length}
+                </div>
+              {/if}
+
+              <!-- Filtered Out Ghost Tag -->
+              {#if isFilteredOut}
+                <div class="filtered-out-indicator">
+                  <span>Filtered</span>
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <div class="empty-day-box">
+              <span class="empty-day-number">{dayNum}</span>
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {/key}
 
   <!-- Explore Memories Outline Box Button -->
   <div class="calendar-footer-actions">
@@ -546,10 +692,40 @@
     padding: 4px 0;
   }
 
+  .month-count-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+  }
+
+  .picker-month-btn.is-selected .month-count-tag {
+    background: rgba(0, 0, 0, 0.2);
+    color: #000000;
+  }
+
+  .month-fade-in {
+    animation: monthFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes monthFadeIn {
+    from {
+      opacity: 0;
+      background: #000000;
+    }
+    to {
+      opacity: 1;
+      background: transparent;
+    }
+  }
+
   .days-matrix-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 8px;
+    border-radius: 14px;
   }
 
   .day-cell {
@@ -563,13 +739,42 @@
   .day-cell.has-memory {
     cursor: pointer;
     border: 1.5px solid rgba(255, 255, 255, 0.08);
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
   }
 
   /* Medium-thick white outline for On-Time BeReals */
   .day-cell.has-memory.is-on-time {
     border: 2.5px solid #ffffff;
     box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+  }
+
+  /* Filtered-out ghost state: soft dimming preserving calendar shape & context */
+  .day-cell.has-memory.is-filtered-out {
+    opacity: 0.28;
+    filter: grayscale(85%) contrast(85%);
+    transform: scale(0.96);
+    border-color: rgba(255, 255, 255, 0.04);
+    box-shadow: none;
+  }
+
+  .day-cell.has-memory.is-filtered-out:hover {
+    opacity: 0.75;
+    filter: grayscale(25%);
+    transform: scale(1.02);
+    z-index: 6;
+  }
+
+  /* Filter-matching highlighted state */
+  .day-cell.has-memory.is-filter-match {
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+    transform: scale(1.01);
+  }
+
+  .day-cell.has-memory.is-filter-match:hover {
+    transform: scale(1.06);
+    box-shadow: 0 8px 24px rgba(56, 189, 248, 0.55);
+    z-index: 6;
   }
 
   .day-cell.has-memory:hover {
@@ -603,6 +808,126 @@
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
     z-index: 10;
+  }
+
+  .day-count-badge.is-matching-badge {
+    background: #38bdf8;
+    color: #000000;
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.6);
+  }
+
+  .filtered-out-indicator {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #a1a1aa;
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Focused Match Pulse State when stepping with Prev/Next */
+  .day-cell.has-memory.is-focused-match {
+    border: 3px solid #ffe600;
+    box-shadow: 0 0 24px rgba(255, 230, 0, 0.7);
+    transform: scale(1.08);
+    z-index: 20;
+    animation: matchPulse 0.4s ease-out;
+  }
+
+  @keyframes matchPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 230, 0, 0); }
+    50% { transform: scale(1.12); box-shadow: 0 0 30px rgba(255, 230, 0, 0.9); }
+    100% { transform: scale(1.08); box-shadow: 0 0 24px rgba(255, 230, 0, 0.7); }
+  }
+
+  /* Calendar Filter Quick Jump Control Panel in header */
+  .calendar-filter-control-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 4px 12px;
+    background: rgba(18, 18, 26, 0.95);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: var(--radius-full);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.18s ease-out;
+  }
+
+  .filter-panel-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .filter-stats-text {
+    font-size: 11.5px;
+    color: #38bdf8;
+    white-space: nowrap;
+  }
+
+  .filter-stats-text strong {
+    color: #ffffff;
+  }
+
+  .filter-nav-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .filter-step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: #181826;
+    border: 1px solid var(--border-subtle);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .filter-step-btn:hover:not(:disabled) {
+    background: #38bdf8;
+    color: #09090b;
+    border-color: #38bdf8;
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+  }
+
+  .filter-step-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .filter-clear-pill-btn {
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    background: rgba(244, 63, 94, 0.16);
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    color: #fda4af;
+    font-size: 10.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .filter-clear-pill-btn:hover {
+    background: #f43f5e;
+    color: #ffffff;
+    border-color: #f43f5e;
   }
 
   .empty-day-box {

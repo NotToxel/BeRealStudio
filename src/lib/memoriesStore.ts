@@ -13,12 +13,14 @@ export const initialFilterState: ExplorerFilterState = {
   hasLocationOnly: false,
   hasBtsOnly: false,
   hasCaptionOnly: false,
+  hasVideoOnly: false,
 };
 
 // ─── Core Stores ──────────────────────────────────────────────────────────────
 
 export const explorerData = writable<ExplorerData | null>(null);
 export const isLoadingMemories = writable<boolean>(false);
+export const memoriesLoadProgress = writable<{ percentage: number; stage: string }>({ percentage: 0, stage: 'Preparing archive...' });
 export const memoriesLoadError = writable<string | null>(null);
 
 export const activeExplorerView = writable<'grid' | 'calendar'>('grid');
@@ -59,6 +61,45 @@ export const explorerFilterCounts = derived(explorerData, ($data): ExplorerFilte
   }
 
   return counts;
+});
+
+// Group cities by country for rich-looking dropdown menus
+export interface CountryCityGroup {
+  country: string;
+  totalPosts: number;
+  cities: { name: string; count: number }[];
+}
+
+export const citiesByCountry = derived(explorerData, ($data): CountryCityGroup[] => {
+  if (!$data || !$data.memories) return [];
+  const countryMap = new Map<string, Map<string, number>>();
+
+  for (const m of $data.memories) {
+    const country = m.country || 'Other';
+    const city = m.city || (m.locationName ? m.locationName.split(',')[0].trim() : '');
+    if (!city) continue;
+
+    if (!countryMap.has(country)) {
+      countryMap.set(country, new Map());
+    }
+    const cityMap = countryMap.get(country)!;
+    cityMap.set(city, (cityMap.get(city) || 0) + 1);
+  }
+
+  const result: CountryCityGroup[] = [];
+  for (const [country, cityMap] of countryMap.entries()) {
+    let totalPosts = 0;
+    const cities: { name: string; count: number }[] = [];
+    for (const [name, count] of cityMap.entries()) {
+      totalPosts += count;
+      cities.push({ name, count });
+    }
+    cities.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    result.push({ country, totalPosts, cities });
+  }
+
+  result.sort((a, b) => b.totalPosts - a.totalPosts || a.country.localeCompare(b.country));
+  return result;
 });
 
 // ─── Derived Filtered Memories Store ──────────────────────────────────────────
@@ -114,6 +155,10 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
       if ($filter.hasLocationOnly && !m.location && !m.locationName) return false;
       if ($filter.hasBtsOnly && !m.btsPath) return false;
       if ($filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
+      if ($filter.hasVideoOnly) {
+        const isVid = m.isVideo || (m.primaryPath && (m.primaryPath.endsWith('.mp4') || m.primaryPath.endsWith('.mov'))) || (m.secondaryPath && (m.secondaryPath.endsWith('.mp4') || m.secondaryPath.endsWith('.mov')));
+        if (!isVid) return false;
+      }
 
       return true;
     });
@@ -132,6 +177,7 @@ export const activeFilterCount = derived(explorerFilter, ($f) => {
   if ($f.hasLocationOnly) count++;
   if ($f.hasBtsOnly) count++;
   if ($f.hasCaptionOnly) count++;
+  if ($f.hasVideoOnly) count++;
   return count;
 });
 
@@ -147,7 +193,21 @@ export const memoriesByMonth = derived(filteredMemories, ($memories) => {
   return map;
 });
 
-// Group memories by date string ("YYYY-MM-DD") for the Calendar day cells
+// Group ALL raw memories by date string ("YYYY-MM-DD")
+export const rawMemoriesByDate = derived(explorerData, ($data) => {
+  const map = new Map<string, ExplorerMemory[]>();
+  if (!$data || !$data.memories) return map;
+  for (const m of $data.memories) {
+    const dateStr = `${m.year}-${String(m.month).padStart(2, '0')}-${String(m.day).padStart(2, '0')}`;
+    if (!map.has(dateStr)) {
+      map.set(dateStr, []);
+    }
+    map.get(dateStr)!.push(m);
+  }
+  return map;
+});
+
+// Group filtered memories by date string ("YYYY-MM-DD") for the Calendar day cells
 export const memoriesByDate = derived(filteredMemories, ($memories) => {
   const map = new Map<string, ExplorerMemory[]>();
   for (const m of $memories) {
@@ -174,9 +234,24 @@ export async function loadMemories(path?: string): Promise<boolean> {
 
   isLoadingMemories.set(true);
   memoriesLoadError.set(null);
+  memoriesLoadProgress.set({ percentage: 20, stage: 'Reading archive & extracting cached media...' });
+
+  // Progress simulation ticker during native extraction
+  const ticker = setInterval(() => {
+    memoriesLoadProgress.update((p) => {
+      if (p.percentage < 85) {
+        const nextPct = p.percentage + Math.min(15, (85 - p.percentage) * 0.35);
+        const stage = nextPct > 55 ? 'Reverse geocoding locations & indexing calendar...' : 'Parsing posts and dual camera perspectives...';
+        return { percentage: Math.round(nextPct), stage };
+      }
+      return p;
+    });
+  }, 180);
 
   try {
     const data = await loadExplorerMemories(targetPath);
+    clearInterval(ticker);
+    memoriesLoadProgress.set({ percentage: 100, stage: 'Memories loaded!' });
     explorerData.set(data);
 
     // Default calendar month to latest month in dataset
@@ -184,9 +259,12 @@ export async function loadMemories(path?: string): Promise<boolean> {
       calendarCurrentMonth.set(data.uniqueMonths[data.uniqueMonths.length - 1]);
     }
 
-    isLoadingMemories.set(false);
+    setTimeout(() => {
+      isLoadingMemories.set(false);
+    }, 250);
     return true;
   } catch (err: any) {
+    clearInterval(ticker);
     console.error('Failed to load explorer memories:', err);
     memoriesLoadError.set(err?.message || String(err));
     isLoadingMemories.set(false);
@@ -385,8 +463,10 @@ import type { MemoryHeaderSettings } from './types';
 export const defaultMemoryHeaderSettings: MemoryHeaderSettings = {
   showLocation: true,
   locationFormat: 'city_country',
+  customLocationText: '',
   showTimeTag: true,
   timeTagFormat: 'time_only',
+  customTimeTagText: '',
 };
 
 function loadMemoryHeaderSettings(): MemoryHeaderSettings {
@@ -409,8 +489,26 @@ if (typeof window !== 'undefined') {
   });
 }
 
+const MONTH_ABBRS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function formatShortDate(memory: ExplorerMemory): string {
+  if (!memory) return '';
+  const d = memory.day;
+  const m = MONTH_ABBRS[(memory.month || 1) - 1] || 'Jan';
+  const y = memory.year;
+  const currentYear = new Date().getFullYear();
+  if (y === currentYear) {
+    return `${d} ${m}`;
+  }
+  return `${d} ${m} ${y}`;
+}
+
 export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showLocation) return '';
+
+  if (settings.locationFormat === 'custom') {
+    return settings.customLocationText?.trim() || '';
+  }
 
   if (settings.locationFormat === 'city_country') {
     if (memory.city && memory.country) return `${memory.city}, ${memory.country}`;
@@ -426,21 +524,32 @@ export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHea
     if (memory.city) return memory.city;
   }
 
-  return memory.locationName || '';
+  // If locationName has coordinates like "51.46°, -0.25°", return clean formatted or empty
+  if (memory.locationName && !memory.locationName.includes('°')) {
+    return memory.locationName;
+  }
+
+  if (memory.city) return memory.city;
+  if (memory.country) return memory.country;
+
+  return '';
 }
 
 export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showTimeTag) return '';
 
-  if (settings.timeTagFormat === 'late_duration' && memory.lateDuration) {
-    return memory.lateDuration;
-  }
-  if (settings.timeTagFormat === 'date_only') {
-    return memory.dateFormatted;
-  }
-  if (settings.timeTagFormat === 'datetime') {
-    return `${memory.dateFormatted} • ${memory.timeFormatted}`;
+  if (settings.timeTagFormat === 'custom') {
+    return settings.customTimeTagText?.trim() || '';
   }
 
-  return memory.timeFormatted;
+  const dateStr = formatShortDate(memory);
+
+  if (settings.timeTagFormat === 'late_duration' && memory.lateDuration) {
+    return `${dateStr} • ${memory.lateDuration}`;
+  }
+  if (settings.timeTagFormat === 'date_only') {
+    return dateStr;
+  }
+
+  return `${dateStr} • ${memory.timeFormatted}`;
 }

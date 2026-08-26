@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Modal from '$components/Modal.svelte';
+  import Toggle from '$components/Toggle.svelte';
   import { APP_VERSION } from '$lib/version';
   import {
     toolkitConfig,
@@ -9,6 +10,11 @@
     ffmpegInfo,
     defaultToolkitConfig,
     defaultRecapperConfig,
+    offlineGeoDbStatus,
+    isDownloadingGeoDb,
+    downloadGeoDbProgress,
+    hwInfoStore,
+    exiftoolStore,
   } from '$lib/stores';
   import {
     detectFfmpeg,
@@ -26,7 +32,6 @@
     onDownloadProgress,
   } from '$lib/tauri';
   import type { HardwareAccelerationInfo } from '$lib/types';
-  import { offlineGeoDbStatus, isDownloadingGeoDb, downloadGeoDbProgress } from '$lib/stores';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
@@ -45,29 +50,68 @@
   import Eye from 'lucide-svelte/icons/eye';
   import Clock from 'lucide-svelte/icons/clock';
   import MapPin from 'lucide-svelte/icons/map-pin';
+  import Copy from 'lucide-svelte/icons/copy';
   import { memoryHeaderSettings } from '$lib/memoriesStore';
 
   let statusMessage = '';
   let isSuccessStatus = true;
   let showResetModal = false;
-  let exiftoolPath: string | null = null;
   let checkingExiftool = false;
-  let hwInfo: HardwareAccelerationInfo | null = null;
+  let checkingHwInfo = false;
 
-  async function detectHwInfo() {
+  async function handleCopyDiagnostics() {
+    const hw = $hwInfoStore;
+    const ff = $ffmpegInfo;
+    const exif = $exiftoolStore;
+    const text = [
+      `=== BeReal Studio System Diagnostics ===`,
+      `App Version: ${APP_VERSION}`,
+      `CPU Cores: ${hw?.cpuCores ?? 'Unknown'} (Threads: ${hw?.parallelThreads ?? 'Unknown'})`,
+      `Hardware GPU Acceleration: ${hw?.isGpuAccelerated ? 'Yes (' + hw.encoderName + ')' : 'CPU Only'}`,
+      `FFmpeg Path: ${ff.path ?? 'Not Detected'}`,
+      `ExifTool Path: ${exif.path ?? 'Using Native Rust EXIF Engine'}`,
+      `Active Offline GeoDB: ${$offlineGeoDbStatus?.activeTier ?? 'Default Global Baseline'}`,
+    ].join('\n');
     try {
-      hwInfo = await checkHardwareAcceleration();
-    } catch (e) {
-      console.warn('Failed to detect hardware acceleration:', e);
+      await navigator.clipboard.writeText(text);
+      showToast('System diagnostics copied to clipboard!');
+    } catch {
+      showToast('Failed to copy to clipboard', false);
     }
   }
 
-  async function detectExiftoolHandler() {
+  async function handleClearThumbnailCache() {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('bereal_studio_media_cache');
+      }
+      showToast('Media and explorer cache cleared successfully.');
+    } catch (e) {
+      showToast(`Clear cache failed: ${e}`, false);
+    }
+  }
+
+  async function detectHwInfo(force = false) {
+    if (!force && $hwInfoStore) return;
+    checkingHwInfo = true;
+    try {
+      const info = await checkHardwareAcceleration();
+      hwInfoStore.set(info);
+    } catch (e) {
+      console.warn('Failed to detect hardware acceleration:', e);
+    } finally {
+      checkingHwInfo = false;
+    }
+  }
+
+  async function detectExiftoolHandler(force = false) {
+    if (!force && $exiftoolStore.checked) return;
     checkingExiftool = true;
     try {
-      exiftoolPath = await checkExiftool();
+      const p = await checkExiftool();
+      exiftoolStore.set({ path: p, checked: true });
     } catch {
-      exiftoolPath = null;
+      exiftoolStore.set({ path: null, checked: true });
     } finally {
       checkingExiftool = false;
     }
@@ -77,13 +121,19 @@
     if (!$ffmpegInfo.checked) {
       await detectFfmpeg();
     }
-    await detectExiftoolHandler();
-    await detectHwInfo();
-    try {
-      const dbStatus = await checkOfflineGeoDb();
-      offlineGeoDbStatus.set(dbStatus);
-    } catch (e) {
-      console.warn('Failed to check offline geodb:', e);
+    if (!$exiftoolStore.checked) {
+      await detectExiftoolHandler();
+    }
+    if (!$hwInfoStore) {
+      await detectHwInfo();
+    }
+    if (!$offlineGeoDbStatus?.tiers?.length) {
+      try {
+        const dbStatus = await checkOfflineGeoDb();
+        offlineGeoDbStatus.set(dbStatus);
+      } catch (e) {
+        console.warn('Failed to check offline geodb:', e);
+      }
     }
   });
 
@@ -354,20 +404,20 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            on:click={() => detectFfmpeg()}
-            disabled={$ffmpegInfo.checking}
+            on:click={handleCopyDiagnostics}
+            title="Copy full hardware, encoder, and dependency info to clipboard"
           >
-            <RefreshCw size={12} class={$ffmpegInfo.checking ? 'animate-spin' : ''} />
-            <span>{$ffmpegInfo.checking ? 'Checking...' : 'Recheck FFmpeg'}</span>
+            <Copy size={13} />
+            <span>Copy Diagnostics</span>
           </button>
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            on:click={detectExiftoolHandler}
-            disabled={checkingExiftool}
+            on:click={handleClearThumbnailCache}
+            title="Clear cached thumbnails & geocoded index"
           >
-            <RefreshCw size={12} class={checkingExiftool ? 'animate-spin' : ''} />
-            <span>{checkingExiftool ? 'Checking...' : 'Recheck ExifTool'}</span>
+            <Trash2 size={13} />
+            <span>Clear Cache</span>
           </button>
         </div>
       </div>
@@ -405,10 +455,10 @@
       </div>
 
       <div class="dependency-status" style="margin-top: 10px;">
-        <div class="dep-icon" class:found={Boolean(exiftoolPath)}>
+        <div class="dep-icon" class:found={Boolean($exiftoolStore.path)}>
           {#if checkingExiftool}
             <RefreshCw size={18} class="animate-spin text-sky-400" />
-          {:else if exiftoolPath}
+          {:else if $exiftoolStore.path}
             <CheckCircle size={18} />
           {:else}
             <AlertTriangle size={18} />
@@ -420,7 +470,7 @@
             <strong>ExifTool Metadata Sidecar</strong>
             {#if checkingExiftool}
               <span class="badge badge-info">Detecting...</span>
-            {:else if exiftoolPath}
+            {:else if $exiftoolStore.path}
               <span class="badge badge-success">Detected</span>
             {:else}
               <span class="badge badge-warning">Fallback to Native Rust EXIF</span>
@@ -430,33 +480,44 @@
             {#if checkingExiftool}
               Scanning system for ExifTool binary...
             {:else}
-              {exiftoolPath || 'Using built-in native Rust EXIF/IPTC engine. Install ExifTool for enhanced multi-tag synchronization.'}
+              {$exiftoolStore.path || 'Using built-in native Rust EXIF/IPTC engine. Install ExifTool for enhanced multi-tag synchronization.'}
             {/if}
           </p>
         </div>
       </div>
 
-      {#if hwInfo}
-        <div class="dependency-status" style="margin-top: 10px;">
-          <div class="dep-icon" class:found={hwInfo.isGpuAccelerated}>
-            <Sparkles size={18} class={hwInfo.isGpuAccelerated ? 'text-emerald-400' : 'text-sky-400'} />
-          </div>
-
-          <div class="dep-info">
-            <div class="dep-name">
-              <strong>Hardware Acceleration &amp; Parallelism</strong>
-              {#if hwInfo.isGpuAccelerated}
-                <span class="badge badge-success">GPU Accelerated</span>
-              {:else}
-                <span class="badge badge-info">Multi-Core CPU ({hwInfo.cpuCores} Threads)</span>
-              {/if}
-            </div>
-            <p class="dep-path text-secondary">
-              Video Encoder: <strong class="text-white">{hwInfo.encoderName}</strong> &bull; Rayon Parallelism: <strong class="text-white">{hwInfo.parallelThreads} Active CPU Worker Threads</strong>
-            </p>
-          </div>
+      <!-- Hardware Acceleration Card (Statically rendered with loading indicator) -->
+      <div class="dependency-status" style="margin-top: 10px;">
+        <div class="dep-icon" class:found={Boolean($hwInfoStore?.isGpuAccelerated)}>
+          {#if !$hwInfoStore && checkingHwInfo}
+            <RefreshCw size={18} class="animate-spin text-sky-400" />
+          {:else if $hwInfoStore}
+            <Sparkles size={18} class={$hwInfoStore.isGpuAccelerated ? 'text-emerald-400' : 'text-sky-400'} />
+          {:else}
+            <RefreshCw size={18} class="animate-spin text-sky-400" />
+          {/if}
         </div>
-      {/if}
+
+        <div class="dep-info">
+          <div class="dep-name">
+            <strong>Hardware Acceleration &amp; Parallelism</strong>
+            {#if !$hwInfoStore}
+              <span class="badge badge-info">Detecting...</span>
+            {:else if $hwInfoStore.isGpuAccelerated}
+              <span class="badge badge-success">GPU Accelerated</span>
+            {:else}
+              <span class="badge badge-info">Multi-Core CPU ({$hwInfoStore.cpuCores} Threads)</span>
+            {/if}
+          </div>
+          <p class="dep-path text-secondary">
+            {#if !$hwInfoStore}
+              Probing GPU video encoder (NVENC / QuickSync / AMF / VideoToolbox)...
+            {:else}
+              Video Encoder: <strong class="text-white">{$hwInfoStore.encoderName}</strong> &bull; Rayon Parallelism: <strong class="text-white">{$hwInfoStore.parallelThreads} Active CPU Worker Threads</strong>
+            {/if}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- 3. Offline Reverse Geocoding Datasets -->
@@ -480,23 +541,26 @@
                 {#if tier.isInstalled}
                   <CheckCircle size={16} class="text-emerald-400" />
                 {:else}
-                  <Database size={16} class="text-secondary" />
+                  <Download size={16} class="text-muted" />
                 {/if}
               </div>
+
               <div class="tier-setting-info">
                 <div class="tier-setting-title-row">
-                  <span class="font-semibold text-white text-sm">{tier.name} Dataset</span>
-                  <span class="text-xs text-muted">({tier.subtitle})</span>
+                  <span class="font-bold text-white text-sm">{tier.name}</span>
                   {#if tier.isActive}
-                    <span class="badge badge-success font-mono text-xs">✓ Active In Memory</span>
+                    <span class="badge badge-success font-mono text-xs">Active Dataset</span>
                   {:else if tier.isInstalled}
-                    <span class="badge badge-subtle font-mono text-xs">Installed</span>
-                  {:else}
-                    <span class="badge badge-yellow font-mono text-xs">~{tier.approxDownloadMb} MB Download</span>
+                    <span class="badge badge-info font-mono text-xs">Installed</span>
                   {/if}
                 </div>
+                <span class="text-xs text-secondary">{tier.subtitle} &bull; {tier.approxCities}</span>
                 <span class="text-xs text-muted font-mono">
-                  {tier.approxCities} &bull; {tier.isInstalled ? `${(tier.fileSizeBytes / 1048576).toFixed(1)} MB on disk` : `~${tier.approxDownloadMb} MB archive`}
+                  {#if tier.isInstalled}
+                    Disk size: {(tier.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB &bull; {tier.cityCount.toLocaleString()} locations loaded
+                  {:else}
+                    Download: ~{tier.approxDownloadMb} MB (uncompressed JSON index)
+                  {/if}
                 </span>
               </div>
             </div>
@@ -588,67 +652,134 @@
       </p>
 
       <div class="settings-grid-2col">
-        <!-- Location Display Toggle & Format -->
+        <!-- Location Display Toggle & Rich Format Selector -->
         <div class="setting-item-box">
-          <div class="setting-item-header">
-            <MapPin size={15} class="text-emerald-400" />
-            <span class="font-bold text-white text-sm">Location Display</span>
-          </div>
-
-          <label class="toggle-control-row">
-            <input
-              type="checkbox"
-              bind:checked={$memoryHeaderSettings.showLocation}
-            />
-            <span class="text-xs text-secondary">Show location above photos in feed</span>
-          </label>
+          <Toggle
+            label="Location Display"
+            description="Show reverse-geocoded location directly above photos in the feed"
+            icon={MapPin}
+            accentColor="emerald"
+            bind:checked={$memoryHeaderSettings.showLocation}
+          />
 
           {#if $memoryHeaderSettings.showLocation}
-            <div class="setting-select-wrap">
-              <label class="text-xs text-muted" for="location-format-select">Format</label>
-              <select
-                id="location-format-select"
-                class="setting-dropdown-select"
-                bind:value={$memoryHeaderSettings.locationFormat}
-              >
-                <option value="city_country">City, Country (e.g. Constanța, Romania)</option>
-                <option value="suburb_city_country">Suburb, City, Country (e.g. Soho, London, UK)</option>
-                <option value="suburb_city">Suburb, City (e.g. Soho, London)</option>
-                <option value="city_only">City Only (e.g. London)</option>
-                <option value="full">Full Geocoded Address</option>
-              </select>
+            <div class="format-choice-list">
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'city_country'}>
+                <input type="radio" name="locFormat" value="city_country" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">City, Country</span>
+                  <span class="choice-sample">London, England</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'suburb_city_country'}>
+                <input type="radio" name="locFormat" value="suburb_city_country" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Area, City, Country</span>
+                  <span class="choice-sample">Soho, London, England</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'suburb_city'}>
+                <input type="radio" name="locFormat" value="suburb_city" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Area, City</span>
+                  <span class="choice-sample">Soho, London</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'city_only'}>
+                <input type="radio" name="locFormat" value="city_only" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">City Only</span>
+                  <span class="choice-sample">London</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'custom'}>
+                <input type="radio" name="locFormat" value="custom" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Custom Location Text</span>
+                  <span class="choice-sample">Display custom text everywhere</span>
+                </div>
+              </label>
+
+              {#if $memoryHeaderSettings.locationFormat === 'custom'}
+                <div class="custom-header-input-wrap">
+                  <input
+                    type="text"
+                    class="input custom-text-field"
+                    placeholder="e.g. London, UK or Home 🏠"
+                    bind:value={$memoryHeaderSettings.customLocationText}
+                  />
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
 
-        <!-- Time & Late Tag Toggle & Format -->
+        <!-- Time & Late Tag Toggle & Rich Format Selector -->
         <div class="setting-item-box">
-          <div class="setting-item-header">
-            <Clock size={15} class="text-amber-400" />
-            <span class="font-bold text-white text-sm">Time / Date Subtitle</span>
-          </div>
-
-          <label class="toggle-control-row">
-            <input
-              type="checkbox"
-              bind:checked={$memoryHeaderSettings.showTimeTag}
-            />
-            <span class="text-xs text-secondary">Show timestamp / late tag next to location</span>
-          </label>
+          <Toggle
+            label="Time / Date Subtitle"
+            description="Show timestamp, progressive date, or late duration next to location"
+            icon={Clock}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showTimeTag}
+          />
 
           {#if $memoryHeaderSettings.showTimeTag}
-            <div class="setting-select-wrap">
-              <label class="text-xs text-muted" for="time-format-select">Format</label>
-              <select
-                id="time-format-select"
-                class="setting-dropdown-select"
-                bind:value={$memoryHeaderSettings.timeTagFormat}
-              >
-                <option value="time_only">Time Only (e.g. 14:20)</option>
-                <option value="late_duration">Late Tag if late (e.g. 3h late or 3h ago)</option>
-                <option value="date_only">Date Only (e.g. 25 August 2024)</option>
-                <option value="datetime">Date &amp; Time (e.g. 25 Aug 2024 • 14:20)</option>
-              </select>
+            <div class="format-choice-list">
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'late_duration'}>
+                <input type="radio" name="timeFormat" value="late_duration" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Smart Progressive (Recommended)</span>
+                  <span class="choice-sample">45m late • 26 Aug (Current year) / Full date (Past years)</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'datetime'}>
+                <input type="radio" name="timeFormat" value="datetime" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Date &amp; Time</span>
+                  <span class="choice-sample">26 Aug • 14:20</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'date_only'}>
+                <input type="radio" name="timeFormat" value="date_only" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Date Only</span>
+                  <span class="choice-sample">26 Aug (or 26 Aug 2024)</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'time_only'}>
+                <input type="radio" name="timeFormat" value="time_only" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Time Only</span>
+                  <span class="choice-sample">14:20</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'custom'}>
+                <input type="radio" name="timeFormat" value="custom" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Custom Subtitle Text</span>
+                  <span class="choice-sample">Display custom text everywhere</span>
+                </div>
+              </label>
+
+              {#if $memoryHeaderSettings.timeTagFormat === 'custom'}
+                <div class="custom-header-input-wrap">
+                  <input
+                    type="text"
+                    class="input custom-text-field"
+                    placeholder="e.g. Summer '24 or 10:45 PM"
+                    bind:value={$memoryHeaderSettings.customTimeTagText}
+                  />
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -659,23 +790,25 @@
         <span class="preview-box-label">LIVE HEADER PREVIEW</span>
         <div class="preview-header-row">
           <div class="preview-avatar">
-            <span>C</span>
+            <span>N</span>
           </div>
           <div class="preview-text-col">
-            <span class="preview-username">cold.lin</span>
+            <span class="preview-username">nottoxel</span>
             <div class="preview-subtitle">
               {#if $memoryHeaderSettings.showLocation}
                 <span class="preview-loc">
-                  {#if $memoryHeaderSettings.locationFormat === 'city_country'}
-                    Constanța, Romania
+                  {#if $memoryHeaderSettings.locationFormat === 'custom'}
+                    {$memoryHeaderSettings.customLocationText || 'Custom Location'}
+                  {:else if $memoryHeaderSettings.locationFormat === 'city_country'}
+                    London, England
                   {:else if $memoryHeaderSettings.locationFormat === 'suburb_city_country'}
-                    Tomis Nord, Constanța, Romania
+                    Soho, London, England
                   {:else if $memoryHeaderSettings.locationFormat === 'suburb_city'}
-                    Tomis Nord, Constanța
+                    Soho, London
                   {:else if $memoryHeaderSettings.locationFormat === 'city_only'}
-                    Constanța
+                    London
                   {:else}
-                    Constanța, Romania
+                    London, England
                   {/if}
                 </span>
               {/if}
@@ -684,12 +817,14 @@
               {/if}
               {#if $memoryHeaderSettings.showTimeTag}
                 <span class="preview-time">
-                  {#if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
-                    3h ago
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'date_only'}
-                    25 August 2024
+                  {#if $memoryHeaderSettings.timeTagFormat === 'custom'}
+                    {$memoryHeaderSettings.customTimeTagText || 'Custom Subtitle'}
+                  {:else if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
+                    45m late • 26 Aug
                   {:else if $memoryHeaderSettings.timeTagFormat === 'datetime'}
-                    25 Aug 2024 • 14:20
+                    26 Aug • 14:20
+                  {:else if $memoryHeaderSettings.timeTagFormat === 'date_only'}
+                    26 Aug
                   {:else}
                     14:20
                   {/if}
@@ -1010,41 +1145,78 @@
     padding: 14px;
   }
 
-  .setting-item-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .toggle-control-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .setting-select-wrap {
+  .format-choice-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     margin-top: 4px;
   }
 
-  .setting-dropdown-select {
-    height: 34px;
+  .format-choice-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
     background: #14141d;
-    border: 1px solid var(--border-medium);
+    border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    color: #ffffff;
-    padding: 0 10px;
-    font-size: 12.5px;
-    outline: none;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  .setting-dropdown-select:focus {
+  .format-choice-card input {
+    margin-top: 3px;
+    accent-color: #38bdf8;
+  }
+
+  .format-choice-card:hover {
+    background: #1c1c28;
+    border-color: var(--border-medium);
+  }
+
+  .format-choice-card.selected {
+    background: rgba(56, 189, 248, 0.1);
     border-color: #38bdf8;
+  }
+
+  .choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .choice-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .choice-sample {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .custom-header-input-wrap {
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+
+  .custom-text-field {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #14141d;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: var(--radius-sm);
+    color: #ffffff;
+  }
+
+  .custom-text-field:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    outline: none;
   }
 
   .header-live-preview-box {

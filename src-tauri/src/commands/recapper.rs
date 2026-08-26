@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use std::{path::Path, time::Instant};
 use tauri::{AppHandle, State};
 
@@ -178,19 +177,47 @@ fn run_recapper(
         }
     }
 
-    // ── Step 5: Multi-Core Parallel Frame Rendering (Rayon) ──────────────────
-    emitter.info(format!("Rendering {} frames across all CPU cores with Rayon multi-threading...", total));
+    // ── Step 5 & 6: On-Demand Streaming Frame Rendering & Hardware Video Encoding ──
     let font = font_resolver::load_font(&config.font_path).unwrap_or_else(|_| {
         font_resolver::load_font("inter").expect("Default font must be available")
     });
 
-    let rendered_counter = std::sync::atomic::AtomicUsize::new(0);
-    let frames_rendered: anyhow::Result<Vec<(image::RgbImage, f64)>> = (0..total)
-        .into_par_iter()
-        .map(|i| {
-            if emitter.is_aborted() {
-                anyhow::bail!("Aborted");
+    let out_path = Path::new(&config.output_path);
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", parent.display(), e))?;
+    }
+
+    let fps = config.fps;
+    let total_video_frames: u64 = durations
+        .iter()
+        .map(|dur| (dur * fps as f64).round() as u64)
+        .sum();
+
+    let ffmpeg_bin = crate::pipeline::video_ops::detect_ffmpeg()?;
+    let (_enc_args, encoder_name) = video_encoder::detect_best_encoder(&ffmpeg_bin);
+    emitter.info(format!("Encoding video with hardware encoder: {} (zero-copy memory streaming)...", encoder_name));
+
+    emitter.emit_progress(&ProgressEvent {
+        job_id: None,
+        stage: ProcessingStage::RenderingFrames,
+        current: 0,
+        total,
+        percentage: 20.0,
+        current_file: None,
+    });
+
+    let mut current_img_idx = 0usize;
+    let emitter_clone = emitter.clone();
+    let res = video_encoder::encode_slideshow_streaming(
+        total_video_frames,
+        || {
+            if emitter_clone.is_aborted() || current_img_idx >= total {
+                return Ok(None);
             }
+            let i = current_img_idx;
+            current_img_idx += 1;
+
             let img_path = &image_paths[i];
             let duration = durations[i];
 
@@ -206,66 +233,23 @@ fn run_recapper(
             let frame = match frame_renderer::render_frame_with_font(img_path, &config, &date_str, loc_str, &font) {
                 Ok(f) => f,
                 Err(e) => {
-                    emitter.warn(format!("Frame render error for {}: {}", img_path.display(), e));
+                    emitter_clone.warn(format!("Frame render error for {}: {}", img_path.display(), e));
                     let (w, h) = config.resolution;
                     image::RgbImage::new(w, h)
                 }
             };
 
-            let done = rendered_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            let pct = 25.0 + (done as f32 / total as f32) * 50.0; // 25% -> 75%
-            emitter.emit_progress(&ProgressEvent {
+            let render_pct = 20.0 + (i as f32 / total as f32) * 55.0; // 20% -> 75%
+            emitter_clone.emit_progress(&ProgressEvent {
                 job_id: None,
                 stage: ProcessingStage::RenderingFrames,
-                current: done,
+                current: i + 1,
                 total,
-                percentage: pct,
+                percentage: render_pct,
                 current_file: img_path.file_name().map(|n| n.to_string_lossy().to_string()),
             });
 
-            Ok((frame, duration))
-        })
-        .collect();
-
-    let frames_vec = frames_rendered?;
-
-    // ── Step 6: GPU-Accelerated Hardware Video Encoding (FFmpeg) ──────────────
-    let out_path = Path::new(&config.output_path);
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| anyhow::anyhow!("Cannot create directory '{}' ({}). Please check folder write permissions or select an alternative output directory.", parent.display(), e))?;
-    }
-
-    let fps = config.fps;
-    let total_video_frames: u64 = durations
-        .iter()
-        .map(|dur| (dur * fps as f64).round() as u64)
-        .sum();
-
-    let ffmpeg_bin = crate::pipeline::video_ops::detect_ffmpeg()?;
-    let (_enc_args, encoder_name) = video_encoder::detect_best_encoder(&ffmpeg_bin);
-    emitter.info(format!("Encoding video with hardware encoder: {}...", encoder_name));
-
-    emitter.emit_progress(&ProgressEvent {
-        job_id: None,
-        stage: ProcessingStage::EncodingVideo,
-        current: 0,
-        total: total_video_frames as usize,
-        percentage: 75.0,
-        current_file: None,
-    });
-
-    let mut current_frame_idx = 0usize;
-    let emitter_clone = emitter.clone();
-    let res = video_encoder::encode_slideshow_streaming(
-        total_video_frames,
-        || {
-            if emitter_clone.is_aborted() || current_frame_idx >= frames_vec.len() {
-                return Ok(None);
-            }
-            let (ref frame, dur) = frames_vec[current_frame_idx];
-            current_frame_idx += 1;
-            Ok(Some((frame.clone(), dur)))
+            Ok(Some((frame, duration)))
         },
         Path::new(&config.music_path),
         out_path,

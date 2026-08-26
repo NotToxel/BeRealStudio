@@ -148,13 +148,17 @@ fn load_explorer_memories_inner(
         let dest_dir = cache_root.join(hash);
         fs::create_dir_all(&dest_dir)?;
 
-        // Instant Cache Hit: Return cached explorer JSON if available
+        // Instant Cache Hit: Return cached explorer JSON if available and already geocoded
         let cache_json_file = dest_dir.join("explorer_cache.json");
         if cache_json_file.exists() {
             if let Ok(file) = File::open(&cache_json_file) {
                 let reader = BufReader::with_capacity(128 * 1024, file);
                 if let Ok(cached_data) = serde_json::from_reader::<_, ExplorerData>(reader) {
-                    if !cached_data.memories.is_empty() {
+                    let needs_regeocode = cached_data.memories.iter().any(|m| {
+                        m.location.is_some() && (m.city.is_none() || m.location_name.as_deref().unwrap_or("").contains('°'))
+                    });
+
+                    if !needs_regeocode && !cached_data.memories.is_empty() {
                         return Ok(cached_data);
                     }
                 }
@@ -497,10 +501,10 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
         .and_then(parse_taken_at)
         .unwrap_or_else(Utc::now);
 
-    let location = if opts.latitude.is_some() && opts.longitude.is_some() {
+    let location = if let (Some(latitude), Some(longitude)) = (opts.latitude, opts.longitude) {
         Some(Location {
-            latitude: opts.latitude.unwrap(),
-            longitude: opts.longitude.unwrap(),
+            latitude,
+            longitude,
         })
     } else {
         None

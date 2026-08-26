@@ -4,17 +4,60 @@
     explorerData,
     filteredMemories,
     explorerFilterCounts,
+    citiesByCountry,
     resetFilters,
   } from '$lib/memoriesStore';
+  import CountryFlag from '../common/CountryFlag.svelte';
   import Search from 'lucide-svelte/icons/search';
   import X from 'lucide-svelte/icons/circle-x';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Film from 'lucide-svelte/icons/film';
+  import Clapperboard from 'lucide-svelte/icons/clapperboard';
   import MessageSquare from 'lucide-svelte/icons/message-square';
   import Filter from 'lucide-svelte/icons/filter';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import Check from 'lucide-svelte/icons/check';
+  import Globe from 'lucide-svelte/icons/globe';
+  import Building from 'lucide-svelte/icons/building';
+  import Calendar from 'lucide-svelte/icons/calendar';
 
   let showAdvanced = false;
+  let activeOpenDropdown: 'country' | 'city' | 'suburb' | 'year' | 'month' | null = null;
+
+  function toggleDropdown(name: 'country' | 'city' | 'suburb' | 'year' | 'month', e?: MouseEvent) {
+    e?.stopPropagation();
+    activeOpenDropdown = activeOpenDropdown === name ? null : name;
+  }
+
+  function closeDropdowns() {
+    activeOpenDropdown = null;
+  }
+
+  function selectCountry(val: string) {
+    $explorerFilter.selectedCountry = val;
+    closeDropdowns();
+  }
+
+  function selectCity(val: string) {
+    $explorerFilter.selectedCity = val;
+    closeDropdowns();
+  }
+
+  function selectSuburb(val: string) {
+    $explorerFilter.selectedSuburb = val;
+    closeDropdowns();
+  }
+
+  function selectYear(val: number | 'all') {
+    $explorerFilter.selectedYear = val;
+    closeDropdowns();
+  }
+
+  function selectMonth(val: string) {
+    $explorerFilter.selectedMonth = val;
+    closeDropdowns();
+  }
 
   $: isFiltered =
     $explorerFilter.searchQuery !== '' ||
@@ -25,12 +68,15 @@
     $explorerFilter.selectedSuburb !== 'all' ||
     $explorerFilter.hasLocationOnly ||
     $explorerFilter.hasBtsOnly ||
-    $explorerFilter.hasCaptionOnly;
+    $explorerFilter.hasCaptionOnly ||
+    $explorerFilter.hasVideoOnly;
 
   $: totalMemories = $explorerData?.totalCount ?? 0;
   $: countShown = $filteredMemories.length;
   $: counts = $explorerFilterCounts;
 </script>
+
+<svelte:window on:click={closeDropdowns} />
 
 <div class="filter-bar-container">
   <div class="main-filter-row">
@@ -66,6 +112,16 @@
       >
         <MapPin size={12} />
         <span>Location</span>
+      </button>
+
+      <button
+        type="button"
+        class="filter-chip chip-video"
+        class:active={$explorerFilter.hasVideoOnly}
+        on:click={() => ($explorerFilter.hasVideoOnly = !$explorerFilter.hasVideoOnly)}
+      >
+        <Clapperboard size={12} />
+        <span>Videos</span>
       </button>
 
       <button
@@ -112,7 +168,7 @@
       {/if}
     </div>
 
-    <!-- Count Pill -->
+    <!-- Count Pill with Smooth Micro-Glow Indicator -->
     <div class="count-pill" class:is-active-filter={isFiltered}>
       {#if isFiltered}
         <span class="count-badge-tag">Filtered</span>
@@ -122,101 +178,288 @@
     </div>
   </div>
 
-  <!-- Advanced Dropdowns Drawer (Country, City, Suburb, Year, Month) with counts -->
+  <!-- Advanced Custom Dropdowns (Country with flags, Grouped Cities, Suburbs, Years, Months) -->
   {#if showAdvanced && $explorerData}
-    <div class="advanced-filter-drawer">
-      <!-- Country Filter -->
+    <div class="advanced-filter-drawer" role="presentation" on:click|stopPropagation>
+      <!-- Country Dropdown -->
       {#if $explorerData.uniqueCountries.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-country-select">Country</label>
-          <select
-            id="filter-country-select"
-            class="filter-select"
-            class:is-active={$explorerFilter.selectedCountry !== 'all'}
-            bind:value={$explorerFilter.selectedCountry}
+        <div class="custom-select-group">
+          <span class="custom-select-label">Country</span>
+          <button
+            type="button"
+            class="custom-select-trigger"
+            class:is-selected={$explorerFilter.selectedCountry !== 'all'}
+            on:click={(e) => toggleDropdown('country', e)}
           >
-            <option value="all">All Countries ({$explorerData.uniqueCountries.length})</option>
-            {#each $explorerData.uniqueCountries as country}
-              {@const cnt = counts.byCountry.get(country) || 0}
-              <option value={country}>{country} ({cnt})</option>
-            {/each}
-          </select>
+            <div class="trigger-left-content">
+              {#if $explorerFilter.selectedCountry !== 'all'}
+                <CountryFlag country={$explorerFilter.selectedCountry} size="sm" />
+                <span class="trigger-label-text">{$explorerFilter.selectedCountry}</span>
+              {:else}
+                <Globe size={13} class="text-secondary" />
+                <span class="trigger-label-text text-secondary">All Countries</span>
+              {/if}
+            </div>
+            <ChevronDown size={13} class="chevron-arrow" />
+          </button>
+
+          {#if activeOpenDropdown === 'country'}
+            <div class="custom-popover-menu">
+              <button
+                type="button"
+                class="popover-item"
+                class:active={$explorerFilter.selectedCountry === 'all'}
+                on:click={() => selectCountry('all')}
+              >
+                <div class="popover-item-left">
+                  <Globe size={14} class="text-secondary" />
+                  <span>All Countries</span>
+                </div>
+                <span class="item-count-badge">{$explorerData.uniqueCountries.length}</span>
+              </button>
+
+              <div class="popover-divider"></div>
+
+              {#each $explorerData.uniqueCountries as country}
+                {@const cnt = counts.byCountry.get(country) || 0}
+                <button
+                  type="button"
+                  class="popover-item"
+                  class:active={$explorerFilter.selectedCountry === country}
+                  on:click={() => selectCountry(country)}
+                >
+                  <div class="popover-item-left">
+                    <CountryFlag {country} size="sm" />
+                    <span class="popover-item-title">{country}</span>
+                  </div>
+                  <span class="item-count-badge">{cnt}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
-      <!-- City Filter -->
-      {#if $explorerData.uniqueCities.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-city-select">City</label>
-          <select
-            id="filter-city-select"
-            class="filter-select"
-            class:is-active={$explorerFilter.selectedCity !== 'all'}
-            bind:value={$explorerFilter.selectedCity}
+      <!-- City Dropdown (Grouped by Country with Flags) -->
+      {#if $citiesByCountry.length > 0}
+        <div class="custom-select-group">
+          <span class="custom-select-label">City</span>
+          <button
+            type="button"
+            class="custom-select-trigger"
+            class:is-selected={$explorerFilter.selectedCity !== 'all'}
+            on:click={(e) => toggleDropdown('city', e)}
           >
-            <option value="all">All Cities ({$explorerData.uniqueCities.length})</option>
-            {#each $explorerData.uniqueCities as city}
-              {@const cnt = counts.byCity.get(city) || 0}
-              <option value={city}>{city} ({cnt})</option>
-            {/each}
-          </select>
+            <div class="trigger-left-content">
+              {#if $explorerFilter.selectedCity !== 'all'}
+                <Building size={13} class="text-sky-400" />
+                <span class="trigger-label-text">{$explorerFilter.selectedCity}</span>
+              {:else}
+                <Building size={13} class="text-secondary" />
+                <span class="trigger-label-text text-secondary">All Cities</span>
+              {/if}
+            </div>
+            <ChevronDown size={13} class="chevron-arrow" />
+          </button>
+
+          {#if activeOpenDropdown === 'city'}
+            <div class="custom-popover-menu max-height-scroll">
+              <button
+                type="button"
+                class="popover-item"
+                class:active={$explorerFilter.selectedCity === 'all'}
+                on:click={() => selectCity('all')}
+              >
+                <div class="popover-item-left">
+                  <Building size={14} class="text-secondary" />
+                  <span>All Cities</span>
+                </div>
+                <span class="item-count-badge">{$explorerData.uniqueCities.length}</span>
+              </button>
+
+              {#each $citiesByCountry as group}
+                <div class="popover-group-header">
+                  <CountryFlag country={group.country} size="sm" />
+                  <span class="group-country-name">{group.country}</span>
+                  <span class="group-total-badge">{group.totalPosts}</span>
+                </div>
+
+                {#each group.cities as cityItem}
+                  <button
+                    type="button"
+                    class="popover-item sub-item"
+                    class:active={$explorerFilter.selectedCity === cityItem.name}
+                    on:click={() => selectCity(cityItem.name)}
+                  >
+                    <div class="popover-item-left">
+                      <span class="popover-item-title">{cityItem.name}</span>
+                    </div>
+                    <span class="item-count-badge">{cityItem.count}</span>
+                  </button>
+                {/each}
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
-      <!-- Suburb / Area Filter -->
+      <!-- Suburb / Area Dropdown -->
       {#if $explorerData.uniqueSuburbs && $explorerData.uniqueSuburbs.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-suburb-select">Suburb / Area</label>
-          <select
-            id="filter-suburb-select"
-            class="filter-select"
-            class:is-active={$explorerFilter.selectedSuburb !== 'all'}
-            bind:value={$explorerFilter.selectedSuburb}
+        <div class="custom-select-group">
+          <span class="custom-select-label">Area / Suburb</span>
+          <button
+            type="button"
+            class="custom-select-trigger"
+            class:is-selected={$explorerFilter.selectedSuburb !== 'all'}
+            on:click={(e) => toggleDropdown('suburb', e)}
           >
-            <option value="all">All Suburbs ({$explorerData.uniqueSuburbs.length})</option>
-            {#each $explorerData.uniqueSuburbs as suburb}
-              {@const cnt = counts.bySuburb.get(suburb) || 0}
-              <option value={suburb}>{suburb} ({cnt})</option>
-            {/each}
-          </select>
+            <div class="trigger-left-content">
+              {#if $explorerFilter.selectedSuburb !== 'all'}
+                <MapPin size={13} class="text-emerald-400" />
+                <span class="trigger-label-text">{$explorerFilter.selectedSuburb}</span>
+              {:else}
+                <MapPin size={13} class="text-secondary" />
+                <span class="trigger-label-text text-secondary">All Areas</span>
+              {/if}
+            </div>
+            <ChevronDown size={13} class="chevron-arrow" />
+          </button>
+
+          {#if activeOpenDropdown === 'suburb'}
+            <div class="custom-popover-menu max-height-scroll">
+              <button
+                type="button"
+                class="popover-item"
+                class:active={$explorerFilter.selectedSuburb === 'all'}
+                on:click={() => selectSuburb('all')}
+              >
+                <span>All Areas</span>
+                <span class="item-count-badge">{$explorerData.uniqueSuburbs.length}</span>
+              </button>
+
+              <div class="popover-divider"></div>
+
+              {#each $explorerData.uniqueSuburbs as suburb}
+                {@const cnt = counts.bySuburb.get(suburb) || 0}
+                <button
+                  type="button"
+                  class="popover-item"
+                  class:active={$explorerFilter.selectedSuburb === suburb}
+                  on:click={() => selectSuburb(suburb)}
+                >
+                  <span class="popover-item-title">{suburb}</span>
+                  <span class="item-count-badge">{cnt}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
-      <!-- Year Filter -->
+      <!-- Year Dropdown -->
       {#if $explorerData.uniqueYears.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-year-select">Year</label>
-          <select
-            id="filter-year-select"
-            class="filter-select"
-            class:is-active={$explorerFilter.selectedYear !== 'all'}
-            bind:value={$explorerFilter.selectedYear}
+        <div class="custom-select-group">
+          <span class="custom-select-label">Year</span>
+          <button
+            type="button"
+            class="custom-select-trigger"
+            class:is-selected={$explorerFilter.selectedYear !== 'all'}
+            on:click={(e) => toggleDropdown('year', e)}
           >
-            <option value="all">All Years ({$explorerData.uniqueYears.length})</option>
-            {#each $explorerData.uniqueYears as yr}
-              {@const cnt = counts.byYear.get(yr) || 0}
-              <option value={yr}>{yr} ({cnt})</option>
-            {/each}
-          </select>
+            <div class="trigger-left-content">
+              <Calendar size={13} class={$explorerFilter.selectedYear !== 'all' ? 'text-amber-400' : 'text-secondary'} />
+              <span class="trigger-label-text">
+                {$explorerFilter.selectedYear !== 'all' ? $explorerFilter.selectedYear : 'All Years'}
+              </span>
+            </div>
+            <ChevronDown size={13} class="chevron-arrow" />
+          </button>
+
+          {#if activeOpenDropdown === 'year'}
+            <div class="custom-popover-menu">
+              <button
+                type="button"
+                class="popover-item"
+                class:active={$explorerFilter.selectedYear === 'all'}
+                on:click={() => selectYear('all')}
+              >
+                <span>All Years</span>
+              </button>
+
+              <div class="popover-divider"></div>
+
+              {#each $explorerData.uniqueYears as yr}
+                {@const cnt = counts.byYear.get(yr) || 0}
+                <button
+                  type="button"
+                  class="popover-item"
+                  class:active={$explorerFilter.selectedYear === yr}
+                  on:click={() => selectYear(yr)}
+                >
+                  <span class="popover-item-title">{yr}</span>
+                  <span class="item-count-badge">{cnt}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
-      <!-- Month Filter -->
+      <!-- Month Dropdown -->
       {#if $explorerData.uniqueMonths.length > 0}
-        <div class="filter-dropdown-group">
-          <label class="dropdown-label" for="filter-month-select">Month</label>
-          <select
-            id="filter-month-select"
-            class="filter-select"
-            class:is-active={$explorerFilter.selectedMonth !== 'all'}
-            bind:value={$explorerFilter.selectedMonth}
+        <div class="custom-select-group">
+          <span class="custom-select-label">Month</span>
+          <button
+            type="button"
+            class="custom-select-trigger"
+            class:is-selected={$explorerFilter.selectedMonth !== 'all'}
+            on:click={(e) => toggleDropdown('month', e)}
           >
-            <option value="all">All Months</option>
-            {#each $explorerData.uniqueMonths as mo}
-              {@const cnt = counts.byMonth.get(mo) || 0}
-              <option value={mo}>{mo} ({cnt})</option>
-            {/each}
-          </select>
+            <div class="trigger-left-content">
+              <Calendar size={13} class={$explorerFilter.selectedMonth !== 'all' ? 'text-amber-400' : 'text-secondary'} />
+              <span class="trigger-label-text">
+                {#if $explorerFilter.selectedMonth !== 'all'}
+                  {@const [y, m] = $explorerFilter.selectedMonth.split('-')}
+                  {@const mName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m) - 1]}
+                  {mName} {y}
+                {:else}
+                  All Months
+                {/if}
+              </span>
+            </div>
+            <ChevronDown size={13} class="chevron-arrow" />
+          </button>
+
+          {#if activeOpenDropdown === 'month'}
+            <div class="custom-popover-menu max-height-scroll">
+              <button
+                type="button"
+                class="popover-item"
+                class:active={$explorerFilter.selectedMonth === 'all'}
+                on:click={() => selectMonth('all')}
+              >
+                <span>All Months</span>
+              </button>
+
+              <div class="popover-divider"></div>
+
+              {#each $explorerData.uniqueMonths as mo}
+                {@const cnt = counts.byMonth.get(mo) || 0}
+                {@const y = parseInt(mo.slice(0, 4))}
+                {@const m = parseInt(mo.slice(5, 7))}
+                {@const mName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1] || mo}
+                <button
+                  type="button"
+                  class="popover-item"
+                  class:active={$explorerFilter.selectedMonth === mo}
+                  on:click={() => selectMonth(mo)}
+                >
+                  <span class="popover-item-title">{mName} {y}</span>
+                  <span class="item-count-badge">{cnt}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -328,6 +571,13 @@
     box-shadow: 0 2px 10px rgba(16, 185, 129, 0.25);
   }
 
+  .filter-chip.chip-video.active {
+    background: rgba(236, 72, 153, 0.16);
+    border-color: #ec4899;
+    color: #f472b6;
+    box-shadow: 0 2px 10px rgba(236, 72, 153, 0.25);
+  }
+
   .filter-chip.chip-bts.active {
     background: rgba(245, 158, 11, 0.16);
     border-color: #f59e0b;
@@ -389,8 +639,8 @@
 
   .advanced-filter-drawer {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
     padding-top: 10px;
     border-top: 1px solid var(--border-subtle);
     animation: drawerFade 0.15s ease-out;
@@ -407,43 +657,194 @@
     }
   }
 
-  .filter-dropdown-group {
+  .custom-select-group {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
 
-  .dropdown-label {
+  .custom-select-label {
     font-size: 10.5px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
 
-  .filter-select {
-    height: 32px;
-    padding: 0 8px;
-    background: #09090d;
+  .custom-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    background: #09090e;
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-sm);
     color: #ffffff;
     font-size: 12px;
-    outline: none;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 0.15s ease;
+    width: 100%;
+    text-align: left;
   }
 
-  .filter-select:focus {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  .custom-select-trigger:hover {
+    background: #14141c;
+    border-color: var(--border-strong);
   }
 
-  .filter-select.is-active {
-    background: #141420;
+  .custom-select-trigger.is-selected {
+    background: rgba(56, 189, 248, 0.08);
     border-color: #38bdf8;
     color: #38bdf8;
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.2);
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.18);
+  }
+
+  .trigger-left-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+
+  .trigger-label-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :global(.chevron-arrow) {
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+
+  /* Custom Popover Glass Menu */
+  .custom-popover-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 200px;
+    max-width: 280px;
+    background: #12121a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+    padding: 6px;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: popoverFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .custom-popover-menu.max-height-scroll {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  @keyframes popoverFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .popover-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #f4f4f5;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s ease;
+    width: 100%;
+  }
+
+  .popover-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+
+  .popover-item.active {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    font-weight: 700;
+  }
+
+  .popover-item.sub-item {
+    padding-left: 18px;
+  }
+
+  .popover-item-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .popover-item-title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .item-count-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+  }
+
+  .popover-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #a1a1aa;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+  }
+
+  .group-country-name {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .group-total-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .popover-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 4px 0;
   }
 </style>

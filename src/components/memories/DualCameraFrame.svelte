@@ -6,6 +6,9 @@
   import Repeat from 'lucide-svelte/icons/repeat';
   import Film from 'lucide-svelte/icons/film';
   import Move from 'lucide-svelte/icons/move';
+  import Camera from 'lucide-svelte/icons/camera';
+  import User from 'lucide-svelte/icons/circle-user';
+  import VolumeIcon from '../common/VolumeIcon.svelte';
 
   export let primarySrc: string | undefined = undefined;
   export let secondarySrc: string | undefined = undefined;
@@ -16,15 +19,19 @@
   export let dayNumberOverlay: string = '';
   export let badgeText: string = '';
   export let size: 'sm' | 'md' | 'lg' = 'md';
+  export let allowPreviewSwap: boolean = true;
 
   // Camera perspective state: if swapped is true, secondary is large base, primary is small PIP
   let swapped = false;
   let isPlayingBts = false;
+  let isBtsMuted = false;
   let btsVideoEl: HTMLVideoElement | null = null;
 
   // Track raw loaded data URLs for primary & secondary
   let primaryDataUrl = '';
   let secondaryDataUrl = '';
+  let primaryError = false;
+  let secondaryError = false;
 
   // PIP position: 4 corner presets or free percentage (x, y in %)
   type PipCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -42,7 +49,7 @@
   let wasDragged = false;
 
   function toggleSwap(e?: Event) {
-    if (!interactive || isDragging || wasDragged) return;
+    if ((!interactive && !allowPreviewSwap) || isDragging || wasDragged) return;
     e?.stopPropagation();
     swapped = !swapped;
   }
@@ -56,6 +63,8 @@
       if (btsVideoEl) {
         try {
           btsVideoEl.currentTime = 0;
+          btsVideoEl.muted = isBtsMuted;
+          btsVideoEl.volume = 1.0;
           await btsVideoEl.play();
         } catch (err) {
           console.warn('BTS video playback error:', err);
@@ -73,15 +82,25 @@
   async function handlePrimaryImgError() {
     if (primarySrc && !primaryDataUrl) {
       const dataUrl = await getMediaDataUrl(primarySrc);
-      if (dataUrl) primaryDataUrl = dataUrl;
+      if (dataUrl) {
+        primaryDataUrl = dataUrl;
+        primaryError = false;
+        return;
+      }
     }
+    primaryError = true;
   }
 
   async function handleSecondaryImgError() {
     if (secondarySrc && !secondaryDataUrl) {
       const dataUrl = await getMediaDataUrl(secondarySrc);
-      if (dataUrl) secondaryDataUrl = dataUrl;
+      if (dataUrl) {
+        secondaryDataUrl = dataUrl;
+        secondaryError = false;
+        return;
+      }
     }
+    secondaryError = true;
   }
 
   // Drag & Move PIP handler with 4-Corner Snap
@@ -189,18 +208,66 @@
     hasMovedCustom = false;
   }
 
+  function isMediaVideo(src?: string): boolean {
+    if (!src) return false;
+    const clean = src.split('?')[0].toLowerCase();
+    return clean.endsWith('.mp4') || clean.endsWith('.mov') || clean.endsWith('.webm') || clean.includes('video/') || clean.startsWith('data:video/');
+  }
+
   $: resolvedPrimary = primaryDataUrl || getSafeImageSrc(primarySrc);
   $: resolvedSecondary = secondaryDataUrl || getSafeImageSrc(secondarySrc);
+
+  let baseVideoEl: HTMLVideoElement | null = null;
+  let pipVideoEl: HTMLVideoElement | null = null;
+  let isHovered = false;
+
+  function handleMouseEnter() {
+    isHovered = true;
+    playVideoPreview();
+  }
+
+  function handleMouseLeave() {
+    isHovered = false;
+    pauseVideoPreview();
+  }
+
+  function playVideoPreview() {
+    if (baseVideoEl) {
+      baseVideoEl.play().catch(() => {});
+    }
+    if (pipVideoEl) {
+      pipVideoEl.play().catch(() => {});
+    }
+  }
+
+  function pauseVideoPreview() {
+    if (baseVideoEl) {
+      baseVideoEl.pause();
+      baseVideoEl.currentTime = 0;
+    }
+    if (pipVideoEl) {
+      pipVideoEl.pause();
+      pipVideoEl.currentTime = 0;
+    }
+  }
 
   $: largeImage = swapped ? resolvedSecondary : resolvedPrimary;
   $: smallPipImage = swapped ? resolvedPrimary : resolvedSecondary;
   $: safeBtsSrc = getSafeImageSrc(btsSrc);
+
+  $: isBaseVideo = (isVideo || isMediaVideo(largeImage));
+  $: isPipVideo = isMediaVideo(smallPipImage);
 </script>
 
 <div
   bind:this={containerEl}
   class="bereal-frame-container size-{size}"
   class:interactive
+  class:is-hovered={isHovered}
+  on:mouseenter={handleMouseEnter}
+  on:mouseleave={handleMouseLeave}
+  role="region"
+  aria-label={alt}
 >
   <!-- Large Base Canvas (Primary or Secondary when swapped) -->
   <div class="large-canvas-wrap" class:canvas-flipped={swapped}>
@@ -210,20 +277,21 @@
         src={safeBtsSrc}
         class="media-layer base-video"
         autoplay
-        muted
         playsinline
+        muted={isBtsMuted}
         on:ended={handleVideoEnded}
       >
         <track kind="captions" />
       </video>
-    {:else if isVideo && largeImage}
+    {:else if isBaseVideo && largeImage}
       <video
+        bind:this={baseVideoEl}
         src={largeImage}
         class="media-layer base-video"
-        autoplay
         loop
         muted
         playsinline
+        preload="metadata"
       >
         <track kind="captions" />
       </video>
@@ -238,6 +306,13 @@
     {:else}
       <div class="media-placeholder">
         <span class="placeholder-text">Photo Unavailable</span>
+      </div>
+    {/if}
+
+    <!-- Video indicator badge when idle (not hovered & not playing BTS) -->
+    {#if (isBaseVideo || isPipVideo) && !isHovered && !isPlayingBts}
+      <div class="video-indicator-badge" title="Hover to play preview">
+        <Play size={10} class="fill-current text-white" />
       </div>
     {/if}
 
@@ -274,13 +349,31 @@
           title="Click to swap cameras • Drag to move anywhere"
           aria-label="Selfie camera inset — Click to swap, drag to move"
         >
-          <img
-            src={smallPipImage}
-            alt="Selfie inset"
-            class="pip-image"
-            loading="lazy"
-            on:error={swapped ? handlePrimaryImgError : handleSecondaryImgError}
-          />
+          {#if (swapped ? primaryError : secondaryError)}
+            <div class="pip-glass-placeholder" title="Camera view unavailable">
+              <Camera size={16} class="text-white/50 animate-pulse" />
+            </div>
+          {:else if isPipVideo}
+            <video
+              bind:this={pipVideoEl}
+              src={smallPipImage}
+              class="pip-image"
+              loop
+              muted
+              playsinline
+              preload="metadata"
+            >
+              <track kind="captions" />
+            </video>
+          {:else}
+            <img
+              src={smallPipImage}
+              alt=""
+              class="pip-image"
+              loading="lazy"
+              on:error={swapped ? handlePrimaryImgError : handleSecondaryImgError}
+            />
+          {/if}
 
           {#if interactive}
             <div class="pip-overlay-tools">
@@ -302,24 +395,39 @@
       </div>
     {/if}
 
-    <!-- BTS Micro-Video Play Trigger -->
+    <!-- BTS Micro-Video Play Trigger & Audio Toggle -->
     {#if btsSrc}
-      <button
-        type="button"
-        class="bts-trigger-pill"
-        class:active={isPlayingBts}
-        on:click={toggleBts}
-        title="Play BTS micro-video"
-        aria-label="Play BTS micro-video"
-      >
+      <div class="bts-controls-cluster">
+        <button
+          type="button"
+          class="bts-trigger-pill"
+          class:active={isPlayingBts}
+          on:click={toggleBts}
+          title="Play BTS micro-video"
+          aria-label="Play BTS micro-video"
+        >
+          {#if isPlayingBts}
+            <Pause size={12} />
+            <span>BTS Playing</span>
+          {:else}
+            <Film size={12} />
+            <span>BTS</span>
+          {/if}
+        </button>
+
         {#if isPlayingBts}
-          <Pause size={12} />
-          <span>BTS Playing</span>
-        {:else}
-          <Film size={12} />
-          <span>BTS</span>
+          <button
+            type="button"
+            class="bts-audio-pill"
+            class:is-muted={isBtsMuted}
+            on:click|stopPropagation={() => (isBtsMuted = !isBtsMuted)}
+            title={isBtsMuted ? 'Unmute BTS Audio' : 'Mute BTS Audio'}
+            aria-label="Toggle BTS audio"
+          >
+            <VolumeIcon muted={isBtsMuted} size={12} />
+          </button>
         {/if}
-      </button>
+      </div>
     {/if}
   </div>
 </div>
@@ -329,7 +437,7 @@
     position: relative;
     width: 100%;
     aspect-ratio: 3 / 4;
-    border-radius: 20px;
+    border-radius: 16px;
     overflow: hidden;
     background: #0d0d12;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
@@ -338,7 +446,12 @@
   }
 
   .bereal-frame-container.size-sm {
-    border-radius: 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .bereal-frame-container.size-md {
+    border-radius: 16px;
   }
 
   .bereal-frame-container.size-lg {
@@ -415,10 +528,31 @@
     z-index: 15;
   }
 
-  /* Movable Inset PIP Positioning */
+  /* Video indicator badge when idle */
+  .video-indicator-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    z-index: 15;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  /* Movable Inset PIP Positioning matching 100% exact BeReal measurements */
   .pip-frame-wrapper {
     position: absolute;
-    width: 29%;
+    width: 30.47%;
     aspect-ratio: 3 / 4;
     z-index: 25;
     transition: top 0.22s cubic-bezier(0.16, 1, 0.3, 1), left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -429,51 +563,66 @@
   }
 
   .pip-frame-wrapper.corner-top-left {
-    top: 12px;
-    left: 12px;
+    top: 3.78%;
+    left: 3.78%;
   }
 
   .pip-frame-wrapper.corner-top-right {
-    top: 12px;
-    right: 12px;
+    top: 3.78%;
+    right: 3.78%;
     left: auto;
   }
 
   .pip-frame-wrapper.corner-bottom-left {
-    bottom: 12px;
-    left: 12px;
+    bottom: 3.78%;
+    left: 3.78%;
     top: auto;
   }
 
   .pip-frame-wrapper.corner-bottom-right {
-    bottom: 12px;
-    right: 12px;
+    bottom: 3.78%;
+    right: 3.78%;
     top: auto;
     left: auto;
-  }
-
-  .size-sm .pip-frame-wrapper.corner-top-left {
-    top: 6px;
-    left: 6px;
-  }
-
-  .size-lg .pip-frame-wrapper.corner-top-left {
-    top: 16px;
-    left: 16px;
   }
 
   .pip-frame {
     position: relative;
     width: 100%;
     height: 100%;
-    border-radius: 12px;
     overflow: hidden;
-    border: 2.5px solid #000000;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
-    cursor: grab;
     background: #000000;
     padding: 0;
+    box-sizing: border-box;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  }
+
+  /* Size-scaled borders and circular corner radii matching 16.24% continuous curvature */
+  .size-sm .pip-frame {
+    border-radius: 5px;
+    border: 1.5px solid #000000;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+  }
+
+  .size-md .pip-frame {
+    border-radius: 9px;
+    border: 2.5px solid #000000;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.85);
+  }
+
+  .size-lg .pip-frame {
+    border-radius: 18px;
+    border: 4px solid #000000;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.9);
+  }
+
+  .pip-glass-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, #1e1e2c 0%, #0d0d14 100%);
   }
 
   .pip-frame:hover {
@@ -533,11 +682,18 @@
     transform: scale(1.15);
   }
 
-  /* BTS Play Trigger Pill */
-  .bts-trigger-pill {
+  /* BTS Play Trigger & Audio Controls Cluster */
+  .bts-controls-cluster {
     position: absolute;
     bottom: 10px;
     right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 30;
+  }
+
+  .bts-trigger-pill {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -550,7 +706,6 @@
     font-weight: 700;
     color: #ffffff;
     cursor: pointer;
-    z-index: 30;
     transition: all 0.2s ease;
   }
 
@@ -565,5 +720,31 @@
     background: #ffe600;
     color: #000000;
     border-color: #ffe600;
+  }
+
+  .bts-audio-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s ease;
+  }
+
+  .bts-audio-pill:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+  }
+
+  .bts-audio-pill.is-muted {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
   }
 </style>
