@@ -11,6 +11,7 @@
     explorerFilterCounts,
     activeFilterCount,
     resetFilters,
+    showMemoryDebugBadges,
   } from '$lib/memoriesStore';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
@@ -153,7 +154,7 @@
   function handleDayClick(dayNum: number) {
     const dateStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const raw = $rawMemoriesByDate.get(dateStr);
-    if (raw && raw.length > 0) {
+    if ($showMemoryDebugBadges && raw && raw.length > 0) {
       console.log(`[Calendar Day Click ${dateStr}]`, {
         isLate: raw[0].isLate,
         lateDuration: raw[0].lateDuration,
@@ -170,7 +171,7 @@
     }
   }
 
-  $: if ($rawMemoriesByDate && yearMonth) {
+  $: if ($showMemoryDebugBadges && $rawMemoriesByDate && yearMonth) {
     let onTimeCount = 0;
     let lateCount = 0;
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
