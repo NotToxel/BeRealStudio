@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Modal from '$components/Modal.svelte';
+  import Toggle from '$components/Toggle.svelte';
   import { APP_VERSION } from '$lib/version';
+  import { isDev } from '$lib/devMode';
   import {
     toolkitConfig,
     recapperConfig,
@@ -9,6 +11,11 @@
     ffmpegInfo,
     defaultToolkitConfig,
     defaultRecapperConfig,
+    offlineGeoDbStatus,
+    isDownloadingGeoDb,
+    downloadGeoDbProgress,
+    hwInfoStore,
+    exiftoolStore,
   } from '$lib/stores';
   import {
     detectFfmpeg,
@@ -26,7 +33,6 @@
     onDownloadProgress,
   } from '$lib/tauri';
   import type { HardwareAccelerationInfo } from '$lib/types';
-  import { offlineGeoDbStatus, isDownloadingGeoDb, downloadGeoDbProgress } from '$lib/stores';
   import Cpu from 'lucide-svelte/icons/cpu';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
@@ -45,46 +51,130 @@
   import Eye from 'lucide-svelte/icons/eye';
   import Clock from 'lucide-svelte/icons/clock';
   import MapPin from 'lucide-svelte/icons/map-pin';
-  import { memoryHeaderSettings } from '$lib/memoriesStore';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Bug from 'lucide-svelte/icons/bug';
+  import VolumeIcon from '$components/common/VolumeIcon.svelte';
+  import Images from 'lucide-svelte/icons/images';
+  import Calendar from 'lucide-svelte/icons/calendar';
+  import {
+    memoryHeaderSettings,
+    globalAudioSettings,
+    showMemoryDebugBadges,
+    replaceLocationPlaceholders,
+    replaceTimeTagPlaceholders,
+    formatMemoryLocation,
+    formatMemoryTimeTag,
+  } from '$lib/memoriesStore';
+  import type { ExplorerMemory } from '$lib/types';
+
+  const samplePreviewMemory: ExplorerMemory = {
+    id: 'sample-preview',
+    index: 0,
+    takenAt: '2024-08-26T14:20:00.000Z',
+    dateFormatted: '26 August 2024',
+    dayNumber: '26',
+    monthKey: '2024-08',
+    year: 2024,
+    month: 8,
+    day: 26,
+    timeFormatted: '14:20',
+    isLate: true,
+    lateDuration: '45m late',
+    lateExact: '45 min late',
+    lateInSeconds: 2700,
+    retakeCounter: 0,
+    caption: 'Great afternoon!',
+    location: { latitude: 51.5136, longitude: -0.1365 },
+    locationName: 'Soho, London, England',
+    suburb: 'Soho',
+    city: 'London',
+    country: 'England',
+    isVideo: false,
+  };
 
   let statusMessage = '';
   let isSuccessStatus = true;
   let showResetModal = false;
-  let exiftoolPath: string | null = null;
   let checkingExiftool = false;
-  let hwInfo: HardwareAccelerationInfo | null = null;
+  let checkingHwInfo = false;
 
-  async function detectHwInfo() {
+  async function handleCopyDiagnostics() {
+    const hw = $hwInfoStore;
+    const ff = $ffmpegInfo;
+    const exif = $exiftoolStore;
+    const text = [
+      `=== BeReal Studio System Diagnostics ===`,
+      `App Version: ${APP_VERSION}`,
+      `CPU Cores: ${hw?.cpuCores ?? 'Unknown'} (Threads: ${hw?.parallelThreads ?? 'Unknown'})`,
+      `Hardware GPU Acceleration: ${hw?.isGpuAccelerated ? 'Yes (' + hw.encoderName + ')' : 'CPU Only'}`,
+      `FFmpeg Path: ${ff.path ?? 'Not Detected'}`,
+      `ExifTool Path: ${exif.path ?? 'Using Native Rust EXIF Engine'}`,
+      `Active Offline GeoDB: ${$offlineGeoDbStatus?.activeTier ?? 'Default Global Baseline'}`,
+    ].join('\n');
     try {
-      hwInfo = await checkHardwareAcceleration();
-    } catch (e) {
-      console.warn('Failed to detect hardware acceleration:', e);
+      await navigator.clipboard.writeText(text);
+      showToast('System diagnostics copied to clipboard!');
+    } catch {
+      showToast('Failed to copy to clipboard', false);
     }
   }
 
-  async function detectExiftoolHandler() {
+  async function handleClearThumbnailCache() {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('bereal_studio_media_cache');
+      }
+      showToast('Media and explorer cache cleared successfully.');
+    } catch (e) {
+      showToast(`Clear cache failed: ${e}`, false);
+    }
+  }
+
+  async function detectHwInfo(force = false) {
+    if (!force && $hwInfoStore) return;
+    checkingHwInfo = true;
+    try {
+      const info = await checkHardwareAcceleration();
+      hwInfoStore.set(info);
+    } catch (e) {
+      console.warn('Failed to detect hardware acceleration:', e);
+      hwInfoStore.set({
+        gpuName: 'Standard Multi-Core CPU',
+        encoderName: 'libx264 (Software CPU)',
+        isGpuAccelerated: false,
+        cpuCores: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 8) : 8,
+        parallelThreads: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 8) : 8,
+      });
+    } finally {
+      checkingHwInfo = false;
+    }
+  }
+
+  async function detectExiftoolHandler(force = false) {
+    if (!force && $exiftoolStore.checked) return;
     checkingExiftool = true;
     try {
-      exiftoolPath = await checkExiftool();
+      const p = await checkExiftool();
+      exiftoolStore.set({ path: p, checked: true });
     } catch {
-      exiftoolPath = null;
+      exiftoolStore.set({ path: null, checked: true });
     } finally {
       checkingExiftool = false;
     }
   }
 
-  onMount(async () => {
-    if (!$ffmpegInfo.checked) {
-      await detectFfmpeg();
-    }
-    await detectExiftoolHandler();
-    await detectHwInfo();
-    try {
-      const dbStatus = await checkOfflineGeoDb();
-      offlineGeoDbStatus.set(dbStatus);
-    } catch (e) {
-      console.warn('Failed to check offline geodb:', e);
-    }
+  onMount(() => {
+    // Run diagnostics asynchronously without blocking component lifecycle
+    Promise.allSettled([
+      !$ffmpegInfo.checked ? detectFfmpeg() : Promise.resolve(null),
+      !$exiftoolStore.checked ? detectExiftoolHandler() : Promise.resolve(),
+      !$hwInfoStore ? detectHwInfo() : Promise.resolve(),
+      (!$offlineGeoDbStatus?.tiers?.length)
+        ? checkOfflineGeoDb()
+            .then((dbStatus) => offlineGeoDbStatus.set(dbStatus))
+            .catch((e) => console.warn('Failed to check offline geodb:', e))
+        : Promise.resolve(),
+    ]);
   });
 
   async function handleDownloadTier(tierId: string) {
@@ -287,30 +377,6 @@
     </div>
   {/if}
 
-  <!-- Reset Confirmation Modal -->
-  {#if showResetModal}
-    <div class="modal-backdrop">
-      <div class="modal-card">
-        <div class="modal-head">
-          <AlertTriangle size={22} class="text-amber-400" />
-          <h3 class="title-sm font-bold text-white">Reset All Settings to Defaults?</h3>
-        </div>
-        <p class="modal-body text-secondary text-sm">
-          Are you sure you want to restore all photo processing and recap video options to factory defaults? Your processed photos on disk will not be affected.
-        </p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showResetModal = false)}>
-            Cancel
-          </button>
-          <button type="button" class="btn btn-danger btn-sm" on:click={handleConfirmReset}>
-            <RotateCcw size={13} />
-            <span>Yes, Reset to Defaults</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
   <div class="sections-list">
     <!-- 1. Configuration Management (Export / Import / Save) -->
     <div class="card section-card">
@@ -354,20 +420,20 @@
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            on:click={() => detectFfmpeg()}
-            disabled={$ffmpegInfo.checking}
+            on:click={handleCopyDiagnostics}
+            title="Copy full hardware, encoder, and dependency info to clipboard"
           >
-            <RefreshCw size={12} class={$ffmpegInfo.checking ? 'animate-spin' : ''} />
-            <span>{$ffmpegInfo.checking ? 'Checking...' : 'Recheck FFmpeg'}</span>
+            <Copy size={13} />
+            <span>Copy Diagnostics</span>
           </button>
           <button
             type="button"
             class="btn btn-secondary btn-sm"
-            on:click={detectExiftoolHandler}
-            disabled={checkingExiftool}
+            on:click={handleClearThumbnailCache}
+            title="Clear cached thumbnails & geocoded index"
           >
-            <RefreshCw size={12} class={checkingExiftool ? 'animate-spin' : ''} />
-            <span>{checkingExiftool ? 'Checking...' : 'Recheck ExifTool'}</span>
+            <Trash2 size={13} />
+            <span>Clear Cache</span>
           </button>
         </div>
       </div>
@@ -405,10 +471,10 @@
       </div>
 
       <div class="dependency-status" style="margin-top: 10px;">
-        <div class="dep-icon" class:found={Boolean(exiftoolPath)}>
+        <div class="dep-icon" class:found={Boolean($exiftoolStore.path)}>
           {#if checkingExiftool}
             <RefreshCw size={18} class="animate-spin text-sky-400" />
-          {:else if exiftoolPath}
+          {:else if $exiftoolStore.path}
             <CheckCircle size={18} />
           {:else}
             <AlertTriangle size={18} />
@@ -420,7 +486,7 @@
             <strong>ExifTool Metadata Sidecar</strong>
             {#if checkingExiftool}
               <span class="badge badge-info">Detecting...</span>
-            {:else if exiftoolPath}
+            {:else if $exiftoolStore.path}
               <span class="badge badge-success">Detected</span>
             {:else}
               <span class="badge badge-warning">Fallback to Native Rust EXIF</span>
@@ -430,33 +496,44 @@
             {#if checkingExiftool}
               Scanning system for ExifTool binary...
             {:else}
-              {exiftoolPath || 'Using built-in native Rust EXIF/IPTC engine. Install ExifTool for enhanced multi-tag synchronization.'}
+              {$exiftoolStore.path || 'Using built-in native Rust EXIF/IPTC engine. Install ExifTool for enhanced multi-tag synchronization.'}
             {/if}
           </p>
         </div>
       </div>
 
-      {#if hwInfo}
-        <div class="dependency-status" style="margin-top: 10px;">
-          <div class="dep-icon" class:found={hwInfo.isGpuAccelerated}>
-            <Sparkles size={18} class={hwInfo.isGpuAccelerated ? 'text-emerald-400' : 'text-sky-400'} />
-          </div>
-
-          <div class="dep-info">
-            <div class="dep-name">
-              <strong>Hardware Acceleration &amp; Parallelism</strong>
-              {#if hwInfo.isGpuAccelerated}
-                <span class="badge badge-success">GPU Accelerated</span>
-              {:else}
-                <span class="badge badge-info">Multi-Core CPU ({hwInfo.cpuCores} Threads)</span>
-              {/if}
-            </div>
-            <p class="dep-path text-secondary">
-              Video Encoder: <strong class="text-white">{hwInfo.encoderName}</strong> &bull; Rayon Parallelism: <strong class="text-white">{hwInfo.parallelThreads} Active CPU Worker Threads</strong>
-            </p>
-          </div>
+      <!-- Hardware Acceleration Card (Statically rendered with loading indicator) -->
+      <div class="dependency-status" style="margin-top: 10px;">
+        <div class="dep-icon" class:found={Boolean($hwInfoStore?.isGpuAccelerated)}>
+          {#if !$hwInfoStore && checkingHwInfo}
+            <RefreshCw size={18} class="animate-spin text-sky-400" />
+          {:else if $hwInfoStore}
+            <Sparkles size={18} class={$hwInfoStore.isGpuAccelerated ? 'text-emerald-400' : 'text-sky-400'} />
+          {:else}
+            <RefreshCw size={18} class="animate-spin text-sky-400" />
+          {/if}
         </div>
-      {/if}
+
+        <div class="dep-info">
+          <div class="dep-name">
+            <strong>Hardware Acceleration &amp; Parallelism</strong>
+            {#if !$hwInfoStore}
+              <span class="badge badge-info">Detecting...</span>
+            {:else if $hwInfoStore.isGpuAccelerated}
+              <span class="badge badge-success">GPU Accelerated</span>
+            {:else}
+              <span class="badge badge-info">Multi-Core CPU ({$hwInfoStore.cpuCores} Threads)</span>
+            {/if}
+          </div>
+          <p class="dep-path text-secondary">
+            {#if !$hwInfoStore}
+              Probing GPU video encoder (NVENC / QuickSync / AMF / VideoToolbox)...
+            {:else}
+              Video Encoder: <strong class="text-white">{$hwInfoStore.encoderName}</strong> &bull; Rayon Parallelism: <strong class="text-white">{$hwInfoStore.parallelThreads} Active CPU Worker Threads</strong>
+            {/if}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- 3. Offline Reverse Geocoding Datasets -->
@@ -480,23 +557,26 @@
                 {#if tier.isInstalled}
                   <CheckCircle size={16} class="text-emerald-400" />
                 {:else}
-                  <Database size={16} class="text-secondary" />
+                  <Download size={16} class="text-muted" />
                 {/if}
               </div>
+
               <div class="tier-setting-info">
                 <div class="tier-setting-title-row">
-                  <span class="font-semibold text-white text-sm">{tier.name} Dataset</span>
-                  <span class="text-xs text-muted">({tier.subtitle})</span>
+                  <span class="font-bold text-white text-sm">{tier.name}</span>
                   {#if tier.isActive}
-                    <span class="badge badge-success font-mono text-xs">✓ Active In Memory</span>
+                    <span class="badge badge-success font-mono text-xs">Active Dataset</span>
                   {:else if tier.isInstalled}
-                    <span class="badge badge-subtle font-mono text-xs">Installed</span>
-                  {:else}
-                    <span class="badge badge-yellow font-mono text-xs">~{tier.approxDownloadMb} MB Download</span>
+                    <span class="badge badge-info font-mono text-xs">Installed</span>
                   {/if}
                 </div>
+                <span class="text-xs text-secondary">{tier.subtitle} &bull; {tier.approxCities}</span>
                 <span class="text-xs text-muted font-mono">
-                  {tier.approxCities} &bull; {tier.isInstalled ? `${(tier.fileSizeBytes / 1048576).toFixed(1)} MB on disk` : `~${tier.approxDownloadMb} MB archive`}
+                  {#if tier.isInstalled}
+                    Disk size: {(tier.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB &bull; {tier.cityCount.toLocaleString()} locations loaded
+                  {:else}
+                    Download: ~{tier.approxDownloadMb} MB (uncompressed JSON index)
+                  {/if}
                 </span>
               </div>
             </div>
@@ -573,12 +653,12 @@
       {/if}
     </div>
 
-    <!-- 3. Memories & Feed Display Settings -->
+    <!-- 4. Memories & Feed Display Settings -->
     <div class="card section-card">
       <div class="card-head">
         <div class="head-title">
           <Eye size={18} class="text-sky-400" />
-          <h2 class="title-sm">3. Memories &amp; Feed Header Customization</h2>
+          <h2 class="title-sm">4. Memories &amp; Feed Header Customization</h2>
         </div>
         <span class="badge badge-sky font-mono text-xs">Feed View</span>
       </div>
@@ -588,69 +668,182 @@
       </p>
 
       <div class="settings-grid-2col">
-        <!-- Location Display Toggle & Format -->
+        <!-- Location Display Toggle & Rich Format Selector -->
         <div class="setting-item-box">
-          <div class="setting-item-header">
-            <MapPin size={15} class="text-emerald-400" />
-            <span class="font-bold text-white text-sm">Location Display</span>
-          </div>
-
-          <label class="toggle-control-row">
-            <input
-              type="checkbox"
-              bind:checked={$memoryHeaderSettings.showLocation}
-            />
-            <span class="text-xs text-secondary">Show location above photos in feed</span>
-          </label>
+          <Toggle
+            label="Location Display"
+            description="Show reverse-geocoded location directly above photos in the feed"
+            icon={MapPin}
+            accentColor="emerald"
+            bind:checked={$memoryHeaderSettings.showLocation}
+          />
 
           {#if $memoryHeaderSettings.showLocation}
-            <div class="setting-select-wrap">
-              <label class="text-xs text-muted" for="location-format-select">Format</label>
-              <select
-                id="location-format-select"
-                class="setting-dropdown-select"
-                bind:value={$memoryHeaderSettings.locationFormat}
-              >
-                <option value="city_country">City, Country (e.g. Constanța, Romania)</option>
-                <option value="suburb_city_country">Suburb, City, Country (e.g. Soho, London, UK)</option>
-                <option value="suburb_city">Suburb, City (e.g. Soho, London)</option>
-                <option value="city_only">City Only (e.g. London)</option>
-                <option value="full">Full Geocoded Address</option>
-              </select>
+            <div class="format-choice-list">
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'city_country'}>
+                <input type="radio" name="locFormat" value="city_country" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">City, Country</span>
+                  <span class="choice-sample">London, England</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'suburb_city_country'}>
+                <input type="radio" name="locFormat" value="suburb_city_country" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Area, City, Country</span>
+                  <span class="choice-sample">Soho, London, England</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'suburb_city'}>
+                <input type="radio" name="locFormat" value="suburb_city" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Area, City</span>
+                  <span class="choice-sample">Soho, London</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'city_only'}>
+                <input type="radio" name="locFormat" value="city_only" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">City Only</span>
+                  <span class="choice-sample">London</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.locationFormat === 'custom'}>
+                <input type="radio" name="locFormat" value="custom" bind:group={$memoryHeaderSettings.locationFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Custom Location Text</span>
+                  <span class="choice-sample">Display custom text everywhere</span>
+                </div>
+              </label>
+
+              {#if $memoryHeaderSettings.locationFormat === 'custom'}
+                <div class="custom-header-input-wrap">
+                  <input
+                    type="text"
+                    class="input custom-text-field"
+                    placeholder="e.g. {'{suburb}'}, {'{city}'} or {'{city}'}, {'{country}'}"
+                    bind:value={$memoryHeaderSettings.customLocationText}
+                  />
+                  <div class="placeholder-chips-row">
+                    <span class="placeholder-label">Insert:</span>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{suburb}')}>{'{suburb}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{city}')}>{'{city}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{country}')}>{'{country}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{location}')}>{'{location}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{lat}')}>{'{lat}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customLocationText = ($memoryHeaderSettings.customLocationText || '') + '{lng}')}>{'{lng}'}</button>
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
 
-        <!-- Time & Late Tag Toggle & Format -->
+        <!-- Time & Late Tag Toggle & Rich Format Selector -->
         <div class="setting-item-box">
-          <div class="setting-item-header">
-            <Clock size={15} class="text-amber-400" />
-            <span class="font-bold text-white text-sm">Time / Date Subtitle</span>
-          </div>
-
-          <label class="toggle-control-row">
-            <input
-              type="checkbox"
-              bind:checked={$memoryHeaderSettings.showTimeTag}
-            />
-            <span class="text-xs text-secondary">Show timestamp / late tag next to location</span>
-          </label>
+          <Toggle
+            label="Time / Date Subtitle"
+            description="Show timestamp, progressive date, or late duration next to location"
+            icon={Clock}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showTimeTag}
+          />
 
           {#if $memoryHeaderSettings.showTimeTag}
-            <div class="setting-select-wrap">
-              <label class="text-xs text-muted" for="time-format-select">Format</label>
-              <select
-                id="time-format-select"
-                class="setting-dropdown-select"
-                bind:value={$memoryHeaderSettings.timeTagFormat}
-              >
-                <option value="time_only">Time Only (e.g. 14:20)</option>
-                <option value="late_duration">Late Tag if late (e.g. 3h late or 3h ago)</option>
-                <option value="date_only">Date Only (e.g. 25 August 2024)</option>
-                <option value="datetime">Date &amp; Time (e.g. 25 Aug 2024 • 14:20)</option>
-              </select>
+            <div class="format-choice-list">
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'late_duration'}>
+                <input type="radio" name="timeFormat" value="late_duration" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Smart Progressive (Recommended)</span>
+                  <span class="choice-sample">26 Aug • 14:20 (or full date for past years)</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'datetime'}>
+                <input type="radio" name="timeFormat" value="datetime" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Date &amp; Time</span>
+                  <span class="choice-sample">26 Aug • 14:20</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'date_only'}>
+                <input type="radio" name="timeFormat" value="date_only" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Date Only</span>
+                  <span class="choice-sample">26 Aug (or 26 Aug 2024)</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'time_only'}>
+                <input type="radio" name="timeFormat" value="time_only" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Time Only</span>
+                  <span class="choice-sample">14:20</span>
+                </div>
+              </label>
+
+              <label class="format-choice-card" class:selected={$memoryHeaderSettings.timeTagFormat === 'custom'}>
+                <input type="radio" name="timeFormat" value="custom" bind:group={$memoryHeaderSettings.timeTagFormat} />
+                <div class="choice-text">
+                  <span class="choice-title">Custom Subtitle Text</span>
+                  <span class="choice-sample">Use placeholders like {'{late}'} • {'{date}'}</span>
+                </div>
+              </label>
+
+              {#if $memoryHeaderSettings.timeTagFormat === 'custom'}
+                <div class="custom-header-input-wrap">
+                  <input
+                    type="text"
+                    class="input custom-text-field"
+                    placeholder="e.g. {'{late}'} • {'{date}'} or {'{time}'} • {'{date}'}"
+                    bind:value={$memoryHeaderSettings.customTimeTagText}
+                  />
+                  <div class="placeholder-chips-row">
+                    <span class="placeholder-label">Insert:</span>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{date}')}>{'{date}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{time}')}>{'{time}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{late}')}>{'{late}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{late_exact}')}>{'{late_exact}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{full_date}')}>{'{full_date}'}</button>
+                    <button type="button" class="placeholder-chip" on:click={() => ($memoryHeaderSettings.customTimeTagText = ($memoryHeaderSettings.customTimeTagText || '') + '{year}')}>{'{year}'}</button>
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
+        </div>
+      </div>
+
+      <!-- Additional Late Tag & Pill Visibility Toggles -->
+      <div class="setting-item-box" style="margin-top: 16px;">
+        <h3 class="title-xs" style="margin-bottom: 10px; color: var(--text-main); font-weight: 600;">Late Submission Indicators</h3>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <Toggle
+            label="Append Late Duration in Post Header"
+            description="Display how late you were next to the timestamp (e.g. • 45m late) matching standard theme text"
+            icon={Clock}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLateAddition}
+          />
+          <Toggle
+            label="Show Late Pills on Memories Grid"
+            description="Display the late duration badge on memory thumbnail cards in the grid view"
+            icon={Images}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLatePillsInGrid}
+          />
+          <Toggle
+            label="Show Late Pills in Calendar View"
+            description="Display the late submission pill directly inside calendar day cells"
+            icon={Calendar}
+            accentColor="yellow"
+            bind:checked={$memoryHeaderSettings.showLatePillsInCalendar}
+          />
         </div>
       </div>
 
@@ -659,24 +852,14 @@
         <span class="preview-box-label">LIVE HEADER PREVIEW</span>
         <div class="preview-header-row">
           <div class="preview-avatar">
-            <span>C</span>
+            <span>N</span>
           </div>
           <div class="preview-text-col">
-            <span class="preview-username">cold.lin</span>
+            <span class="preview-username">nottoxel</span>
             <div class="preview-subtitle">
               {#if $memoryHeaderSettings.showLocation}
                 <span class="preview-loc">
-                  {#if $memoryHeaderSettings.locationFormat === 'city_country'}
-                    Constanța, Romania
-                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city_country'}
-                    Tomis Nord, Constanța, Romania
-                  {:else if $memoryHeaderSettings.locationFormat === 'suburb_city'}
-                    Tomis Nord, Constanța
-                  {:else if $memoryHeaderSettings.locationFormat === 'city_only'}
-                    Constanța
-                  {:else}
-                    Constanța, Romania
-                  {/if}
+                  {formatMemoryLocation(samplePreviewMemory, $memoryHeaderSettings) || 'London, England'}
                 </span>
               {/if}
               {#if $memoryHeaderSettings.showLocation && $memoryHeaderSettings.showTimeTag}
@@ -684,15 +867,7 @@
               {/if}
               {#if $memoryHeaderSettings.showTimeTag}
                 <span class="preview-time">
-                  {#if $memoryHeaderSettings.timeTagFormat === 'late_duration'}
-                    3h ago
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'date_only'}
-                    25 August 2024
-                  {:else if $memoryHeaderSettings.timeTagFormat === 'datetime'}
-                    25 Aug 2024 • 14:20
-                  {:else}
-                    14:20
-                  {/if}
+                  {formatMemoryTimeTag(samplePreviewMemory, $memoryHeaderSettings) || '14:20'}
                 </span>
               {/if}
             </div>
@@ -701,11 +876,147 @@
       </div>
     </div>
 
-    <!-- 4. Local Storage & Privacy Management -->
+    <!-- 5. Memory Audio & Video Playback Settings Overhaul -->
+    <div class="card section-card">
+      <div class="head-title">
+        <VolumeIcon size={18} className="text-sky-400" />
+        <h2 class="title-sm">5. Memory Audio &amp; Video Playback Defaults</h2>
+      </div>
+
+      <p class="text-secondary text-desc">
+        Configure default autoplay sound behavior and volume faders for BeReal videos and BTS (Behind-The-Scenes) micro-clips in the memories viewer.
+      </p>
+
+      <div class="settings-grid-2col">
+        <!-- Column 1: Autoplay Sound Mode -->
+        <div class="setting-item-box">
+          <Toggle
+            label="Mute Video Autoplay"
+            description="Start videos and BTS micro-clips in silent mode when hovered"
+            icon={VolumeIcon}
+            accentColor="cyan"
+            bind:checked={$globalAudioSettings.defaultMuted}
+          />
+
+          <div class="format-choice-list mt-3">
+            <label class="format-choice-card" class:selected={$globalAudioSettings.defaultMuted}>
+              <input
+                type="radio"
+                name="muteMode"
+                value={true}
+                checked={$globalAudioSettings.defaultMuted}
+                on:change={() => ($globalAudioSettings.defaultMuted = true)}
+              />
+              <div class="choice-text">
+                <span class="choice-title">Always Muted (Recommended)</span>
+                <span class="choice-sample">Videos play quietly on hover with a click-to-unmute audio pill</span>
+              </div>
+            </label>
+
+            <label class="format-choice-card" class:selected={!$globalAudioSettings.defaultMuted}>
+              <input
+                type="radio"
+                name="muteMode"
+                value={false}
+                checked={!$globalAudioSettings.defaultMuted}
+                on:change={() => ($globalAudioSettings.defaultMuted = false)}
+              />
+              <div class="choice-text">
+                <span class="choice-title">Unmuted on Hover</span>
+                <span class="choice-sample">Automatically plays full audio as soon as your cursor hovers over the card</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Column 2: Master Volume with Vertical Fader -->
+        <div class="setting-item-box volume-fader-box">
+          <div class="volume-card-header">
+            <div class="volume-title-group">
+              <span class="volume-title">Master Playback Volume</span>
+              <span class="volume-subtitle">Adjust output gain for all video files &amp; BTS audio</span>
+            </div>
+            <span class="volume-level-badge font-mono">
+              {Math.round($globalAudioSettings.volume * 100)}%
+            </span>
+          </div>
+
+          <div class="vertical-fader-container">
+            <!-- Vertical Range Slider -->
+            <div class="vertical-slider-track-wrap">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                class="vertical-range-fader"
+                bind:value={$globalAudioSettings.volume}
+                aria-label="Master audio volume level"
+              />
+            </div>
+
+            <!-- Visual Scale Labels & Quick Jump Buttons -->
+            <div class="fader-scale-column">
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.95}
+                on:click={() => ($globalAudioSettings.volume = 1.0)}
+              >
+                <span>100%</span>
+                <span class="level-desc">Max Volume</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.75 && $globalAudioSettings.volume < 0.95}
+                on:click={() => ($globalAudioSettings.volume = 0.8)}
+              >
+                <span>80%</span>
+                <span class="level-desc">Default</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume >= 0.45 && $globalAudioSettings.volume < 0.75}
+                on:click={() => ($globalAudioSettings.volume = 0.5)}
+              >
+                <span>50%</span>
+                <span class="level-desc">Half</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn"
+                class:active={$globalAudioSettings.volume > 0.05 && $globalAudioSettings.volume < 0.45}
+                on:click={() => ($globalAudioSettings.volume = 0.25)}
+              >
+                <span>25%</span>
+                <span class="level-desc">Quiet</span>
+              </button>
+
+              <button
+                type="button"
+                class="fader-level-btn fader-mute-btn"
+                class:active={$globalAudioSettings.volume <= 0.05}
+                on:click={() => ($globalAudioSettings.volume = 0.0)}
+              >
+                <span>0%</span>
+                <span class="level-desc">Mute</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Local Storage & Privacy Management -->
     <div class="card section-card">
       <div class="head-title">
         <ShieldCheck size={18} class="text-emerald-400" />
-        <h2 class="title-sm">4. Local Storage &amp; Factory Reset</h2>
+        <h2 class="title-sm">6. Local Storage &amp; Factory Reset</h2>
       </div>
 
       <p class="text-secondary text-desc">
@@ -724,6 +1035,32 @@
         </button>
       </div>
     </div>
+
+    {#if isDev}
+      <!-- 7. Developer Tools & Diagnostics (Dev Mode Only) -->
+      <div class="card section-card">
+        <div class="head-title">
+          <Bug size={18} class="text-amber-400" />
+          <h2 class="title-sm">7. Developer Tools &amp; Metadata Inspector</h2>
+        </div>
+
+        <p class="text-secondary text-desc">
+          Feature flags and advanced metadata inspection tools for troubleshooting and dataset analysis. (Only visible in development environment).
+        </p>
+
+        <div class="settings-grid-2col">
+          <div class="setting-item-box">
+            <Toggle
+              label="Memory Timing &amp; Metadata Inspector"
+              description="Display interactive badges on memory cards with live BeReal moment alerts, timing offsets, and JSON inspector tooltips"
+              icon={Bug}
+              accentColor="cyan"
+              bind:checked={$showMemoryDebugBadges}
+            />
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 
   <Modal bind:open={showResetModal} title="Reset All Settings?" maxWidth="440px">
@@ -1010,41 +1347,110 @@
     padding: 14px;
   }
 
-  .setting-item-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .toggle-control-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .setting-select-wrap {
+  .format-choice-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     margin-top: 4px;
   }
 
-  .setting-dropdown-select {
-    height: 34px;
+  .format-choice-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
     background: #14141d;
-    border: 1px solid var(--border-medium);
+    border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-sm);
-    color: #ffffff;
-    padding: 0 10px;
-    font-size: 12.5px;
-    outline: none;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  .setting-dropdown-select:focus {
+  .format-choice-card input {
+    margin-top: 3px;
+    accent-color: #38bdf8;
+  }
+
+  .format-choice-card:hover {
+    background: #1c1c28;
+    border-color: var(--border-medium);
+  }
+
+  .format-choice-card.selected {
+    background: rgba(56, 189, 248, 0.1);
     border-color: #38bdf8;
+  }
+
+  .choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .choice-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .choice-sample {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .custom-header-input-wrap {
+    margin-top: 4px;
+    padding: 0 4px;
+  }
+
+  .custom-text-field {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #14141d;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: var(--radius-sm);
+    color: #ffffff;
+  }
+
+  .custom-text-field:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    outline: none;
+  }
+
+  .placeholder-chips-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .placeholder-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .placeholder-chip {
+    padding: 2px 6px;
+    background: #181824;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: #38bdf8;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .placeholder-chip:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    transform: scale(1.04);
   }
 
   .header-live-preview-box {
@@ -1123,42 +1529,159 @@
     color: #a1a1aa;
   }
 
-  /* Modal Backdrop */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-    padding: 20px;
-  }
-
-  .modal-card {
-    background: #131318;
-    border: 1px solid var(--border-medium);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    max-width: 440px;
-    width: 100%;
+  /* Audio & Video Playback Section Overhaul */
+  .volume-fader-box {
     display: flex;
     flex-direction: column;
     gap: 14px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    background: #0d0d12;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
   }
 
-  .modal-head {
+  .volume-card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  .modal-actions {
+  .volume-title-group {
     display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 6px;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .volume-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .volume-subtitle {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .volume-level-badge {
+    font-size: 13px;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    letter-spacing: -0.02em;
+  }
+
+  .vertical-fader-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 6px 6px 6px;
+    min-height: 180px;
+  }
+
+  .vertical-slider-track-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 170px;
+    width: 44px;
+    background: #14141d;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
+    padding: 12px 0;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  .vertical-range-fader {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 8px;
+    height: 140px;
+    appearance: none;
+    background: #0a0a0f;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .vertical-range-fader::-webkit-slider-runnable-track {
+    width: 8px;
+    height: 140px;
+    background: linear-gradient(to top, rgba(56, 189, 248, 0.2), #38bdf8);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .vertical-range-fader::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 3px solid #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.8), 0 2px 6px rgba(0, 0, 0, 0.8);
+    cursor: grab;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    margin-left: -8px;
+  }
+
+  .vertical-range-fader::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.15);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 1), 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  .fader-scale-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 170px;
+    flex: 1;
+    gap: 4px;
+  }
+
+  .fader-level-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #12121a;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .fader-level-btn:hover {
+    background: #181824;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+  }
+
+  .fader-level-btn.active {
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    font-weight: 700;
+  }
+
+  .fader-level-btn .level-desc {
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .fader-level-btn.active .level-desc {
+    color: #7dd3fc;
   }
 </style>

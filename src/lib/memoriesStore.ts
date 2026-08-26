@@ -13,12 +13,14 @@ export const initialFilterState: ExplorerFilterState = {
   hasLocationOnly: false,
   hasBtsOnly: false,
   hasCaptionOnly: false,
+  hasVideoOnly: false,
 };
 
 // ─── Core Stores ──────────────────────────────────────────────────────────────
 
 export const explorerData = writable<ExplorerData | null>(null);
 export const isLoadingMemories = writable<boolean>(false);
+export const memoriesLoadProgress = writable<{ percentage: number; stage: string }>({ percentage: 0, stage: 'Preparing archive...' });
 export const memoriesLoadError = writable<string | null>(null);
 
 export const activeExplorerView = writable<'grid' | 'calendar'>('grid');
@@ -26,6 +28,81 @@ export const activeFeedMemory = writable<ExplorerMemory | null>(null);
 export const activeFeedIndex = writable<number | null>(null);
 
 export const explorerFilter = writable<ExplorerFilterState>({ ...initialFilterState });
+
+// Global Audio settings (default muted state and volume level)
+export interface GlobalAudioSettings {
+  defaultMuted: boolean;
+  volume: number; // 0.0 to 1.0
+}
+
+const DEFAULT_AUDIO_SETTINGS: GlobalAudioSettings = {
+  defaultMuted: true,
+  volume: 0.8,
+};
+
+function loadGlobalAudioSettings(): GlobalAudioSettings {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_audio_settings');
+      if (saved) return { ...DEFAULT_AUDIO_SETTINGS, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...DEFAULT_AUDIO_SETTINGS };
+}
+
+export const globalAudioSettings = writable<GlobalAudioSettings>(loadGlobalAudioSettings());
+
+if (typeof window !== 'undefined') {
+  globalAudioSettings.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_audio_settings', JSON.stringify(val));
+    } catch {}
+  });
+}
+
+// Memory Inspector & Metadata Debug Badges Flag (Hidden behind feature flag, default: false)
+function loadDebugBadgesSetting(): boolean {
+  if (typeof window !== 'undefined') {
+    try {
+      return localStorage.getItem('bereal_show_debug_badges') === 'true';
+    } catch {}
+  }
+  return false;
+}
+
+export const showMemoryDebugBadges = writable<boolean>(loadDebugBadgesSetting());
+
+if (typeof window !== 'undefined') {
+  showMemoryDebugBadges.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_show_debug_badges', String(val));
+    } catch {}
+  });
+}
+
+// Global perspective toggle ('primary' = main camera large | 'secondary' = selfie camera large)
+export const globalPerspective = writable<'primary' | 'secondary'>('primary');
+
+export function toggleGlobalPerspective() {
+  globalPerspective.update((p) => (p === 'primary' ? 'secondary' : 'primary'));
+}
+
+// Helper to toggle Videos and BTS as mutually exclusive
+export function toggleVideoOnlyFilter() {
+  explorerFilter.update((f) => ({
+    ...f,
+    hasVideoOnly: !f.hasVideoOnly,
+    hasBtsOnly: !f.hasVideoOnly ? false : f.hasBtsOnly,
+  }));
+}
+
+export function toggleBtsOnlyFilter() {
+  explorerFilter.update((f) => ({
+    ...f,
+    hasBtsOnly: !f.hasBtsOnly,
+    hasVideoOnly: !f.hasBtsOnly ? false : f.hasVideoOnly,
+  }));
+}
 
 // Current month viewed in the Calendar view ("YYYY-MM")
 export const calendarCurrentMonth = writable<string>('');
@@ -59,6 +136,45 @@ export const explorerFilterCounts = derived(explorerData, ($data): ExplorerFilte
   }
 
   return counts;
+});
+
+// Group cities by country for rich-looking dropdown menus
+export interface CountryCityGroup {
+  country: string;
+  totalPosts: number;
+  cities: { name: string; count: number }[];
+}
+
+export const citiesByCountry = derived(explorerData, ($data): CountryCityGroup[] => {
+  if (!$data || !$data.memories) return [];
+  const countryMap = new Map<string, Map<string, number>>();
+
+  for (const m of $data.memories) {
+    const country = m.country || 'Other';
+    const city = m.city || (m.locationName ? m.locationName.split(',')[0].trim() : '');
+    if (!city) continue;
+
+    if (!countryMap.has(country)) {
+      countryMap.set(country, new Map());
+    }
+    const cityMap = countryMap.get(country)!;
+    cityMap.set(city, (cityMap.get(city) || 0) + 1);
+  }
+
+  const result: CountryCityGroup[] = [];
+  for (const [country, cityMap] of countryMap.entries()) {
+    let totalPosts = 0;
+    const cities: { name: string; count: number }[] = [];
+    for (const [name, count] of cityMap.entries()) {
+      totalPosts += count;
+      cities.push({ name, count });
+    }
+    cities.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    result.push({ country, totalPosts, cities });
+  }
+
+  result.sort((a, b) => b.totalPosts - a.totalPosts || a.country.localeCompare(b.country));
+  return result;
 });
 
 // ─── Derived Filtered Memories Store ──────────────────────────────────────────
@@ -114,6 +230,10 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
       if ($filter.hasLocationOnly && !m.location && !m.locationName) return false;
       if ($filter.hasBtsOnly && !m.btsPath) return false;
       if ($filter.hasCaptionOnly && (!m.caption || m.caption.trim().length === 0)) return false;
+      if ($filter.hasVideoOnly) {
+        const isVid = m.isVideo || (m.primaryPath && (m.primaryPath.endsWith('.mp4') || m.primaryPath.endsWith('.mov'))) || (m.secondaryPath && (m.secondaryPath.endsWith('.mp4') || m.secondaryPath.endsWith('.mov')));
+        if (!isVid) return false;
+      }
 
       return true;
     });
@@ -132,6 +252,7 @@ export const activeFilterCount = derived(explorerFilter, ($f) => {
   if ($f.hasLocationOnly) count++;
   if ($f.hasBtsOnly) count++;
   if ($f.hasCaptionOnly) count++;
+  if ($f.hasVideoOnly) count++;
   return count;
 });
 
@@ -147,7 +268,21 @@ export const memoriesByMonth = derived(filteredMemories, ($memories) => {
   return map;
 });
 
-// Group memories by date string ("YYYY-MM-DD") for the Calendar day cells
+// Group ALL raw memories by date string ("YYYY-MM-DD")
+export const rawMemoriesByDate = derived(explorerData, ($data) => {
+  const map = new Map<string, ExplorerMemory[]>();
+  if (!$data || !$data.memories) return map;
+  for (const m of $data.memories) {
+    const dateStr = `${m.year}-${String(m.month).padStart(2, '0')}-${String(m.day).padStart(2, '0')}`;
+    if (!map.has(dateStr)) {
+      map.set(dateStr, []);
+    }
+    map.get(dateStr)!.push(m);
+  }
+  return map;
+});
+
+// Group filtered memories by date string ("YYYY-MM-DD") for the Calendar day cells
 export const memoriesByDate = derived(filteredMemories, ($memories) => {
   const map = new Map<string, ExplorerMemory[]>();
   for (const m of $memories) {
@@ -174,9 +309,24 @@ export async function loadMemories(path?: string): Promise<boolean> {
 
   isLoadingMemories.set(true);
   memoriesLoadError.set(null);
+  memoriesLoadProgress.set({ percentage: 20, stage: 'Reading archive & extracting cached media...' });
+
+  // Progress simulation ticker during native extraction
+  const ticker = setInterval(() => {
+    memoriesLoadProgress.update((p) => {
+      if (p.percentage < 85) {
+        const nextPct = p.percentage + Math.min(15, (85 - p.percentage) * 0.35);
+        const stage = nextPct > 55 ? 'Reverse geocoding locations & indexing calendar...' : 'Parsing posts and dual camera perspectives...';
+        return { percentage: Math.round(nextPct), stage };
+      }
+      return p;
+    });
+  }, 180);
 
   try {
     const data = await loadExplorerMemories(targetPath);
+    clearInterval(ticker);
+    memoriesLoadProgress.set({ percentage: 100, stage: 'Memories loaded!' });
     explorerData.set(data);
 
     // Default calendar month to latest month in dataset
@@ -184,9 +334,12 @@ export async function loadMemories(path?: string): Promise<boolean> {
       calendarCurrentMonth.set(data.uniqueMonths[data.uniqueMonths.length - 1]);
     }
 
-    isLoadingMemories.set(false);
+    setTimeout(() => {
+      isLoadingMemories.set(false);
+    }, 250);
     return true;
   } catch (err: any) {
+    clearInterval(ticker);
     console.error('Failed to load explorer memories:', err);
     memoriesLoadError.set(err?.message || String(err));
     isLoadingMemories.set(false);
@@ -195,22 +348,25 @@ export async function loadMemories(path?: string): Promise<boolean> {
 }
 
 const mediaDataUrlCache = new Map<string, string>();
+const safeImageSrcCache = new Map<string, string>();
 
 /**
- * Resolve a local disk image path to a safe browser/Tauri file asset URL.
+ * Resolve a local disk image path to a safe browser/Tauri file asset URL with instant memoization.
  */
 export function getSafeImageSrc(filePath?: string): string {
   if (!filePath) return '';
   if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('data:')) {
     return filePath;
   }
+  if (safeImageSrcCache.has(filePath)) {
+    return safeImageSrcCache.get(filePath)!;
+  }
   if (mediaDataUrlCache.has(filePath)) {
     return mediaDataUrlCache.get(filePath)!;
   }
-  if (isTauri()) {
-    return convertFileSrc(filePath);
-  }
-  return filePath;
+  const result = isTauri() ? convertFileSrc(filePath) : filePath;
+  safeImageSrcCache.set(filePath, result);
+  return result;
 }
 
 /**
@@ -385,8 +541,13 @@ import type { MemoryHeaderSettings } from './types';
 export const defaultMemoryHeaderSettings: MemoryHeaderSettings = {
   showLocation: true,
   locationFormat: 'city_country',
+  customLocationText: '',
   showTimeTag: true,
-  timeTagFormat: 'time_only',
+  timeTagFormat: 'late_duration',
+  customTimeTagText: '',
+  showLateAddition: true,
+  showLatePillsInGrid: true,
+  showLatePillsInCalendar: true,
 };
 
 function loadMemoryHeaderSettings(): MemoryHeaderSettings {
@@ -409,8 +570,65 @@ if (typeof window !== 'undefined') {
   });
 }
 
+const MONTH_ABBRS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function formatShortDate(memory: ExplorerMemory): string {
+  if (!memory) return '';
+  const d = memory.day;
+  const m = MONTH_ABBRS[(memory.month || 1) - 1] || 'Jan';
+  const y = memory.year;
+  const currentYear = new Date().getFullYear();
+  if (y === currentYear) {
+    return `${d} ${m}`;
+  }
+  return `${d} ${m} ${y}`;
+}
+
+export function replaceLocationPlaceholders(template: string, memory: ExplorerMemory): string {
+  if (!template) return '';
+  let result = template
+    .replace(/\{city\}/gi, memory.city || '')
+    .replace(/\{suburb\}|\{area\}/gi, memory.suburb || '')
+    .replace(/\{country\}/gi, memory.country || '')
+    .replace(/\{location\}|\{locationName\}/gi, memory.locationName || '')
+    .replace(/\{lat\}|\{latitude\}/gi, memory.location ? memory.location.latitude.toFixed(4) : '')
+    .replace(/\{lng\}|\{lon\}|\{longitude\}/gi, memory.location ? memory.location.longitude.toFixed(4) : '');
+
+  return result
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/^\s*,\s*|\s*,\s*$/g, '')
+    .trim();
+}
+
+export function replaceTimeTagPlaceholders(template: string, memory: ExplorerMemory): string {
+  if (!template) return '';
+  const shortDate = formatShortDate(memory);
+  const lateStr = memory.isLate ? (memory.lateDuration || 'Late') : 'On time';
+  const lateExactStr = memory.isLate ? (memory.lateExact || memory.lateDuration || 'Late') : 'On time';
+
+  let result = template
+    .replace(/\{time\}/gi, memory.timeFormatted || '')
+    .replace(/\{date\}/gi, shortDate)
+    .replace(/\{full_date\}|\{dateFormatted\}/gi, memory.dateFormatted || '')
+    .replace(/\{day\}/gi, String(memory.day || ''))
+    .replace(/\{month\}/gi, MONTH_ABBRS[(memory.month || 1) - 1] || '')
+    .replace(/\{year\}/gi, String(memory.year || ''))
+    .replace(/\{late\}|\{lateDuration\}/gi, lateStr)
+    .replace(/\{late_exact\}|\{lateExact\}/gi, lateExactStr)
+    .replace(/\{caption\}/gi, memory.caption || '');
+
+  return result
+    .replace(/\s*•\s*•\s*/g, ' • ')
+    .replace(/^\s*•\s*|\s*•\s*$/g, '')
+    .trim();
+}
+
 export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showLocation) return '';
+
+  if (settings.locationFormat === 'custom') {
+    return replaceLocationPlaceholders(settings.customLocationText?.trim() || '', memory);
+  }
 
   if (settings.locationFormat === 'city_country') {
     if (memory.city && memory.country) return `${memory.city}, ${memory.country}`;
@@ -426,21 +644,50 @@ export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHea
     if (memory.city) return memory.city;
   }
 
-  return memory.locationName || '';
+  // If locationName has coordinates like "51.46°, -0.25°", return clean formatted or empty
+  if (memory.locationName && !memory.locationName.includes('°')) {
+    return memory.locationName;
+  }
+
+  if (memory.city) return memory.city;
+  if (memory.country) return memory.country;
+
+  return '';
 }
 
 export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showTimeTag) return '';
 
-  if (settings.timeTagFormat === 'late_duration' && memory.lateDuration) {
-    return memory.lateDuration;
-  }
-  if (settings.timeTagFormat === 'date_only') {
-    return memory.dateFormatted;
-  }
-  if (settings.timeTagFormat === 'datetime') {
-    return `${memory.dateFormatted} • ${memory.timeFormatted}`;
+  if (settings.timeTagFormat === 'custom') {
+    let customFormatted = replaceTimeTagPlaceholders(settings.customTimeTagText?.trim() || '', memory);
+    if (settings.showLateAddition && memory.isLate && !customFormatted.includes(memory.lateDuration || 'Late')) {
+      const lateStr = memory.lateDuration || 'Late';
+      customFormatted = customFormatted ? `${customFormatted} • ${lateStr}` : lateStr;
+    }
+    return customFormatted;
   }
 
-  return memory.timeFormatted;
+  const dateStr = formatShortDate(memory);
+  const timeFormatted = memory.timeFormatted || '12:00';
+  let baseTime = '';
+
+  if (settings.timeTagFormat === 'date_only') {
+    baseTime = dateStr;
+  } else if (settings.timeTagFormat === 'time_only') {
+    baseTime = timeFormatted;
+  } else if (settings.timeTagFormat === 'datetime') {
+    baseTime = `${dateStr} • ${timeFormatted}`;
+  } else {
+    // Default / Smart Progressive ('late_duration' or 'smart_progressive'):
+    // Always shows the date and timestamp by default even if late
+    baseTime = `${dateStr} • ${timeFormatted}`;
+  }
+
+  // Show how late you were as an addition separated by a dot if enabled, matching theme text
+  if (settings.showLateAddition && memory.isLate && (memory.lateDuration || memory.lateExact)) {
+    const lateStr = memory.lateDuration || 'Late';
+    return `${baseTime} • ${lateStr}`;
+  }
+
+  return baseTime;
 }

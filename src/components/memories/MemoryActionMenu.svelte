@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fade } from 'svelte/transition';
   import type { ExplorerMemory } from '$lib/types';
   import { openExportModal } from '$lib/memoriesStore';
   import { exportSingleMemory, revealInFolder, isTauri } from '$lib/tauri';
@@ -14,12 +15,17 @@
   import Check from 'lucide-svelte/icons/check';
   import Layers from 'lucide-svelte/icons/layers';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Clock from 'lucide-svelte/icons/clock';
+  import Share2 from 'lucide-svelte/icons/share-2';
+  import MapPin from 'lucide-svelte/icons/map-pin';
+  import FileText from 'lucide-svelte/icons/file-text';
+  import Eye from 'lucide-svelte/icons/eye';
 
   export let memory: ExplorerMemory;
 
   let isOpen = false;
   let isExporting = false;
-  let copiedText = '';
+  let copiedInfo: { label: string; text: string } | null = null;
 
   function toggleMenu(e: MouseEvent) {
     e.stopPropagation();
@@ -35,11 +41,48 @@
     openExportModal(memory);
   }
 
-  async function handleOpenExplorer() {
+  async function handleReveal(filePath?: string) {
     closeMenu();
-    if (memory.primaryPath) {
-      await revealInFolder(memory.primaryPath);
+    if (filePath) {
+      await revealInFolder(filePath);
     }
+  }
+
+  function getFilenameFromPath(filePath?: string): string {
+    if (!filePath) return `${memory.takenAt.slice(0, 10)}_bereal.jpg`;
+    return filePath.split(/[/\\]/).pop() || `${memory.takenAt.slice(0, 10)}_bereal.jpg`;
+  }
+
+  function getFormattedOutputFilename(mem: ExplorerMemory, exportType: string = 'combined_pip', ext: string = 'jpg'): string {
+    let timeTag = mem.takenAt
+      ? mem.takenAt.replace(/[:]/g, '-').replace(/\.\d+Z?$/, '').replace(/Z$/, '')
+      : `${mem.year}-${String(mem.month).padStart(2, '0')}-${String(mem.day).padStart(2, '0')}`;
+
+    if (!timeTag.includes('T')) {
+      timeTag = `${timeTag}T${mem.timeFormatted ? mem.timeFormatted.replace(':', '-') : '12-00-00'}`;
+    }
+
+    const suffix = exportType === 'combined_pip' || exportType === 'combined'
+      ? '_combined'
+      : exportType === 'combined_sidebyside'
+      ? '_combined_sidebyside'
+      : exportType === 'primary_only'
+      ? '_primary'
+      : exportType === 'secondary_only'
+      ? '_secondary'
+      : exportType === 'bts_only'
+      ? '_bts'
+      : exportType === 'motion_photo'
+      ? '_motion'
+      : `_${exportType}`;
+
+    const extension = exportType === 'bts_only' ? 'mp4' : ext;
+    return `${timeTag}${suffix}.${extension}`;
+  }
+
+  async function handleQuickDownload() {
+    closeMenu();
+    await handleExport('combined_pip');
   }
 
   async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo') {
@@ -73,7 +116,7 @@
         outputPath: savePath,
         exportType,
         format: 'Jpeg',
-        quality: 92,
+        quality: 95,
         embedExif: true,
         takenAt: memory.takenAt,
         latitude: memory.location?.latitude,
@@ -88,16 +131,43 @@
     }
   }
 
+  async function performWriteToClipboard(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Standard clipboard write failed, trying fallback:', e);
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      textarea.style.top = '-999999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return success;
+    } catch (err) {
+      console.error('Fallback clipboard copy failed:', err);
+      return false;
+    }
+  }
+
   async function copyToClipboard(text: string, label: string) {
     closeMenu();
-    try {
-      await navigator.clipboard.writeText(text);
-      copiedText = label;
+    if (!text) return;
+    const success = await performWriteToClipboard(text);
+    if (success) {
+      copiedInfo = { label, text };
       setTimeout(() => {
-        copiedText = '';
-      }, 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
+        copiedInfo = null;
+      }, 2500);
     }
   }
 </script>
@@ -110,7 +180,7 @@
     class="menu-trigger-btn"
     class:active={isOpen}
     on:click={toggleMenu}
-    title="Memory actions & export options"
+    title="Memory options"
     aria-label="Memory options"
   >
     <MoreHorizontal size={18} />
@@ -118,51 +188,101 @@
 
   {#if isOpen}
     <div class="menu-popover" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
+      <!-- Official BeReal Primary Actions -->
       <div class="menu-section">
-        <span class="menu-header">Open &amp; Export</span>
-
-        {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={handleOpenExplorer}>
-            <FolderOpen size={14} class="text-sky-400" />
-            <span>Reveal in File Explorer</span>
-          </button>
-        {/if}
-
-        <button type="button" class="menu-item" on:click={handleOpenExportDialog}>
-          <SlidersHorizontal size={14} class="text-sky-400" />
-          <span>Export Options &amp; Settings...</span>
+        <button type="button" class="menu-item primary-action" on:click={handleOpenExportDialog}>
+          <Share2 size={16} class="text-sky-400" />
+          <span>Share BeReal.</span>
         </button>
+
+        <button type="button" class="menu-item" on:click={handleQuickDownload}>
+          <Download size={16} class="text-emerald-400" />
+          <span>Download</span>
+        </button>
+
+        <!-- Reveal in Folder (Inline Camera & Video File Selector) -->
+        {#if memory.primaryPath || memory.secondaryPath || memory.btsPath}
+          <div class="inline-reveal-row">
+            <span class="inline-reveal-label">
+              <FolderOpen size={13} class="text-amber-400" />
+              <span>Reveal in Folder:</span>
+            </span>
+            <div class="inline-reveal-buttons">
+              {#if memory.primaryPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.primaryPath)}
+                  title="Reveal Main Camera photo in file explorer"
+                >
+                  <Camera size={11} class="text-teal-400" />
+                  <span>Main</span>
+                </button>
+              {/if}
+
+              {#if memory.secondaryPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.secondaryPath)}
+                  title="Reveal Selfie Camera photo in file explorer"
+                >
+                  <User size={11} class="text-rose-400" />
+                  <span>Selfie</span>
+                </button>
+              {/if}
+
+              {#if memory.btsPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.btsPath)}
+                  title="Reveal BTS Video in file explorer"
+                >
+                  <Film size={11} class="text-amber-400" />
+                  <span>BTS</span>
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <div class="menu-divider"></div>
+
+      <!-- Quick Export Variations -->
+      <div class="menu-section">
+        <span class="menu-header">Export Variations</span>
 
         <button type="button" class="menu-item" on:click={() => handleExport('combined_pip')}>
-          <Layers size={14} class="text-amber-400" />
-          <span>Save Combined Photo (PIP)</span>
+          <Layers size={15} class="text-blue-400" />
+          <span>Save Picture-in-Picture</span>
         </button>
 
-        {#if memory.secondaryPath}
-          <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
-            <Download size={14} class="text-purple-400" />
-            <span>Save Side-by-Side Photo</span>
-          </button>
-
-          <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
-            <User size={14} class="text-cyan-400" />
-            <span>Save Front / Selfie Camera</span>
-          </button>
-        {/if}
+        <button type="button" class="menu-item" on:click={() => handleExport('combined_sidebyside')}>
+          <SlidersHorizontal size={15} class="text-purple-400" />
+          <span>Save Side-by-Side</span>
+        </button>
 
         <button type="button" class="menu-item" on:click={() => handleExport('primary_only')}>
-          <Camera size={14} class="text-emerald-400" />
+          <Camera size={15} class="text-teal-400" />
           <span>Save Main Camera</span>
         </button>
 
+        {#if memory.secondaryPath}
+          <button type="button" class="menu-item" on:click={() => handleExport('secondary_only')}>
+            <User size={15} class="text-rose-400" />
+            <span>Save Selfie Camera</span>
+          </button>
+        {/if}
+
         {#if memory.btsPath}
           <button type="button" class="menu-item" on:click={() => handleExport('bts_only')}>
-            <Film size={14} class="text-amber-400" />
-            <span>Save BTS Video (.mp4)</span>
+            <Film size={15} class="text-amber-400" />
+            <span>Save BTS Clip (Video)</span>
           </button>
-
           <button type="button" class="menu-item" on:click={() => handleExport('motion_photo')}>
-            <Sparkles size={14} class="text-emerald-400" />
+            <Sparkles size={15} class="text-emerald-400" />
             <span>Save Motion Photo (Live)</span>
           </button>
         {/if}
@@ -170,20 +290,58 @@
 
       <div class="menu-divider"></div>
 
+      <!-- Copy Details & Coordinates -->
       <div class="menu-section">
-        <span class="menu-header">Copy Details</span>
+        <span class="menu-header">Copy Info</span>
 
-        {#if memory.caption}
-          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
-            <Copy size={14} />
-            <span>Copy Caption</span>
+        <!-- Output Filename in properly formatted Toolkit convention -->
+        <button
+          type="button"
+          class="menu-item"
+          on:click={() => copyToClipboard(getFormattedOutputFilename(memory), 'Output Filename')}
+        >
+          <FileText size={15} class="text-emerald-400" />
+          <span>Copy Output Filename</span>
+        </button>
+
+        {#if memory.primaryPath}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Source Filename')}>
+            <FileText size={15} class="text-cyan-400" />
+            <span>Copy Source Filename</span>
           </button>
         {/if}
 
-        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Date')}>
-          <Copy size={14} />
-          <span>Copy Timestamp ({memory.dateFormatted})</span>
+        {#if memory.primaryPath}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.primaryPath || '', 'File Path')}>
+            <FolderOpen size={15} class="text-slate-400" />
+            <span>Copy Full File Path</span>
+          </button>
+        {/if}
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.takenAt, 'Timestamp')}>
+          <Clock size={15} class="text-blue-400" />
+          <span>Copy Timestamp ({memory.timeFormatted})</span>
         </button>
+
+        <button type="button" class="menu-item" on:click={() => copyToClipboard(`${memory.dateFormatted} • ${memory.timeFormatted}`, 'Formatted Date')}>
+          <Copy size={15} class="text-indigo-400" />
+          <span>Copy Formatted Date</span>
+        </button>
+
+        {#if memory.locationName || memory.location}
+          <button
+            type="button"
+            class="menu-item"
+            on:click={() =>
+              copyToClipboard(
+                memory.locationName || `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
+                'Location'
+              )}
+          >
+            <MapPin size={15} class="text-rose-400" />
+            <span>Copy Location</span>
+          </button>
+        {/if}
 
         {#if memory.location}
           <button
@@ -192,21 +350,34 @@
             on:click={() =>
               copyToClipboard(
                 `${memory.location?.latitude.toFixed(6)}, ${memory.location?.longitude.toFixed(6)}`,
-                'GPS'
+                'GPS Coordinates'
               )}
           >
-            <Copy size={14} />
+            <Copy size={15} class="text-teal-400" />
             <span>Copy GPS Coordinates</span>
+          </button>
+        {/if}
+
+        {#if memory.caption}
+          <button type="button" class="menu-item" on:click={() => copyToClipboard(memory.caption || '', 'Caption')}>
+            <FileText size={15} class="text-yellow-400" />
+            <span>Copy Caption</span>
           </button>
         {/if}
       </div>
     </div>
   {/if}
 
-  {#if copiedText}
-    <div class="toast-indicator">
-      <Check size={12} />
-      <span>{copiedText} copied!</span>
+  <!-- Live Toast Indicator with Copy Preview -->
+  {#if copiedInfo}
+    <div class="toast-preview-card" transition:fade={{ duration: 150 }}>
+      <div class="toast-preview-header">
+        <Check size={13} class="text-emerald-400" />
+        <span class="toast-preview-title">Copied {copiedInfo.label}</span>
+      </div>
+      <div class="toast-preview-snippet" title={copiedInfo.text}>
+        <code>{copiedInfo.text.length > 36 ? copiedInfo.text.slice(0, 36) + '...' : copiedInfo.text}</code>
+      </div>
     </div>
   {/if}
 </div>
@@ -299,27 +470,91 @@
     color: #ffffff;
   }
 
-  .menu-divider {
-    height: 1px;
-    background: var(--border-subtle);
-    margin: 4px 0;
+  /* Inline Reveal Selection Row */
+  .inline-reveal-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius-sm);
+    margin: 2px 0;
   }
 
-  .toast-indicator {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    right: 0;
+  .inline-reveal-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .inline-reveal-buttons {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 10px;
-    background: #059669;
+    flex-wrap: wrap;
+  }
+
+  .inline-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #1a1a26;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
     color: #ffffff;
-    border-radius: var(--radius-full);
     font-size: 11px;
     font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .inline-pill-btn:hover {
+    background: #28283a;
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .toast-preview-card {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 250;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(12, 12, 18, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    animation: popoverIn 0.15s ease-out;
+    min-width: 170px;
+    max-width: 280px;
+    animation: popoverIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .toast-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #34d399;
+  }
+
+  .toast-preview-snippet {
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: #cbd5e1;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 3px 6px;
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

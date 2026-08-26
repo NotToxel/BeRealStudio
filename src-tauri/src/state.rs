@@ -159,6 +159,10 @@ impl ProgressEmitter {
         }
 
         if let Ok(mut buf) = self.log_buffer.lock() {
+            if buf.len() >= 2000 {
+                let excess = buf.len() - 1999;
+                buf.drain(0..excess);
+            }
             buf.push(event);
         }
     }

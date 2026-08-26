@@ -104,8 +104,8 @@ pub async fn open_file(path: String) -> Result<(), String> {
     {
         use std::process::Command;
         let clean_path = path.replace('/', "\\");
-        let _ = Command::new("cmd")
-            .args(["/C", "start", "", &clean_path])
+        let _ = Command::new("explorer")
+            .arg(&clean_path)
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(())

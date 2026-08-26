@@ -4,14 +4,27 @@ use img_parts::{jpeg::Jpeg, ImageEXIF};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use crate::pipeline::types::Location;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Helper to create a Command that does NOT pop up a command prompt window on Windows.
+pub fn silent_command<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
 
 /// Detect ExifTool executable in PATH, application bundle, or common system paths.
 pub fn detect_exiftool() -> Option<PathBuf> {
     // 1. Query system PATH for absolute binary location
     #[cfg(target_os = "windows")]
     {
-        if let Ok(output) = Command::new("where.exe").arg("exiftool").output() {
+        if let Ok(output) = silent_command("where.exe").arg("exiftool").output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(first_line) = stdout.lines().next() {
@@ -25,7 +38,7 @@ pub fn detect_exiftool() -> Option<PathBuf> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        if let Ok(output) = Command::new("which").arg("exiftool").output() {
+        if let Ok(output) = silent_command("which").arg("exiftool").output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if let Some(first_line) = stdout.lines().next() {
@@ -41,15 +54,19 @@ pub fn detect_exiftool() -> Option<PathBuf> {
     // 2. Check known standard Windows installation directories
     #[cfg(target_os = "windows")]
     {
-        let candidates = [
-            "E:\\Scripts\\exiftool.exe",
-            "C:\\Program Files\\exiftool\\exiftool.exe",
-            "C:\\Program Files (x86)\\exiftool\\exiftool.exe",
-            "C:\\exiftool\\exiftool.exe",
-            "C:\\Windows\\exiftool.exe",
+        let mut candidates = vec![
+            PathBuf::from("C:\\Program Files\\exiftool\\exiftool.exe"),
+            PathBuf::from("C:\\Program Files (x86)\\exiftool\\exiftool.exe"),
+            PathBuf::from("C:\\exiftool\\exiftool.exe"),
+            PathBuf::from("C:\\Windows\\exiftool.exe"),
         ];
-        for c in candidates {
-            let p = PathBuf::from(c);
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            candidates.push(PathBuf::from(local_app_data).join("Programs\\exiftool\\exiftool.exe"));
+        }
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            candidates.push(PathBuf::from(user_profile).join("scoop\\shims\\exiftool.exe"));
+        }
+        for p in candidates {
             if p.exists() {
                 return Some(p);
             }
@@ -72,7 +89,7 @@ pub fn detect_exiftool() -> Option<PathBuf> {
     }
 
     // 4. Fallback check if directly runnable via PATH
-    if let Ok(output) = Command::new("exiftool").arg("-ver").output() {
+    if let Ok(output) = silent_command("exiftool").arg("-ver").output() {
         if output.status.success() {
             return Some(PathBuf::from("exiftool"));
         }
@@ -102,7 +119,7 @@ pub fn extract_gps_batch(
         return map;
     }
 
-    let output = Command::new(exiftool_path)
+    let output = silent_command(exiftool_path)
         .arg("-@")
         .arg(&temp_file)
         .arg("-GPSLatitude")
@@ -147,7 +164,7 @@ pub fn write_metadata_exiftool(
     let date_sub_str = datetime.format("%Y:%m:%d %H:%M:%S%.3f").to_string();
     let tz_str = datetime.format("%:z").to_string();
 
-    let mut cmd = Command::new(exiftool_path);
+    let mut cmd = silent_command(exiftool_path);
     cmd.arg("-overwrite_original")
         .arg("-m")
         .arg(format!("-AllDates={}", date_str))

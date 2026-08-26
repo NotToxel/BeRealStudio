@@ -2,10 +2,22 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+pub fn silent_command<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 /// Detect FFmpeg on PATH and return its path.
 pub fn detect_ffmpeg() -> Result<PathBuf> {
     let cmd = if cfg!(target_os = "windows") { "ffmpeg.exe" } else { "ffmpeg" };
-    let output = Command::new(cmd)
+    let output = silent_command(cmd)
         .arg("-version")
         .output()
         .with_context(|| {
@@ -16,7 +28,7 @@ pub fn detect_ffmpeg() -> Result<PathBuf> {
     if output.status.success() {
         // Find the actual path via `where`/`which`
         let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
-        if let Ok(out) = Command::new(which_cmd).arg(cmd).output() {
+        if let Ok(out) = silent_command(which_cmd).arg(cmd).output() {
             if let Ok(path_str) = String::from_utf8(out.stdout) {
                 let path = PathBuf::from(path_str.lines().next().unwrap_or(cmd).trim());
                 return Ok(path);
@@ -42,17 +54,16 @@ pub fn combine_videos_pip(
 
     let ffmpeg = detect_ffmpeg().context("FFmpeg required for video combining")?;
 
-    // Filter graph: scale secondary + rounded corners via geq + overlay
-    // We approximate rounded corners using a vignette/crop approach
+    // Exact proportional PIP overlay matching official BeReal layout
     let filter = format!(
-        "[1:v]scale=iw/3.333:ih/3.333[pip_raw];\
+        "[1:v]scale=main_w*0.3047:main_w*0.3047*4/3[pip_raw];\
          [pip_raw]format=rgba,geq=\
            r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':\
            a='if(gt(hypot(X-W/2,Y-H/2),hypot(W/2,H/2)*0.95),0,255)'[pip];\
-         [0:v][pip]overlay=55:55[out]"
+         [0:v][pip]overlay=W*0.0378:W*0.0378[out]"
     );
 
-    let status = Command::new(&ffmpeg)
+    let status = silent_command(&ffmpeg)
         .args([
             "-i", primary.to_str().unwrap_or(""),
             "-i", secondary.to_str().unwrap_or(""),
@@ -88,7 +99,7 @@ pub fn set_video_metadata(video_path: &Path, datetime: &chrono::DateTime<chrono:
     if let Ok(ffmpeg) = detect_ffmpeg() {
         let date_str = datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
         let temp_out = video_path.with_extension("_meta_tmp.mp4");
-        let status = Command::new(&ffmpeg)
+        let status = silent_command(&ffmpeg)
             .args([
                 "-i", video_path.to_str().unwrap_or(""),
                 "-metadata", &format!("creation_time={}", date_str),
@@ -112,7 +123,7 @@ pub fn set_video_metadata(video_path: &Path, datetime: &chrono::DateTime<chrono:
 
 /// Get the duration of a video file in seconds using FFprobe.
 pub fn get_video_duration(path: &Path) -> Result<f64> {
-    let output = Command::new("ffprobe")
+    let output = silent_command("ffprobe")
         .args([
             "-v", "quiet",
             "-print_format", "json",

@@ -206,17 +206,20 @@
   }
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let activeScanPath = '';
 
-  async function handleArchiveChange(path: string) {
+  async function handleArchiveChange(path: string, force: boolean = false) {
     if (!path || path.trim().length === 0) {
       archiveMetadata.set(null);
       $lastScannedArchivePath = '';
+      activeScanPath = '';
       return;
     }
-    // Skip re-scan if this path was already successfully scanned
-    if (path === $lastScannedArchivePath && $archiveMetadata && $archiveMetadata.isValid) {
+    // Skip re-scan if this path was already successfully scanned into memory
+    if (!force && path === activeScanPath && $archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.entryCount > 0) {
       return;
     }
+    activeScanPath = path;
     $lastScannedArchivePath = path;
     scanning = true;
     showMissingDetails = false;
@@ -239,15 +242,24 @@
     }
   }
 
-  $: if ($toolkitConfig.inputPath !== $lastScannedArchivePath) {
+  onMount(() => {
+    if ($toolkitConfig.inputPath) {
+      handleArchiveChange($toolkitConfig.inputPath);
+    }
+  });
+
+  let prevInputPath = '';
+  $: if ($toolkitConfig.inputPath !== prevInputPath || (!$archiveMetadata && $toolkitConfig.inputPath)) {
+    prevInputPath = $toolkitConfig.inputPath;
     if (debounceTimer) clearTimeout(debounceTimer);
     if (!$toolkitConfig.inputPath || $toolkitConfig.inputPath.trim().length === 0) {
       archiveMetadata.set(null);
       $lastScannedArchivePath = '';
+      activeScanPath = '';
     } else {
       debounceTimer = setTimeout(() => {
         handleArchiveChange($toolkitConfig.inputPath);
-      }, 450);
+      }, 200);
     }
   }
 
@@ -330,7 +342,7 @@
 
     const unlistenLog = await onJobLog(job.id, (l) => {
       appendActiveJobLog(job.id, l);
-      liveLogs.update((logs) => [...logs, l]);
+      liveLogs.update((logs) => [...logs.slice(-499), l]);
     });
 
     startToolkit($toolkitConfig, job.id)

@@ -145,7 +145,9 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
             let norm = name.replace('\\', "/");
             let norm_lower = norm.to_lowercase();
 
-            if norm_lower.ends_with("posts.json") && posts_entry_name.is_none() {
+            if norm_lower.ends_with("memories.json") {
+                posts_entry_name = Some(name.clone());
+            } else if norm_lower.ends_with("posts.json") && posts_entry_name.is_none() {
                 posts_entry_name = Some(name.clone());
             }
             if norm_lower.ends_with("user.json") && user_entry_name.is_none() {
@@ -223,7 +225,7 @@ fn scan_zip_archive(zip_path: &Path) -> Result<ArchiveInfo> {
                     let entry_name = entry.name();
                     if entry_name.ends_with(filename)
                         || entry_name.eq_ignore_ascii_case(filename)
-                        || (clean_tp.is_some() && entry_name.ends_with(clean_tp.unwrap()))
+                        || clean_tp.map(|tp| entry_name.ends_with(tp)).unwrap_or(false)
                     {
                         found_pic_entry = Some(entry_name.to_string());
                         break;
@@ -957,39 +959,41 @@ fn check_disk_media_presence(
     (total, found, missing, missing_sample)
 }
 
-/// Find posts.json by searching common locations in the archive directory.
+/// Find memories.json or posts.json by searching common locations in the archive directory.
 pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
-    // Direct: base/posts.json
-    let direct = base.join("posts.json");
-    if direct.exists() {
-        return Ok(direct);
+    // 1. Direct: base/memories.json (Highest priority for rich metadata)
+    let direct_memories = base.join("memories.json");
+    if direct_memories.exists() {
+        return Ok(direct_memories);
     }
-    // Direct case-insensitive
-    let direct_upper = base.join("Posts.json");
-    if direct_upper.exists() {
-        return Ok(direct_upper);
+
+    // 2. Direct: base/posts.json
+    let direct_posts = base.join("posts.json");
+    if direct_posts.exists() {
+        return Ok(direct_posts);
     }
-    // One or two levels deep
+
+    // 3. One or two levels deep
     if let Ok(entries) = std::fs::read_dir(base) {
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
-                let candidate = p.join("posts.json");
-                if candidate.exists() {
-                    return Ok(candidate);
-                }
-                let candidate_upper = p.join("Posts.json");
-                if candidate_upper.exists() {
-                    return Ok(candidate_upper);
+                for name in &["memories.json", "posts.json"] {
+                    let candidate = p.join(name);
+                    if candidate.exists() {
+                        return Ok(candidate);
+                    }
                 }
                 // Two levels deep
                 if let Ok(sub_entries) = std::fs::read_dir(&p) {
                     for sub in sub_entries.flatten() {
                         let sub_p = sub.path();
                         if sub_p.is_dir() {
-                            let sub_cand = sub_p.join("posts.json");
-                            if sub_cand.exists() {
-                                return Ok(sub_cand);
+                            for name in &["memories.json", "posts.json"] {
+                                let sub_cand = sub_p.join(name);
+                                if sub_cand.exists() {
+                                    return Ok(sub_cand);
+                                }
                             }
                         }
                     }
@@ -998,17 +1002,29 @@ pub fn find_posts_json(base: &Path) -> Result<PathBuf> {
         }
     }
     anyhow::bail!(
-        "Could not find posts.json in '{}'. Make sure you selected the correct folder from your BeReal data export.",
+        "Could not find memories.json or posts.json in '{}'. Make sure you selected the correct folder from your BeReal data export.",
         base.display()
     )
 }
 
-/// Parse posts.json into a vector of BeRealPost structs.
+/// Parse posts/memories JSON into a vector of BeRealPost structs.
 pub fn parse_posts(json_path: &Path) -> Result<Vec<BeRealPost>> {
     let data = std::fs::read_to_string(json_path)
         .with_context(|| format!("Failed to read {}", json_path.display()))?;
-    let posts: Vec<serde_json::Value> = serde_json::from_str(&data)
-        .with_context(|| "posts.json is not valid JSON")?;
+    let root_val: serde_json::Value = serde_json::from_str(&data)
+        .with_context(|| "Data file is not valid JSON")?;
+
+    let posts: Vec<serde_json::Value> = match root_val {
+        serde_json::Value::Array(arr) => arr,
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(arr)) = map.get("memories").or_else(|| map.get("posts")).or_else(|| map.get("data")) {
+                arr.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
 
     let mut result = Vec::with_capacity(posts.len());
     for (i, val) in posts.into_iter().enumerate() {
@@ -1020,6 +1036,123 @@ pub fn parse_posts(json_path: &Path) -> Result<Vec<BeRealPost>> {
         }
     }
     Ok(result)
+}
+
+/// Intelligently merge a primary list of posts (from posts.json and memories.json)
+pub fn merge_posts_and_memories(
+    memories_posts: Vec<(BeRealPost, String)>,
+    posts_json_posts: Vec<(BeRealPost, String)>,
+) -> Vec<(BeRealPost, String)> {
+    if memories_posts.is_empty() {
+        return posts_json_posts;
+    }
+    if posts_json_posts.is_empty() {
+        return memories_posts;
+    }
+
+    // 1. Build lookup tables for memories.json by timestamp, minute prefix, and media filename
+    let mut memories_by_time: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut memories_by_minute: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut memories_by_media: HashMap<String, (BeRealPost, String)> = HashMap::new();
+    let mut moments: Vec<(DateTime<Utc>, String, Option<String>)> = Vec::new();
+
+    for (m, raw) in &memories_posts {
+        memories_by_time.insert(m.taken_at.clone(), (m.clone(), raw.clone()));
+        if m.taken_at.len() >= 16 {
+            memories_by_minute.insert(m.taken_at[..16].to_string(), (m.clone(), raw.clone()));
+        }
+        if let Some(ref prim) = m.primary {
+            if let Some(fname) = Path::new(&prim.path).file_name().and_then(|n| n.to_str()) {
+                memories_by_media.insert(fname.to_lowercase(), (m.clone(), raw.clone()));
+            }
+        }
+        if let Some(ref notif_str) = m.notification_at {
+            if let Some(dt) = parse_taken_at(notif_str) {
+                moments.push((dt, notif_str.clone(), m.date.clone()));
+            }
+        }
+    }
+
+    moments.sort_by_key(|k| k.0);
+    moments.dedup_by(|a, b| a.1 == b.1);
+
+    let mut merged = Vec::with_capacity(posts_json_posts.len() + 10);
+    let mut used_mem_times = HashSet::new();
+
+    // 2. Iterate through all posts in posts_json_posts (guaranteeing 100% of posts appear in calendar and feed)
+    for (mut post, post_raw) in posts_json_posts {
+        let mem_match = memories_by_time.get(&post.taken_at)
+            .or_else(|| {
+                if post.taken_at.len() >= 16 {
+                    memories_by_minute.get(&post.taken_at[..16])
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                post.primary.as_ref().and_then(|prim| {
+                    Path::new(&prim.path).file_name().and_then(|n| n.to_str()).and_then(|fname| {
+                        memories_by_media.get(&fname.to_lowercase())
+                    })
+                })
+            });
+
+        if let Some((mem, _)) = mem_match {
+            used_mem_times.insert(mem.taken_at.clone());
+            if post.is_late.is_none() {
+                post.is_late = mem.is_late;
+            }
+            if post.late_in_seconds.is_none() {
+                post.late_in_seconds = mem.late_in_seconds;
+            }
+            if post.notification_at.is_none() {
+                post.notification_at = mem.notification_at.clone();
+            }
+            if post.date.is_none() {
+                post.date = mem.date.clone();
+            }
+            if post.location.is_none() {
+                post.location = mem.location.clone();
+            }
+            if post.caption.is_none() {
+                post.caption = mem.caption.clone();
+            }
+            if post.bts_media.is_none() {
+                post.bts_media = mem.bts_media.clone();
+            }
+        } else {
+            // Post exists in posts.json but missing in memories.json: derive its BeReal moment from registry
+            if let Some(post_dt) = parse_taken_at(&post.taken_at) {
+                let matched_moment = moments.iter().rev().find(|m| m.0 <= post_dt);
+                if let Some((m_dt, m_str, m_date)) = matched_moment {
+                    let diff_sec = (post_dt - *m_dt).num_seconds();
+                    if post.notification_at.is_none() {
+                        post.notification_at = Some(m_str.clone());
+                    }
+                    if post.is_late.is_none() {
+                        post.is_late = Some(diff_sec > 120);
+                    }
+                    if post.late_in_seconds.is_none() && diff_sec > 120 {
+                        post.late_in_seconds = Some(diff_sec);
+                    }
+                    if post.date.is_none() && m_date.is_some() {
+                        post.date = m_date.clone();
+                    }
+                }
+            }
+        }
+
+        merged.push((post, post_raw));
+    }
+
+    // 3. Append any memory that was in memories.json but not in posts.json
+    for (m, mem_raw) in memories_posts {
+        if !used_mem_times.contains(&m.taken_at) {
+            merged.push((m, mem_raw));
+        }
+    }
+
+    merged
 }
 
 /// Compute a per-month histogram of BeReal counts.
@@ -1210,5 +1343,132 @@ mod tests {
         let bad_info = scan_archive("non_existent_archive_path.zip").unwrap();
         assert!(!bad_info.is_valid);
         assert_eq!(bad_info.validation_errors.len(), 1);
+    }
+
+    #[test]
+    fn test_bereal_post_flexible_is_late_deserialization() {
+        // 1. camelCase with boolean true
+        let json1 = r#"{"takenAt": "2024-08-26T16:00:00Z", "isLate": true, "notificationAt": "2024-08-26T14:00:00Z"}"#;
+        let p1: BeRealPost = serde_json::from_str(json1).unwrap();
+        assert_eq!(p1.is_late, Some(true));
+        assert_eq!(p1.notification_at.as_deref(), Some("2024-08-26T14:00:00Z"));
+
+        // 2. snake_case with boolean true
+        let json2 = r#"{"taken_at": "2024-08-26T16:00:00Z", "is_late": true, "late_in_seconds": 7200}"#;
+        let p2: BeRealPost = serde_json::from_str(json2).unwrap();
+        assert_eq!(p2.is_late, Some(true));
+        assert_eq!(p2.late_in_seconds, Some(7200));
+
+        // 3. String boolean "true" and string seconds "3600"
+        let json3 = r#"{"takenAt": "2024-08-26T15:00:00Z", "isLate": "true", "lateInSeconds": "3600"}"#;
+        let p3: BeRealPost = serde_json::from_str(json3).unwrap();
+        assert_eq!(p3.is_late, Some(true));
+        assert_eq!(p3.late_in_seconds, Some(3600));
+
+        // 4. Integer 1 for true
+        let json4 = r#"{"takenAt": "2024-08-26T15:00:00Z", "isLate": 1}"#;
+        let p4: BeRealPost = serde_json::from_str(json4).unwrap();
+        assert_eq!(p4.is_late, Some(true));
+
+        // 5. On-time with boolean false
+        let json5 = r#"{"takenAt": "2024-08-26T14:02:00Z", "isLate": false}"#;
+        let p5: BeRealPost = serde_json::from_str(json5).unwrap();
+        assert_eq!(p5.is_late, Some(false));
+
+        // 6. On-time with snake_case "is_late": false
+        let json6 = r#"{"taken_at": "2024-08-26T14:02:00Z", "is_late": false}"#;
+        let p6: BeRealPost = serde_json::from_str(json6).unwrap();
+        assert_eq!(p6.is_late, Some(false));
+    }
+
+    #[test]
+    fn test_merge_posts_and_memories() {
+        let mem_json = r#"{"takenTime": "2026-01-01T12:31:24.396Z", "berealMoment": "2026-01-01T12:31:05.229Z", "isLate": false}"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+        let mem_list = vec![(mem_post, mem_json.to_string())];
+
+        let post_json = r#"{"takenAt": "2026-01-01T12:31:24.396Z", "retakeCounter": 3, "visibility": ["friends"]}"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+        let post_list = vec![(post_item, post_json.to_string())];
+
+        let merged = merge_posts_and_memories(mem_list, post_list);
+        assert_eq!(merged.len(), 1);
+        let (p, _) = &merged[0];
+        assert_eq!(p.is_late, Some(false));
+        assert_eq!(p.notification_at.as_deref(), Some("2026-01-01T12:31:05.229Z"));
+        assert_eq!(p.retake_counter, Some(3));
+        assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
+    }
+
+    #[test]
+    fn test_merge_exact_user_samples() {
+        let mem_json = r#"{
+            "frontImage": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/FXZtPxP7F6fBqNna.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "backImage": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "caption": "I may have had a dream BeReal went off",
+            "isLate": true,
+            "date": "2025-06-18T00:00:00.000Z",
+            "takenTime": "2025-06-18T12:03:26.815Z",
+            "berealMoment": "2025-06-18T11:40:05.293Z",
+            "location": {"latitude": 51.462059020996094, "longitude": -0.2528020143508911}
+        }"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+        assert_eq!(mem_post.is_late, Some(true));
+        assert_eq!(mem_post.taken_at, "2025-06-18T12:03:26.815Z");
+        assert_eq!(mem_post.notification_at.as_deref(), Some("2025-06-18T11:40:05.293Z"));
+        assert!(mem_post.primary.is_some());
+        assert_eq!(mem_post.primary.as_ref().unwrap().path, "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp");
+
+        let post_json = r#"{
+            "primary": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/qrd1qukCZ8u3f1oL.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "secondary": {"bucket": "storage.bere.al", "height": 2000, "width": 1500, "path": "/Photos/4KxneKfqNuNOA08K31QeHa0l7MI2/post/FXZtPxP7F6fBqNna.webp", "mediaType": "image", "mimeType": "image/webp"},
+            "retakeCounter": 0,
+            "caption": "I may have had a dream BeReal went off",
+            "location": {"latitude": 51.462059020996094, "longitude": -0.2528020143508911},
+            "visibility": ["friends"],
+            "takenAt": "2025-06-18T12:03:26.815Z"
+        }"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+
+        let merged = merge_posts_and_memories(vec![(mem_post, mem_json.to_string())], vec![(post_item, post_json.to_string())]);
+        assert_eq!(merged.len(), 1);
+        let (p, _) = &merged[0];
+        assert_eq!(p.is_late, Some(true));
+        assert_eq!(p.notification_at.as_deref(), Some("2025-06-18T11:40:05.293Z"));
+        assert_eq!(p.retake_counter, Some(0));
+        assert_eq!(p.visibility.as_ref().unwrap(), &vec!["friends".to_string()]);
+    }
+
+    #[test]
+    fn test_merge_unindexed_ontime_post() {
+        // An existing memory from that day sets the daily berealMoment to 14:22:05
+        let mem_json = r#"{
+            "takenTime": "2025-12-21T17:28:59.814Z",
+            "berealMoment": "2025-12-21T14:22:05.244Z",
+            "date": "2025-12-21T00:00:00.000Z",
+            "isLate": true
+        }"#;
+        let mem_post: BeRealPost = serde_json::from_str(mem_json).unwrap();
+
+        // An unindexed on-time post present in posts.json taken at 14:23:15 (70 seconds after the moment)
+        let post_json = r#"{
+            "takenAt": "2025-12-21T14:23:15.671Z",
+            "retakeCounter": 0,
+            "visibility": ["friends"]
+        }"#;
+        let post_item: BeRealPost = serde_json::from_str(post_json).unwrap();
+
+        let merged = merge_posts_and_memories(
+            vec![(mem_post, mem_json.to_string())],
+            vec![(post_item, post_json.to_string())],
+        );
+
+        assert_eq!(merged.len(), 2);
+        // Find the unindexed post in merged
+        let unindexed = merged.iter().find(|(p, _)| p.taken_at == "2025-12-21T14:23:15.671Z").unwrap();
+        let (p, _) = unindexed;
+        assert_eq!(p.notification_at.as_deref(), Some("2025-12-21T14:22:05.244Z"));
+        assert_eq!(p.is_late, Some(false)); // 70s <= 120s => ON TIME
+        assert_eq!(p.date.as_deref(), Some("2025-12-21T00:00:00.000Z"));
     }
 }

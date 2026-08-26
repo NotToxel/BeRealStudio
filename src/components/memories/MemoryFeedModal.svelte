@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { tick, onDestroy } from 'svelte';
+  import { fade, scale } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
+  import type { ExplorerMemory } from '$lib/types';
   import {
     activeFeedMemory,
     closeFeed,
@@ -8,23 +11,130 @@
     openExportModal,
     exportPreferences,
     memoryHeaderSettings,
+    showMemoryDebugBadges,
     formatMemoryLocation,
     formatMemoryTimeTag,
   } from '$lib/memoriesStore';
   import { exportSingleMemory } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
-  import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import MemoryActionMenu from './MemoryActionMenu.svelte';
+  import PerspectiveSwitcher from './PerspectiveSwitcher.svelte';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
-  import MapPin from 'lucide-svelte/icons/map-pin';
-  import Clock from 'lucide-svelte/icons/clock';
-  import Calendar from 'lucide-svelte/icons/calendar';
   import Download from 'lucide-svelte/icons/download';
 
-  let feedScrollContainer: HTMLElement | null = null;
-  let activeVisibleMemory: ExplorerMemory | null = null;
-  let hasScrolledInitial = false;
+  const CARD_HEIGHT = 750; // Reference height for virtual spacers
+
+  let scrollContainer: HTMLElement | null = null;
+  let activeIndex = 0;
+  let scrollTop = 0;
+  let lastJumpedId: string | null = null;
+  let isJumping = false;
+
+  // Windowed virtual rendering: Render 2 items before and 2 items ahead (max 5 cards in DOM)
+  $: windowStart = Math.max(0, activeIndex - 2);
+  $: windowEnd = Math.min($filteredMemories.length, activeIndex + 3);
+  $: visibleSlice = $filteredMemories.slice(windowStart, windowEnd);
+
+  $: topSpacerHeight = windowStart * CARD_HEIGHT;
+  $: bottomSpacerHeight = Math.max(0, ($filteredMemories.length - windowEnd) * CARD_HEIGHT);
+
+  $: currentMemory = $filteredMemories[activeIndex] || $activeFeedMemory;
+
+  // Trigger jump only once per memory opening to avoid recursive loops
+  $: if ($activeFeedMemory && scrollContainer && $activeFeedMemory.id !== lastJumpedId) {
+    lastJumpedId = $activeFeedMemory.id;
+    const targetIdx = $filteredMemories.findIndex((m) => m.id === $activeFeedMemory?.id);
+    if (targetIdx !== -1) {
+      activeIndex = targetIdx;
+      jumpToActiveMemory(targetIdx);
+    }
+  }
+
+  async function jumpToActiveMemory(targetIdx: number) {
+    isJumping = true;
+    await tick();
+    if (!scrollContainer) return;
+
+    // Approximate initial scroll position
+    const vh = scrollContainer.clientHeight || 750;
+    const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
+    const targetScroll = Math.max(0, targetIdx * CARD_HEIGHT - centerOffset);
+    scrollContainer.scrollTop = targetScroll;
+    scrollTop = targetScroll;
+
+    // Ensure DOM is fully mounted, then compute exact pixel-perfect vertical centering
+    await tick();
+    const targetMem = $filteredMemories[targetIdx];
+    if (targetMem && scrollContainer) {
+      const cardEl = document.getElementById(`feed-card-${targetMem.id}`);
+      if (cardEl) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const cardRect = cardEl.getBoundingClientRect();
+        const currentCardTopRelativeToContainer = cardRect.top - containerRect.top + scrollContainer.scrollTop;
+        const perfectCenterScroll = Math.max(0, currentCardTopRelativeToContainer - (containerRect.height - cardRect.height) / 2);
+        scrollContainer.scrollTop = perfectCenterScroll;
+        scrollTop = perfectCenterScroll;
+      }
+    }
+
+    setTimeout(() => {
+      isJumping = false;
+    }, 80);
+  }
+
+  function handleScroll(e: Event) {
+    const el = e.currentTarget as HTMLElement;
+    if (!el) return;
+    scrollTop = el.scrollTop;
+    if (!isJumping) {
+      const newIdx = Math.min(
+        $filteredMemories.length - 1,
+        Math.max(0, Math.round((scrollTop + CARD_HEIGHT * 0.35) / CARD_HEIGHT))
+      );
+      if (newIdx !== activeIndex) {
+        activeIndex = newIdx;
+      }
+    }
+  }
+
+  function scrollToIndex(idx: number) {
+    if (idx < 0 || idx >= $filteredMemories.length || !scrollContainer) return;
+    activeIndex = idx;
+    const targetMem = $filteredMemories[idx];
+    if (targetMem) {
+      const cardEl = document.getElementById(`feed-card-${targetMem.id}`);
+      if (cardEl && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const cardRect = cardEl.getBoundingClientRect();
+        const currentCardTopRelativeToContainer = cardRect.top - containerRect.top + scrollContainer.scrollTop;
+        const perfectCenterScroll = Math.max(0, currentCardTopRelativeToContainer - (containerRect.height - cardRect.height) / 2);
+        scrollContainer.scrollTo({ top: perfectCenterScroll, behavior: 'smooth' });
+        return;
+      }
+    }
+    const vh = scrollContainer.clientHeight || 750;
+    const centerOffset = Math.max(0, (vh - CARD_HEIGHT) / 2);
+    const targetScroll = Math.max(0, idx * CARD_HEIGHT - centerOffset);
+    scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (!$activeFeedMemory) return;
+    if (e.key === 'Escape') {
+      handleClose();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k') {
+      e.preventDefault();
+      if (activeIndex > 0) {
+        scrollToIndex(activeIndex - 1);
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j' || e.key === ' ') {
+      e.preventDefault();
+      if (activeIndex < $filteredMemories.length - 1) {
+        scrollToIndex(activeIndex + 1);
+      }
+    }
+  }
 
   async function handleQuickDownload(mem: ExplorerMemory) {
     if (!mem.primaryPath) return;
@@ -67,186 +177,206 @@
     }
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      closeFeed();
-    }
+  function handleClose() {
+    lastJumpedId = null;
+    closeFeed();
   }
-
-  // When activeFeedMemory changes, auto-scroll to that memory item in the feed
-  $: if ($activeFeedMemory && feedScrollContainer) {
-    scrollToMemory($activeFeedMemory.id);
-  }
-
-  async function scrollToMemory(id: string) {
-    await tick();
-    const el = document.getElementById(`feed-item-${id}`);
-    if (el && feedScrollContainer) {
-      el.scrollIntoView({ behavior: 'auto', block: 'start' });
-      activeVisibleMemory = $activeFeedMemory;
-    }
-  }
-
-  function handleScroll() {
-    if (!feedScrollContainer) return;
-    // Find item currently closest to top
-    const containerTop = feedScrollContainer.getBoundingClientRect().top;
-    for (const m of $filteredMemories) {
-      const el = document.getElementById(`feed-item-${m.id}`);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= containerTop + 140 && rect.bottom >= containerTop + 40) {
-          activeVisibleMemory = m;
-          break;
-        }
-      }
-    }
-  }
-
-  $: currentMemory = activeVisibleMemory || $activeFeedMemory || $filteredMemories[0];
-  $: currentIndex = currentMemory ? $filteredMemories.findIndex((m) => m.id === currentMemory.id) : 0;
 
   $: userName = $explorerData?.userName || 'toxel';
-  $: userFullname = $explorerData?.userFullname || '';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
-{#if $activeFeedMemory}
+{#if $activeFeedMemory && currentMemory}
   <div
     class="feed-modal-backdrop"
+    transition:fade={{ duration: 240, easing: cubicOut }}
     role="dialog"
     aria-modal="true"
     tabindex="-1"
-    on:click={(e) => e.target === e.currentTarget && closeFeed()}
-    on:keydown={(e) => e.key === 'Escape' && closeFeed()}
+    on:click={(e) => e.target === e.currentTarget && handleClose()}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
   >
     <div
       class="feed-modal-shell"
+      in:scale={{ start: 0.88, duration: 280, opacity: 0, easing: cubicOut }}
+      out:scale={{ start: 0.94, duration: 200, opacity: 0, easing: cubicOut }}
       role="document"
     >
-      <!-- Sticky Top Bar (shows active visible memory date) -->
+      <!-- Sticky Top Header -->
       <div class="feed-top-bar">
         <button
           type="button"
           class="back-nav-btn"
-          on:click={closeFeed}
+          on:click={handleClose}
           title="Back to Grid / Calendar (Esc)"
           aria-label="Close feed"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
           <span>Memories</span>
         </button>
 
         <div class="top-date-indicator">
-          {#if currentMemory}
-            <span class="top-date-text">{currentMemory.dateFormatted}</span>
-            <span class="top-index-text">{currentIndex + 1} of {$filteredMemories.length}</span>
-          {/if}
+          <span class="top-date-text">{currentMemory.dateFormatted}</span>
+          <span class="top-index-text">{activeIndex + 1} of {$filteredMemories.length}</span>
         </div>
 
         <div class="top-actions">
-          {#if currentMemory}
-            <MemoryActionMenu memory={currentMemory} />
-          {/if}
+          <button
+            type="button"
+            class="quick-download-btn"
+            on:click={() => handleQuickDownload(currentMemory)}
+            title="Export / Download this memory"
+            aria-label="Download memory"
+          >
+            <Download size={14} />
+          </button>
+          <MemoryActionMenu memory={currentMemory} />
         </div>
       </div>
 
-      <!-- Continuous Vertical Feed Scroll Container -->
+      <!-- High-Performance Windowed Infinite Scroll Viewport -->
       <div
-        bind:this={feedScrollContainer}
-        class="feed-scroll-container"
+        bind:this={scrollContainer}
+        class="feed-scroll-viewport custom-thick-scrollbar"
         on:scroll={handleScroll}
       >
-        {#each $filteredMemories as memory (memory.id)}
-          {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
-          {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
+        <!-- Top Virtual Spacer (preserves scroll position without rendering off-screen DOM nodes) -->
+        {#if topSpacerHeight > 0}
+          <div class="virtual-spacer" style="height: {topSpacerHeight}px;"></div>
+        {/if}
 
-          <article
-            id="feed-item-{memory.id}"
-            class="feed-post-card"
-          >
-            <!-- Post Header -->
-            <div class="post-header-row">
-              <div class="user-avatar-wrap">
-                {#if profilePic}
-                  <img src={profilePic} alt={userName} class="user-avatar-img" />
-                {:else}
-                  <div class="user-avatar-placeholder">
-                    <span>{userName.charAt(0).toUpperCase()}</span>
-                  </div>
-                {/if}
-              </div>
+        <div class="feed-cards-container">
+          {#each visibleSlice as memory (memory.id)}
+            {@const locText = formatMemoryLocation(memory, $memoryHeaderSettings)}
+            {@const timeText = formatMemoryTimeTag(memory, $memoryHeaderSettings)}
 
-              <div class="user-meta-column">
-                <div class="user-name-row">
-                  <span class="user-name">{userName}</span>
+            <article id="feed-card-{memory.id}" class="feed-post-card">
+              <!-- Post Header Row with Avatar, Name, Location/Time, Download & Action Menu -->
+              <div class="post-header-row">
+                <div class="user-avatar-wrap">
+                  {#if profilePic}
+                    <img src={profilePic} alt={userName} class="user-avatar-img" />
+                  {:else}
+                    <div class="user-avatar-placeholder">
+                      <span>{userName.charAt(0).toUpperCase()}</span>
+                    </div>
+                  {/if}
                 </div>
 
-                {#if locText || timeText}
-                  <div class="user-subtitle-row">
-                    {#if locText}
-                      <span class="location-text">{locText}</span>
-                    {/if}
-                    {#if locText && timeText}
-                      <span class="subtitle-bullet">•</span>
-                    {/if}
-                    {#if timeText}
-                      <span class="time-text">{timeText}</span>
-                    {/if}
+                <div class="user-meta-column">
+                  <div class="user-name-row">
+                    <span class="user-name">{userName}</span>
                   </div>
-                {/if}
-              </div>
 
-              <div class="post-header-actions">
-                <button
-                  type="button"
-                  class="quick-download-btn"
-                  on:click={() => handleQuickDownload(memory)}
-                  title="Export / Download this memory"
-                  aria-label="Download memory"
-                >
-                  <Download size={14} />
-                </button>
-                <MemoryActionMenu {memory} />
-              </div>
-            </div>
-
-            <!-- BeReal Dual Camera Frame (Click to swap, drag to move PIP) -->
-            <div class="dual-frame-wrapper">
-              <DualCameraFrame
-                primarySrc={memory.primaryPath}
-                secondarySrc={memory.secondaryPath}
-                btsSrc={memory.btsPath}
-                isVideo={memory.isVideo}
-                alt="BeReal {memory.dateFormatted}"
-                size="lg"
-                interactive={true}
-              />
-            </div>
-
-            <!-- Post Footer: Location, Caption, and Metadata -->
-            <div class="post-footer-section">
-              {#if memory.locationName}
-                <div class="location-badge-pill" title="GPS: {memory.location?.latitude.toFixed(4)}, {memory.location?.longitude.toFixed(4)}">
-                  <MapPin size={13} class="text-emerald-400" />
-                  <span>{memory.locationName}</span>
+                  {#if locText || timeText}
+                    <div class="user-subtitle-row">
+                      {#if locText}
+                        <span class="location-text">{locText}</span>
+                      {/if}
+                      {#if locText && timeText}
+                        <span class="subtitle-bullet">•</span>
+                      {/if}
+                      {#if timeText}
+                        <span
+                          class="time-text"
+                          title={memory.isLate
+                            ? (memory.lateExact ? `${memory.lateExact} (${memory.timeFormatted})` : (memory.lateDuration ? `${memory.lateDuration} (${memory.timeFormatted})` : 'Posted late'))
+                            : `Taken at ${memory.timeFormatted}`}
+                        >
+                          {timeText}
+                        </span>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
-              {/if}
 
+                <!-- Action Buttons directly on each memory post -->
+                <div class="post-header-actions">
+                  <button
+                    type="button"
+                    class="quick-download-btn"
+                    on:click|stopPropagation={() => handleQuickDownload(memory)}
+                    title="Export / Download this memory"
+                    aria-label="Download memory"
+                  >
+                    <Download size={14} />
+                  </button>
+                  <MemoryActionMenu {memory} />
+                </div>
+              </div>
+
+              <!-- Caption -->
               {#if memory.caption}
-                <div class="caption-block">
-                  <p class="caption-text">{memory.caption}</p>
+                <div class="post-header-caption-wrap">
+                  <p class="post-header-caption-text">{memory.caption}</p>
                 </div>
               {/if}
-            </div>
 
-            <!-- Subtle Post Divider -->
-            <div class="feed-post-divider"></div>
-          </article>
-        {/each}
+              <!-- BeReal Dual Camera Frame (Full size) -->
+              <div class="dual-frame-wrapper">
+                <DualCameraFrame
+                  primarySrc={memory.primaryPath}
+                  secondarySrc={memory.secondaryPath}
+                  btsSrc={memory.btsPath}
+                  isVideo={memory.isVideo}
+                  alt="BeReal {memory.dateFormatted}"
+                  size="lg"
+                  interactive={true}
+                  isLate={memory.isLate}
+                  lateDuration={memory.lateDuration}
+                  lateExact={memory.lateExact}
+                  takenAt={memory.takenAt}
+                  rawJson={memory.rawJson}
+                  debugInfo={memory.debugInfo}
+                />
+              </div>
+
+              <!-- Dev Debug JSON & Extraction Inspector (Hidden behind $showMemoryDebugBadges flag) -->
+              {#if $showMemoryDebugBadges && (memory.rawJson || memory.debugInfo)}
+                <details class="feed-dev-debug-accordion">
+                  <summary class="debug-accordion-summary">
+                    <span class="debug-tag {memory.isLate ? 'is-late' : 'is-ontime'}">
+                      {memory.isLate ? `⚠️ LATE (${memory.lateDuration || 'Late'})` : '✓ ON TIME'}
+                    </span>
+                    <span class="debug-summary-title">🐞 Dev Debug JSON &amp; Extraction</span>
+                  </summary>
+                  <div class="debug-accordion-body">
+                    <div class="debug-fields-grid">
+                      <div><span class="field-k">isLate:</span> <span class="field-v">{String(memory.isLate)}</span></div>
+                      <div><span class="field-k">lateDuration:</span> <span class="field-v">{memory.lateDuration || 'None'}</span></div>
+                      <div><span class="field-k">lateInSeconds:</span> <span class="field-v">{memory.lateInSeconds ?? 'None'}</span></div>
+                      <div><span class="field-k">takenAt:</span> <span class="field-v">{memory.takenAt}</span></div>
+                      <div><span class="field-k">location:</span> <span class="field-v">{memory.location ? `${memory.location.latitude.toFixed(4)}, ${memory.location.longitude.toFixed(4)}` : 'None'}</span></div>
+                      {#if memory.debugInfo}
+                        <div class="full-w"><span class="field-k">debugInfo:</span> <span class="field-v">{memory.debugInfo}</span></div>
+                      {/if}
+                    </div>
+                    {#if memory.rawJson}
+                      <div class="debug-raw-json-wrap">
+                        <span class="raw-json-heading">Raw Archive JSON:</span>
+                        <pre class="raw-json-pre"><code>{(() => { try { return JSON.stringify(JSON.parse(memory.rawJson), null, 2); } catch { return memory.rawJson; } })()}</code></pre>
+                      </div>
+                    {/if}
+                  </div>
+                </details>
+              {/if}
+
+              <!-- Clean Spacing & Divider between items in infinite scroll -->
+              <div class="feed-card-divider"></div>
+            </article>
+          {/each}
+        </div>
+
+        <!-- Bottom Virtual Spacer -->
+        {#if bottomSpacerHeight > 0}
+          <div class="virtual-spacer" style="height: {bottomSpacerHeight}px;"></div>
+        {/if}
       </div>
+
+      <!-- Always Visible Pinned Bottom-Left Perspective Toggle (Cannot be scrolled off) -->
+      <PerspectiveSwitcher variant="floating-modal" />
     </div>
   </div>
 {/if}
@@ -255,28 +385,18 @@
   .feed-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(20px);
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(24px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 500;
-    animation: fadeIn 0.16s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
   }
 
   .feed-modal-shell {
     position: relative;
     width: 100%;
-    max-width: 580px;
+    max-width: 530px;
     height: 96vh;
     display: flex;
     flex-direction: column;
@@ -285,23 +405,11 @@
     border-radius: 28px;
     overflow: hidden;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95);
-    animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (min-width: 1200px) {
     .feed-modal-shell {
-      max-width: 620px;
-    }
-  }
-
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.94);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
+      max-width: 550px;
     }
   }
 
@@ -311,12 +419,63 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px;
+    padding: 10px 16px;
     background: rgba(0, 0, 0, 0.88);
     backdrop-filter: blur(14px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     z-index: 40;
     flex-shrink: 0;
+  }
+
+  .feed-scroll-viewport {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: auto;
+    padding: 20px 16px 48px 16px;
+  }
+
+  .virtual-spacer {
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .feed-cards-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    width: 100%;
+  }
+
+  .feed-post-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 480px;
+    box-sizing: border-box;
+    animation: feedCardReveal 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    will-change: transform, opacity;
+  }
+
+  @keyframes feedCardReveal {
+    0% {
+      opacity: 0.35;
+      transform: scale(0.96) translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .feed-card-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin-top: 20px;
+    width: 100%;
   }
 
   .back-nav-btn {
@@ -358,30 +517,40 @@
   .top-actions {
     display: flex;
     align-items: center;
+    gap: 6px;
   }
 
-  /* Continuous Scroll Container */
-  .feed-scroll-container {
-    flex: 1;
-    overflow-y: auto;
-    scroll-behavior: smooth;
+  .post-header-actions {
+    margin-left: auto;
     display: flex;
-    flex-direction: column;
-    padding: 16px 18px 40px 18px;
-    gap: 28px;
+    align-items: center;
+    gap: 6px;
   }
 
-  .feed-post-card {
+  .quick-download-btn {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
-    width: 100%;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .quick-download-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
   }
 
   .post-header-row {
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
   }
 
   .user-avatar-wrap {
@@ -406,27 +575,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, #2a2a3c, #161622);
     color: #ffffff;
     font-weight: 700;
     font-size: 14px;
-    background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
   }
 
   .user-meta-column {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    flex: 1;
-  }
-
-  .user-name-row {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
+    gap: 1px;
+    min-width: 0;
   }
 
   .user-name {
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: -0.01em;
@@ -436,105 +599,140 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #a1a1aa;
-    line-height: 1.3;
-  }
-
-  .location-text {
-    color: #d4d4d8;
-    font-weight: 500;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .subtitle-bullet {
-    color: #71717a;
-    font-size: 10px;
+    opacity: 0.5;
   }
 
-  .time-text {
-    color: #a1a1aa;
-    font-weight: 400;
+  .post-header-caption-wrap {
+    width: 100%;
+    padding: 0 4px;
   }
 
-  .post-header-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .quick-download-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    background: #181824;
-    border: 1px solid var(--border-subtle);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .quick-download-btn:hover {
-    background: rgba(56, 189, 248, 0.15);
-    border-color: #38bdf8;
-    color: #38bdf8;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
+  .post-header-caption-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #f4f4f5;
+    line-height: 1.4;
+    word-break: break-word;
   }
 
   .dual-frame-wrapper {
     width: 100%;
+    display: flex;
+    justify-content: center;
   }
 
-  .post-footer-section {
+  /* Dev Debug Accordion Card on Feed */
+  .feed-dev-debug-accordion {
+    width: 100%;
+    margin-top: 8px;
+    background: rgba(18, 18, 26, 0.95);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    font-size: 11.5px;
+  }
+
+  .debug-accordion-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.04);
+    user-select: none;
+    transition: background 0.15s ease;
+  }
+
+  .debug-accordion-summary:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .debug-tag {
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    font-size: 9.5px;
+    font-weight: 800;
+  }
+
+  .debug-tag.is-late {
+    background: rgba(239, 68, 68, 0.25);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+  }
+
+  .debug-tag.is-ontime {
+    background: rgba(16, 185, 129, 0.25);
+    border: 1px solid #10b981;
+    color: #6ee7b7;
+  }
+
+  .debug-summary-title {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .debug-accordion-body {
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  .location-badge-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    background: rgba(52, 211, 153, 0.1);
-    border: 1px solid rgba(52, 211, 153, 0.25);
-    border-radius: var(--radius-full);
-    font-size: 11.5px;
+  .debug-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+
+  .debug-fields-grid .full-w {
+    grid-column: 1 / -1;
+  }
+
+  .field-k {
+    color: var(--text-muted);
     font-weight: 600;
-    color: #34d399;
-    align-self: flex-start;
   }
 
-  .caption-block {
-    padding: 4px 0;
+  .field-v {
+    color: #38bdf8;
   }
 
-  .caption-text {
-    font-size: 14px;
-    line-height: 1.45;
-    color: #ffffff;
-    font-weight: 500;
-    margin: 0;
+  .debug-raw-json-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
   }
 
-  .feed-post-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.07);
-    margin-top: 14px;
-    width: 100%;
+  .raw-json-heading {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
 
-  @media (max-width: 600px) {
-    .feed-modal-shell {
-      height: 100vh;
-      max-height: 100vh;
-      border-radius: 0;
-      border: none;
-    }
+  .raw-json-pre {
+    background: #09090d;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 </style>

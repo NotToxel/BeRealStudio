@@ -26,7 +26,8 @@
   $: prefs = $exportPreferences;
 
   let selectedType: ExportPreferences['exportType'] = $exportPreferences?.exportType || 'combined_pip';
-  let selectedFormat: ExportPreferences['format'] = $exportPreferences?.format || 'Jpeg';
+  let selectedFormat: 'Jpeg' | 'Png' | 'WebP' = ($exportPreferences?.format as any) || 'Jpeg';
+  let imageQuality: number = $exportPreferences?.quality || 95;
   let embedExif = $exportPreferences?.embedExif ?? true;
   let embedGps = $exportPreferences?.embedGps ?? true;
   let makeDefault = $exportPreferences?.isDefaultSet ?? false;
@@ -34,7 +35,8 @@
   // Sync state when modal is opened
   $: if (state?.isOpen && $exportPreferences) {
     selectedType = $exportPreferences.exportType || 'combined_pip';
-    selectedFormat = $exportPreferences.format || 'Jpeg';
+    selectedFormat = ($exportPreferences.format as any) || 'Jpeg';
+    imageQuality = $exportPreferences.quality || 95;
     embedExif = $exportPreferences.embedExif ?? true;
     embedGps = $exportPreferences.embedGps ?? true;
     makeDefault = $exportPreferences.isDefaultSet ?? false;
@@ -59,7 +61,7 @@
       exportPreferences.set({
         exportType: selectedType,
         format: selectedFormat,
-        quality: 92,
+        quality: imageQuality,
         embedExif,
         embedGps,
         isDefaultSet: makeDefault,
@@ -72,7 +74,7 @@
 
       const filters = isVideoExport
         ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
-        : [{ name: 'Image', extensions: [ext] }];
+        : [{ name: `${selectedFormat} Image`, extensions: [ext] }];
 
       const savePath = await save({
         defaultPath: defaultFilename,
@@ -92,7 +94,7 @@
         outputPath: savePath,
         exportType: selectedType,
         format: selectedFormat,
-        quality: 92,
+        quality: imageQuality,
         embedExif,
         takenAt: memory.takenAt,
         latitude: embedGps && memory.location ? memory.location.latitude : undefined,
@@ -278,8 +280,69 @@
           {/if}
         </div>
 
-        <!-- Metadata & Location Options -->
+        <!-- Format & Quality Section (for image exports) -->
         {#if selectedType !== 'bts_only'}
+          <div class="format-quality-section">
+            <div class="section-label">OUTPUT FORMAT &amp; QUALITY</div>
+
+            <div class="format-pills-row">
+              <button
+                type="button"
+                class="format-pill-btn"
+                class:active={selectedFormat === 'Jpeg'}
+                on:click={() => (selectedFormat = 'Jpeg')}
+              >
+                JPEG
+              </button>
+              <button
+                type="button"
+                class="format-pill-btn"
+                class:active={selectedFormat === 'WebP'}
+                on:click={() => (selectedFormat = 'WebP')}
+              >
+                WEBP
+              </button>
+              <button
+                type="button"
+                class="format-pill-btn"
+                class:active={selectedFormat === 'Png'}
+                on:click={() => (selectedFormat = 'Png')}
+              >
+                PNG
+              </button>
+            </div>
+
+            {#if selectedFormat === 'Jpeg'}
+              <div class="quality-number-row">
+                <span class="quality-label">JPEG Quality</span>
+                <div class="number-stepper">
+                  <button
+                    type="button"
+                    class="stepper-btn"
+                    on:click={() => (imageQuality = Math.max(50, imageQuality - 5))}
+                    disabled={imageQuality <= 50}
+                  >-</button>
+                  <input
+                    type="number"
+                    min="50"
+                    max="100"
+                    step="1"
+                    bind:value={imageQuality}
+                    class="quality-number-input"
+                  />
+                  <button
+                    type="button"
+                    class="stepper-btn"
+                    on:click={() => (imageQuality = Math.min(100, imageQuality + 5))}
+                    disabled={imageQuality >= 100}
+                  >+</button>
+                  <span class="unit-text">%</span>
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Metadata & Location Options -->
           <div class="metadata-section">
             <div class="section-label">METADATA &amp; LOCATION</div>
 
@@ -530,6 +593,119 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .format-quality-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .format-pills-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .format-pill-btn {
+    flex: 1;
+    padding: 7px 12px;
+    background: #161622;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .format-pill-btn:hover {
+    background: #1f1f2e;
+    color: #ffffff;
+  }
+
+  .format-pill-btn.active {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+
+  .quality-number-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #14141e;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .quality-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .number-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stepper-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .stepper-btn:hover:not(:disabled) {
+    background: rgba(56, 189, 248, 0.2);
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+
+  .stepper-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .quality-number-input {
+    width: 48px;
+    height: 26px;
+    background: #09090e;
+    border: 1px solid var(--border-medium);
+    border-radius: 6px;
+    color: #38bdf8;
+    font-weight: 700;
+    font-size: 13px;
+    text-align: center;
+    outline: none;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .quality-number-input::-webkit-outer-spin-button,
+  .quality-number-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .unit-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
   }
 
   .metadata-section {

@@ -36,6 +36,8 @@ pub struct ExplorerMemory {
     pub time_formatted: String,
     pub is_late: bool,
     pub late_duration: Option<String>,
+    pub late_exact: Option<String>,
+    pub late_in_seconds: Option<i64>,
     pub retake_counter: u32,
     pub caption: Option<String>,
     pub location: Option<Location>,
@@ -49,6 +51,8 @@ pub struct ExplorerMemory {
     pub is_video: bool,
     pub width: Option<u32>,
     pub height: Option<u32>,
+    pub raw_json: Option<String>,
+    pub debug_info: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,25 +152,32 @@ fn load_explorer_memories_inner(
         let dest_dir = cache_root.join(hash);
         fs::create_dir_all(&dest_dir)?;
 
-        // Instant Cache Hit: Return cached explorer JSON if available
+        // Instant Cache Hit: Return cached explorer JSON if available, already geocoded, contains raw_json, and has evaluated late metadata
         let cache_json_file = dest_dir.join("explorer_cache.json");
         if cache_json_file.exists() {
             if let Ok(file) = File::open(&cache_json_file) {
                 let reader = BufReader::with_capacity(128 * 1024, file);
                 if let Ok(cached_data) = serde_json::from_reader::<_, ExplorerData>(reader) {
-                    if !cached_data.memories.is_empty() {
+                    let has_valid_raw_json = cached_data.memories.first().and_then(|m| m.raw_json.as_ref()).is_some();
+                    let has_late_evaluated = cached_data.memories.iter().any(|m| m.is_late || m.late_duration.is_some());
+                    let needs_regeocode = cached_data.memories.iter().any(|m| {
+                        m.location.is_some() && (m.city.is_none() || m.location_name.as_deref().unwrap_or("").contains('°'))
+                    });
+
+                    if has_valid_raw_json && has_late_evaluated && !needs_regeocode && !cached_data.memories.is_empty() {
                         return Ok(cached_data);
                     }
                 }
             }
         }
 
-        let posts_json_candidate = dest_dir.join("posts.json");
         let memories_json_candidate = dest_dir.join("memories.json");
+        let posts_json_candidate = dest_dir.join("posts.json");
 
-        // Extract archive files into cache
+        // Extract archive files into cache with high-throughput buffered streams
         let zip_file = File::open(input_path)?;
-        let mut archive = ZipArchive::new(zip_file)?;
+        let buffered_zip = BufReader::with_capacity(512 * 1024, zip_file);
+        let mut archive = ZipArchive::new(buffered_zip)?;
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)?;
@@ -181,23 +192,33 @@ fn load_explorer_memories_inner(
                     if let Some(parent) = out_path.parent() {
                         let _ = fs::create_dir_all(parent);
                     }
-                    if let Ok(mut out) = File::create(&out_path) {
-                        let _ = std::io::copy(&mut entry, &mut out);
+                    if let Ok(out) = File::create(&out_path) {
+                        let mut buffered_out = std::io::BufWriter::with_capacity(128 * 1024, out);
+                        let _ = std::io::copy(&mut entry, &mut buffered_out);
                     }
                 }
             }
         }
 
         let archive_info = parser::scan_archive(&dest_dir.to_string_lossy())?;
-        let posts_file = if posts_json_candidate.exists() {
-            posts_json_candidate
-        } else if memories_json_candidate.exists() {
-            memories_json_candidate
+        let memories_posts = if memories_json_candidate.exists() {
+            parse_posts_from_path(&memories_json_candidate).unwrap_or_default()
         } else {
-            find_json_in_dir(&dest_dir)?
+            Vec::new()
+        };
+        let posts_json_posts = if posts_json_candidate.exists() {
+            parse_posts_from_path(&posts_json_candidate).unwrap_or_default()
+        } else {
+            Vec::new()
         };
 
-        let raw_posts = parse_posts_from_path(&posts_file)?;
+        let raw_posts = if !memories_posts.is_empty() || !posts_json_posts.is_empty() {
+            parser::merge_posts_and_memories(memories_posts, posts_json_posts)
+        } else {
+            let fallback_file = find_json_in_dir(&dest_dir)?;
+            parse_posts_from_path(&fallback_file)?
+        };
+
         (
             dest_dir,
             raw_posts,
@@ -208,8 +229,26 @@ fn load_explorer_memories_inner(
     } else {
         // Directory
         let archive_info = parser::scan_archive(archive_path_str)?;
-        let posts_file = find_json_in_dir(input_path)?;
-        let raw_posts = parse_posts_from_path(&posts_file)?;
+        let mem_cand = input_path.join("memories.json");
+        let post_cand = input_path.join("posts.json");
+        let memories_posts = if mem_cand.exists() {
+            parse_posts_from_path(&mem_cand).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let posts_json_posts = if post_cand.exists() {
+            parse_posts_from_path(&post_cand).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        let raw_posts = if !memories_posts.is_empty() || !posts_json_posts.is_empty() {
+            parser::merge_posts_and_memories(memories_posts, posts_json_posts)
+        } else {
+            let fallback_file = find_json_in_dir(input_path)?;
+            parse_posts_from_path(&fallback_file)?
+        };
+
         (
             input_path.to_path_buf(),
             raw_posts,
@@ -222,12 +261,12 @@ fn load_explorer_memories_inner(
     // Deduplicate posts by taken_at timestamp and media paths
     let mut seen_keys = HashSet::new();
     let mut posts = Vec::with_capacity(all_raw_posts.len());
-    for p in all_raw_posts {
+    for (p, raw_json_str) in all_raw_posts {
         let prim_str = p.primary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
         let sec_str = p.secondary.as_ref().map(|a| a.path.as_str()).unwrap_or("");
         let dedupe_key = format!("{}:{}:{}", p.taken_at, prim_str, sec_str);
         if seen_keys.insert(dedupe_key) {
-            posts.push(p);
+            posts.push((p, raw_json_str));
         }
     }
 
@@ -246,13 +285,19 @@ fn load_explorer_memories_inner(
     let memories: Vec<ExplorerMemory> = posts
         .par_iter()
         .enumerate()
-        .map(|(idx, post)| {
+        .map(|(idx, (post, raw_json_str))| {
             let dt = parse_taken_at(&post.taken_at).unwrap_or_else(Utc::now);
             let local_dt: DateTime<Local> = DateTime::from(dt);
 
-            let year = local_dt.year();
-            let month = local_dt.month();
-            let day = local_dt.day();
+            // Use the BeReal moment cycle date (from post.date) if available to anchor the BeReal to its true calendar day
+            let cycle_dt: DateTime<Local> = post.date.as_deref()
+                .and_then(parse_taken_at)
+                .map(DateTime::from)
+                .unwrap_or(local_dt);
+
+            let year = cycle_dt.year();
+            let month = cycle_dt.month();
+            let day = cycle_dt.day();
             let month_key = format!("{:04}-{:02}", year, month);
 
             // Fast indexed media lookup
@@ -311,29 +356,80 @@ fn load_explorer_memories_inner(
                 }
             }
 
-            let date_formatted = local_dt.format("%d %B %Y").to_string();
+            let date_formatted = cycle_dt.format("%d %B %Y").to_string();
             let day_number = format!("{}", day);
             let time_formatted = local_dt.format("%H:%M").to_string();
 
             let retake_counter = post.retake_counter.unwrap_or(0);
-            let (is_late, late_duration) = if let Some(sec) = post.late_in_seconds {
-                if sec > 120 {
-                    let mins = sec / 60;
-                    let hrs = mins / 60;
+            
+            // Calculate moment difference between notification time and actual post time
+            let notif_dt = post.notification_at.as_deref().and_then(parser::parse_taken_at);
+            let post_dt = parser::parse_taken_at(&post.taken_at);
+            let moment_diff_sec = match (notif_dt, post_dt) {
+                (Some(n), Some(p)) => {
+                    let d = (p - n).num_seconds();
+                    if d > 0 { Some(d) } else { None }
+                }
+                _ => None,
+            };
+
+            // A post is determined to be late when the boolean tag is true (or fallback if absent)
+            let is_late = match post.is_late {
+                Some(b) => b,
+                None => {
+                    if let Some(s) = post.late_in_seconds {
+                        s > 0
+                    } else if let Some(diff) = moment_diff_sec {
+                        diff > 120
+                    } else {
+                        false
+                    }
+                }
+            };
+
+            let (late_duration, late_exact, late_seconds) = if is_late {
+                let late_sec = moment_diff_sec
+                    .or(post.late_in_seconds)
+                    .unwrap_or(0)
+                    .max(0);
+
+                if late_sec > 0 {
+                    let hrs = late_sec / 3600;
+                    let mins = (late_sec % 3600) / 60;
+                    let secs = late_sec % 60;
+
                     let dur_str = if hrs > 0 {
                         format!("{}h late", hrs)
-                    } else {
+                    } else if mins > 0 {
                         format!("{}m late", mins)
+                    } else {
+                        format!("{}s late", secs)
                     };
-                    (true, Some(dur_str))
+
+                    let exact_str = if hrs > 0 && mins > 0 {
+                        format!("{} hr {} min late", hrs, mins)
+                    } else if hrs > 0 {
+                        format!("{} hr late", hrs)
+                    } else if mins > 0 && secs > 0 {
+                        format!("{} min {} sec late", mins, secs)
+                    } else if mins > 0 {
+                        format!("{} min late", mins)
+                    } else {
+                        format!("{} sec late", secs)
+                    };
+
+                    (Some(dur_str), Some(exact_str), Some(late_sec))
                 } else {
-                    (false, None)
+                    (Some("Late".to_string()), Some("Posted after BeReal moment".to_string()), Some(0))
                 }
-            } else if let Some(late_bool) = post.is_late {
-                (late_bool, if late_bool { Some("Late".to_string()) } else { None })
             } else {
-                (false, None)
+                (None, None, None)
             };
+
+            let debug_info = format!(
+                "is_late: {:?} | raw_is_late: {:?} | late_sec: {:?} | notif: {:?} | taken: {}",
+                is_late, post.is_late, late_seconds, post.notification_at, post.taken_at
+            );
 
             ExplorerMemory {
                 id: format!("bereal-{}", idx),
@@ -348,6 +444,8 @@ fn load_explorer_memories_inner(
                 time_formatted,
                 is_late,
                 late_duration,
+                late_exact,
+                late_in_seconds: late_seconds.or(post.late_in_seconds),
                 retake_counter,
                 caption: post.caption.clone(),
                 location: post.location.clone(),
@@ -361,6 +459,8 @@ fn load_explorer_memories_inner(
                 is_video,
                 width: post.primary.as_ref().and_then(|p| p.width),
                 height: post.primary.as_ref().and_then(|p| p.height),
+                raw_json: Some(raw_json_str.clone()),
+                debug_info: Some(debug_info),
             }
         })
         .collect();
@@ -418,8 +518,9 @@ fn load_explorer_memories_inner(
 
     // Cache computed data to disk for instant sub-millisecond retrieval on next launch
     let cache_file = working_dir.join("explorer_cache.json");
-    if let Ok(serialized) = serde_json::to_string(&data) {
-        let _ = fs::write(cache_file, serialized);
+    if let Ok(file) = File::create(&cache_file) {
+        let mut writer = std::io::BufWriter::with_capacity(256 * 1024, file);
+        let _ = serde_json::to_writer(&mut writer, &data);
     }
 
     Ok(data)
@@ -497,10 +598,10 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
         .and_then(parse_taken_at)
         .unwrap_or_else(Utc::now);
 
-    let location = if opts.latitude.is_some() && opts.longitude.is_some() {
+    let location = if let (Some(latitude), Some(longitude)) = (opts.latitude, opts.longitude) {
         Some(Location {
-            latitude: opts.latitude.unwrap(),
-            longitude: opts.longitude.unwrap(),
+            latitude,
+            longitude,
         })
     } else {
         None
@@ -617,23 +718,46 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
     Ok(out_dest.to_string_lossy().to_string())
 }
 
-/// Helper: Find posts.json or memories.json in extracted directory
+/// Helper: Find memories.json or posts.json in directory
 fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
-    let posts = dir.join("posts.json");
-    if posts.exists() {
-        return Ok(posts);
-    }
+    // 1. Direct priority check: memories.json
     let memories = dir.join("memories.json");
     if memories.exists() {
         return Ok(memories);
     }
 
+    // 2. Direct fallback check: posts.json
+    let posts = dir.join("posts.json");
+    if posts.exists() {
+        return Ok(posts);
+    }
+
+    // Search immediate subdirectories for memories.json first
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.eq_ignore_ascii_case("posts.json") || name.eq_ignore_ascii_case("memories.json") {
+                    if name.eq_ignore_ascii_case("memories.json") {
+                        return Ok(path);
+                    }
+                }
+            } else if path.is_dir() {
+                let sub_memories = path.join("memories.json");
+                if sub_memories.exists() {
+                    return Ok(sub_memories);
+                }
+            }
+        }
+    }
+
+    // Fallback: search for posts.json in subdirectories
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.eq_ignore_ascii_case("posts.json") {
                         return Ok(path);
                     }
                 }
@@ -646,19 +770,83 @@ fn find_json_in_dir(dir: &Path) -> Result<PathBuf> {
         }
     }
 
-    anyhow::bail!("Could not find posts.json or memories.json in {}", dir.display())
+    anyhow::bail!("Could not find memories.json or posts.json in {}", dir.display())
 }
 
-/// Helper: Parse BeRealPost vector from a JSON file path
-fn parse_posts_from_path(path: &Path) -> Result<Vec<BeRealPost>> {
+/// Helper: Parse BeRealPost vector with raw JSON strings from a JSON file path
+fn parse_posts_from_path(path: &Path) -> Result<Vec<(BeRealPost, String)>> {
     let file = File::open(path)?;
     let reader = BufReader::with_capacity(128 * 1024, file);
-    let raw_posts: Vec<serde_json::Value> = serde_json::from_reader(reader)?;
+    let root_val: serde_json::Value = serde_json::from_reader(reader)?;
+
+    let raw_posts: Vec<serde_json::Value> = match root_val {
+        serde_json::Value::Array(arr) => arr,
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(arr)) = map.get("posts").or_else(|| map.get("memories")).or_else(|| map.get("data")) {
+                arr.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
 
     let mut posts = Vec::with_capacity(raw_posts.len());
     for val in raw_posts {
-        if let Ok(p) = serde_json::from_value::<BeRealPost>(val) {
-            posts.push(p);
+        let raw_str = serde_json::to_string(&val).unwrap_or_default();
+        if let Ok(mut p) = serde_json::from_value::<BeRealPost>(val.clone()) {
+            if p.taken_at.is_empty() {
+                if let Some(ref d) = p.date {
+                    p.taken_at = d.clone();
+                }
+            }
+            // Check direct raw field fallbacks if serde left something as None
+            if p.is_late.is_none() {
+                if let Some(val_late) = val.get("isLate")
+                    .or_else(|| val.get("is_late"))
+                    .or_else(|| val.get("late"))
+                    .or_else(|| val.get("wasLate"))
+                    .or_else(|| val.get("isLatePost"))
+                {
+                    if let Some(b) = val_late.as_bool() {
+                        p.is_late = Some(b);
+                    } else if let Some(i) = val_late.as_i64() {
+                        p.is_late = Some(i != 0);
+                    } else if let Some(s) = val_late.as_str() {
+                        p.is_late = Some(s.eq_ignore_ascii_case("true") || s == "1");
+                    }
+                }
+            }
+
+            if p.late_in_seconds.is_none() {
+                if let Some(val_sec) = val.get("lateInSeconds")
+                    .or_else(|| val.get("late_in_seconds"))
+                    .or_else(|| val.get("secondsLate"))
+                    .or_else(|| val.get("lateSeconds"))
+                    .or_else(|| val.get("lateTime"))
+                {
+                    if let Some(i) = val_sec.as_i64() {
+                        p.late_in_seconds = Some(i);
+                    } else if let Some(s) = val_sec.as_str() {
+                        p.late_in_seconds = s.trim().parse::<i64>().ok();
+                    }
+                }
+            }
+
+            if p.notification_at.is_none() {
+                if let Some(val_notif) = val.get("notificationAt")
+                    .or_else(|| val.get("momentAt"))
+                    .or_else(|| val.get("notification_at"))
+                    .or_else(|| val.get("berealMoment"))
+                    .or_else(|| val.get("notificationDate"))
+                {
+                    if let Some(s) = val_notif.as_str() {
+                        p.notification_at = Some(s.to_string());
+                    }
+                }
+            }
+
+            posts.push((p, raw_str));
         }
     }
     Ok(posts)

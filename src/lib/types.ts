@@ -294,6 +294,8 @@ export interface ExplorerMemory {
   timeFormatted: string;
   isLate: boolean;
   lateDuration?: string;
+  lateExact?: string;
+  lateInSeconds?: number;
   retakeCounter: number;
   caption?: string;
   location?: {
@@ -310,6 +312,8 @@ export interface ExplorerMemory {
   isVideo: boolean;
   width?: number;
   height?: number;
+  rawJson?: string;
+  debugInfo?: string;
 }
 
 export interface ExplorerData {
@@ -352,12 +356,18 @@ export interface ExplorerFilterState {
   hasLocationOnly: boolean;
   hasBtsOnly: boolean;
   hasCaptionOnly: boolean;
+  hasVideoOnly: boolean;
 }
 
 export interface MemoryHeaderSettings {
   showLocation: boolean;
-  locationFormat: 'city_country' | 'suburb_city_country' | 'suburb_city' | 'city_only' | 'full';
+  locationFormat: 'city_country' | 'suburb_city_country' | 'suburb_city' | 'city_only' | 'full' | 'custom';
+  customLocationText?: string;
   showTimeTag: boolean;
-  timeTagFormat: 'time_only' | 'date_only' | 'late_duration' | 'datetime';
+  timeTagFormat: 'time_only' | 'date_only' | 'late_duration' | 'datetime' | 'smart_progressive' | 'custom';
+  customTimeTagText?: string;
+  showLateAddition: boolean;
+  showLatePillsInGrid: boolean;
+  showLatePillsInCalendar: boolean;
 }
 

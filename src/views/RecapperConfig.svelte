@@ -104,11 +104,11 @@
   }
 
   let folderDebounce: ReturnType<typeof setTimeout> | null = null;
-  $: if ($recapperConfig.inputFolder !== lastScannedFolder) {
+  $: if ($recapperConfig.inputFolder !== lastScannedFolder || (!recapperArchiveMeta && $recapperConfig.inputFolder)) {
     if (folderDebounce) clearTimeout(folderDebounce);
     folderDebounce = setTimeout(() => {
       handleFolderScan($recapperConfig.inputFolder);
-    }, 350);
+    }, 250);
   }
 
   $: if ($recapperConfig.musicPath) {
@@ -291,6 +291,9 @@
   $: selectedTier = availableTiers.find((t) => t.id === selectedTierId) || availableTiers[2];
 
   onMount(async () => {
+    if ($recapperConfig.inputFolder && (!recapperArchiveMeta || !recapperArchiveMeta.isValid)) {
+      handleFolderScan($recapperConfig.inputFolder);
+    }
     try {
       const status = await checkOfflineGeoDb();
       offlineGeoDbStatus.set(status);
@@ -461,7 +464,7 @@
 
     const unlistenLog = await onJobLog(job.id, (l) => {
       appendActiveJobLog(job.id, l);
-      liveLogs.update((logs) => [...logs, l]);
+      liveLogs.update((logs) => [...logs.slice(-499), l]);
     });
 
     // Start background processing
