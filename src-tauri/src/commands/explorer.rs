@@ -322,41 +322,47 @@ fn load_explorer_memories_inner(
             let time_formatted = local_dt.format("%H:%M").to_string();
 
             let retake_counter = post.retake_counter.unwrap_or(0);
+            
+            // Strictly check is_late from memories.json (or fallback to late_in_seconds > 120)
+            let is_late = match post.is_late {
+                Some(b) => b,
+                None => post.late_in_seconds.map(|s| s > 120).unwrap_or(false),
+            };
+
             let late_sec = post.late_in_seconds.unwrap_or(0);
-            let raw_is_late = post.is_late.unwrap_or(false) || late_sec > 120;
 
-            let (is_late, late_duration, late_exact) = if !raw_is_late || (post.is_late == Some(false) && late_sec <= 120) {
-                (false, None, None)
-            } else if late_sec > 0 {
-                let hrs = late_sec / 3600;
-                let mins = (late_sec % 3600) / 60;
-                let secs = late_sec % 60;
+            let (late_duration, late_exact) = if is_late {
+                if late_sec > 0 {
+                    let hrs = late_sec / 3600;
+                    let mins = (late_sec % 3600) / 60;
+                    let secs = late_sec % 60;
 
-                let dur_str = if hrs > 0 {
-                    format!("{}h late", hrs)
-                } else if mins > 0 {
-                    format!("{}m late", mins)
+                    let dur_str = if hrs > 0 {
+                        format!("{}h late", hrs)
+                    } else if mins > 0 {
+                        format!("{}m late", mins)
+                    } else {
+                        format!("{}s late", secs)
+                    };
+
+                    let exact_str = if hrs > 0 && mins > 0 {
+                        format!("{} hr {} min late", hrs, mins)
+                    } else if hrs > 0 {
+                        format!("{} hr late", hrs)
+                    } else if mins > 0 && secs > 0 {
+                        format!("{} min {} sec late", mins, secs)
+                    } else if mins > 0 {
+                        format!("{} min late", mins)
+                    } else {
+                        format!("{} sec late", secs)
+                    };
+
+                    (Some(dur_str), Some(exact_str))
                 } else {
-                    format!("{}s late", secs)
-                };
-
-                let exact_str = if hrs > 0 && mins > 0 {
-                    format!("{} hr {} min late", hrs, mins)
-                } else if hrs > 0 {
-                    format!("{} hr late", hrs)
-                } else if mins > 0 && secs > 0 {
-                    format!("{} min {} sec late", mins, secs)
-                } else if mins > 0 {
-                    format!("{} min late", mins)
-                } else {
-                    format!("{} sec late", secs)
-                };
-
-                (true, Some(dur_str), Some(exact_str))
-            } else if post.is_late == Some(true) {
-                (true, Some("Late".to_string()), Some("Posted after notification window".to_string()))
+                    (Some("Late".to_string()), Some("Posted after notification window".to_string()))
+                }
             } else {
-                (false, None, None)
+                (None, None)
             };
 
             ExplorerMemory {

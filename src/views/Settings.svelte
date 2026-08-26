@@ -51,7 +51,8 @@
   import Clock from 'lucide-svelte/icons/clock';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Copy from 'lucide-svelte/icons/copy';
-  import { memoryHeaderSettings } from '$lib/memoriesStore';
+  import VolumeIcon from '$components/common/VolumeIcon.svelte';
+  import { memoryHeaderSettings, globalAudioSettings } from '$lib/memoriesStore';
 
   let statusMessage = '';
   let isSuccessStatus = true;
@@ -836,11 +837,51 @@
       </div>
     </div>
 
-    <!-- 4. Local Storage & Privacy Management -->
+    <!-- 4. Memory Media Audio & Video Playback Settings -->
+    <div class="card section-card">
+      <div class="head-title">
+        <VolumeIcon size={18} className="text-sky-400" />
+        <h2 class="title-sm">4. Memory Audio &amp; Video Playback Defaults</h2>
+      </div>
+
+      <p class="text-secondary text-desc">
+        Configure whether video files and BTS (Behind-The-Scenes) micro-videos start muted by default, and adjust default playback volume.
+      </p>
+
+      <div class="setting-item">
+        <div class="setting-text">
+          <span class="setting-label">Start Media Muted by Default</span>
+          <span class="setting-hint">When enabled, videos and BTS clips will start muted until unmuted manually.</span>
+        </div>
+        <Toggle
+          checked={$globalAudioSettings.defaultMuted}
+          on:change={(e) => ($globalAudioSettings.defaultMuted = e.detail)}
+        />
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-text">
+          <span class="setting-label">Default Playback Volume ({Math.round($globalAudioSettings.volume * 100)}%)</span>
+          <span class="setting-hint">Controls the master audio volume level for in-app video and BTS playback.</span>
+        </div>
+        <div class="slider-control-row">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            class="range-slider"
+            bind:value={$globalAudioSettings.volume}
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Local Storage & Privacy Management -->
     <div class="card section-card">
       <div class="head-title">
         <ShieldCheck size={18} class="text-emerald-400" />
-        <h2 class="title-sm">4. Local Storage &amp; Factory Reset</h2>
+        <h2 class="title-sm">5. Local Storage &amp; Factory Reset</h2>
       </div>
 
       <p class="text-secondary text-desc">

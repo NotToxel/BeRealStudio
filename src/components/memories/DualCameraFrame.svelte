@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getSafeImageSrc, getMediaDataUrl, globalPerspective } from '$lib/memoriesStore';
+  import { getSafeImageSrc, getMediaDataUrl, globalPerspective, globalAudioSettings } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';
   import Repeat from 'lucide-svelte/icons/repeat';
@@ -28,8 +28,13 @@
     : (localSwappedOverride !== null ? localSwappedOverride : $globalPerspective === 'secondary');
 
   let isPlayingBts = false;
-  let isBtsMuted = false;
+  let isBtsMuted = true;
+  let isVideoMuted = true;
   let btsVideoEl: HTMLVideoElement | null = null;
+
+  // Sync initial mute state from global settings
+  $: isBtsMuted = $globalAudioSettings.defaultMuted;
+  $: isVideoMuted = $globalAudioSettings.defaultMuted;
 
   // Track raw loaded data URLs for primary & secondary
   let primaryDataUrl = '';
@@ -58,6 +63,19 @@
     localSwappedOverride = !swapped;
   }
 
+  function toggleVideoMute(e: MouseEvent) {
+    e.stopPropagation();
+    isVideoMuted = !isVideoMuted;
+    if (baseVideoEl) baseVideoEl.muted = isVideoMuted;
+    if (pipVideoEl) pipVideoEl.muted = isVideoMuted;
+  }
+
+  function toggleBtsMute(e: MouseEvent) {
+    e.stopPropagation();
+    isBtsMuted = !isBtsMuted;
+    if (btsVideoEl) btsVideoEl.muted = isBtsMuted;
+  }
+
   async function toggleBts(e: MouseEvent) {
     if (!btsSrc) return;
     e.stopPropagation();
@@ -68,7 +86,7 @@
         try {
           btsVideoEl.currentTime = 0;
           btsVideoEl.muted = isBtsMuted;
-          btsVideoEl.volume = 1.0;
+          btsVideoEl.volume = $globalAudioSettings.volume;
           await btsVideoEl.play();
         } catch (err) {
           console.warn('BTS video playback error:', err);
@@ -243,10 +261,15 @@
   }
 
   function playVideoPreview() {
+    const vol = $globalAudioSettings.volume;
     if (baseVideoEl) {
+      baseVideoEl.volume = vol;
+      baseVideoEl.muted = isVideoMuted;
       baseVideoEl.play().catch(() => {});
     }
     if (pipVideoEl) {
+      pipVideoEl.volume = vol;
+      pipVideoEl.muted = isVideoMuted;
       pipVideoEl.play().catch(() => {});
     }
   }
@@ -300,7 +323,7 @@
         src={largeImage}
         class="media-layer base-video"
         loop
-        muted
+        muted={isVideoMuted}
         playsinline
         preload="metadata"
       >
@@ -325,6 +348,23 @@
     {#if (isBaseVideo || isPipVideo) && !isHovered && !isPlayingBts}
       <div class="video-indicator-badge" title="Hover to play preview">
         <Play size={10} class="fill-current text-white" />
+      </div>
+    {/if}
+
+    <!-- Video Audio Mute/Unmute Control Pill when hovered -->
+    {#if (isBaseVideo || isPipVideo) && isHovered && !isPlayingBts}
+      <div class="video-audio-cluster">
+        <button
+          type="button"
+          class="video-audio-pill"
+          class:is-muted={isVideoMuted}
+          on:click={toggleVideoMute}
+          title={isVideoMuted ? 'Unmute Video Audio' : 'Mute Video Audio'}
+          aria-label="Toggle video audio"
+        >
+          <VolumeIcon muted={isVideoMuted} size={12} />
+          <span>{isVideoMuted ? 'Muted' : `${Math.round($globalAudioSettings.volume * 100)}%`}</span>
+        </button>
       </div>
     {/if}
 
@@ -697,6 +737,46 @@
     transform: scale(1.15);
   }
 
+  /* Video Audio Controls Cluster */
+  .video-audio-cluster {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 30;
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  .video-audio-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--radius-full);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .video-audio-pill:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    transform: scale(1.04);
+  }
+
+  .video-audio-pill.is-muted {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+
   /* BTS Play Trigger & Audio Controls Cluster */
   .bts-controls-cluster {
     position: absolute;
@@ -725,16 +805,16 @@
   }
 
   .bts-trigger-pill:hover {
-    background: rgba(255, 230, 0, 0.9);
+    background: rgba(56, 189, 248, 0.9);
     color: #000000;
-    border-color: #ffe600;
+    border-color: #38bdf8;
     transform: scale(1.05);
   }
 
   .bts-trigger-pill.active {
-    background: #ffe600;
+    background: #38bdf8;
     color: #000000;
-    border-color: #ffe600;
+    border-color: #38bdf8;
   }
 
   .bts-audio-pill {

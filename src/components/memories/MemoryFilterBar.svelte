@@ -6,6 +6,8 @@
     explorerFilterCounts,
     citiesByCountry,
     resetFilters,
+    toggleVideoOnlyFilter,
+    toggleBtsOnlyFilter,
   } from '$lib/memoriesStore';
   import CountryFlag from '../common/CountryFlag.svelte';
   import Search from 'lucide-svelte/icons/search';
@@ -118,7 +120,7 @@
         type="button"
         class="filter-chip chip-video"
         class:active={$explorerFilter.hasVideoOnly}
-        on:click={() => ($explorerFilter.hasVideoOnly = !$explorerFilter.hasVideoOnly)}
+        on:click={toggleVideoOnlyFilter}
       >
         <Clapperboard size={12} />
         <span>Videos</span>
@@ -128,7 +130,7 @@
         type="button"
         class="filter-chip chip-bts"
         class:active={$explorerFilter.hasBtsOnly}
-        on:click={() => ($explorerFilter.hasBtsOnly = !$explorerFilter.hasBtsOnly)}
+        on:click={toggleBtsOnlyFilter}
       >
         <Film size={12} />
         <span>BTS Clips</span>

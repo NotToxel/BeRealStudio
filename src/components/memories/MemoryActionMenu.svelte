@@ -16,7 +16,6 @@
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
 
   import Share2 from 'lucide-svelte/icons/share-2';
-  import Trash2 from 'lucide-svelte/icons/trash-2';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import FileText from 'lucide-svelte/icons/file-text';
   import Eye from 'lucide-svelte/icons/eye';
@@ -223,16 +222,6 @@
           </button>
         {/if}
       </div>
-
-      <div class="menu-divider"></div>
-
-      <!-- Delete / Hide Danger Action (Red text matching BeReal app) -->
-      <div class="menu-section">
-        <button type="button" class="menu-item danger-item" on:click={() => copyToClipboard(getFilenameFromPath(memory.primaryPath), 'Deleted item ref')}>
-          <Trash2 size={16} class="text-rose-500" />
-          <span>Delete my BeReal.</span>
-        </button>
-      </div>
     </div>
   {/if}
 
@@ -330,16 +319,6 @@
   .menu-item:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
-  }
-
-  .menu-item.danger-item {
-    color: #f87171;
-    font-weight: 600;
-  }
-
-  .menu-item.danger-item:hover {
-    background: rgba(244, 63, 94, 0.15);
-    color: #fb7185;
   }
 
   .menu-divider {

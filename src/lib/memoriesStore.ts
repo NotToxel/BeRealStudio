@@ -29,11 +29,59 @@ export const activeFeedIndex = writable<number | null>(null);
 
 export const explorerFilter = writable<ExplorerFilterState>({ ...initialFilterState });
 
+// Global Audio settings (default muted state and volume level)
+export interface GlobalAudioSettings {
+  defaultMuted: boolean;
+  volume: number; // 0.0 to 1.0
+}
+
+const DEFAULT_AUDIO_SETTINGS: GlobalAudioSettings = {
+  defaultMuted: true,
+  volume: 0.8,
+};
+
+function loadGlobalAudioSettings(): GlobalAudioSettings {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('bereal_audio_settings');
+      if (saved) return { ...DEFAULT_AUDIO_SETTINGS, ...JSON.parse(saved) };
+    } catch {}
+  }
+  return { ...DEFAULT_AUDIO_SETTINGS };
+}
+
+export const globalAudioSettings = writable<GlobalAudioSettings>(loadGlobalAudioSettings());
+
+if (typeof window !== 'undefined') {
+  globalAudioSettings.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_audio_settings', JSON.stringify(val));
+    } catch {}
+  });
+}
+
 // Global perspective toggle ('primary' = main camera large | 'secondary' = selfie camera large)
 export const globalPerspective = writable<'primary' | 'secondary'>('primary');
 
 export function toggleGlobalPerspective() {
   globalPerspective.update((p) => (p === 'primary' ? 'secondary' : 'primary'));
+}
+
+// Helper to toggle Videos and BTS as mutually exclusive
+export function toggleVideoOnlyFilter() {
+  explorerFilter.update((f) => ({
+    ...f,
+    hasVideoOnly: !f.hasVideoOnly,
+    hasBtsOnly: !f.hasVideoOnly ? false : f.hasBtsOnly,
+  }));
+}
+
+export function toggleBtsOnlyFilter() {
+  explorerFilter.update((f) => ({
+    ...f,
+    hasBtsOnly: !f.hasBtsOnly,
+    hasVideoOnly: !f.hasBtsOnly ? false : f.hasVideoOnly,
+  }));
 }
 
 // Current month viewed in the Calendar view ("YYYY-MM")
