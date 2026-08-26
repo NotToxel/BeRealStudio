@@ -20,6 +20,7 @@
     errorActiveJob,
     recordActivity,
   } from '$lib/stores';
+  import { isDemoExplicitlyRequested } from '$lib/devMode';
   import {
     scanArchive,
     startToolkit,
@@ -215,7 +216,11 @@
       activeScanPath = '';
       return;
     }
-    // Skip re-scan if this path was already successfully scanned into memory
+    // Skip re-scan if in demo mode or if already scanned
+    if (isDemoExplicitlyRequested() && $archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.entryCount > 0) {
+      activeScanPath = path;
+      return;
+    }
     if (!force && path === activeScanPath && $archiveMetadata && $archiveMetadata.isValid && $archiveMetadata.entryCount > 0) {
       return;
     }
@@ -243,13 +248,17 @@
   }
 
   onMount(() => {
+    if (isDemoExplicitlyRequested()) {
+      if ($toolkitConfig.inputPath) activeScanPath = $toolkitConfig.inputPath;
+      return;
+    }
     if ($toolkitConfig.inputPath) {
       handleArchiveChange($toolkitConfig.inputPath);
     }
   });
 
   let prevInputPath = '';
-  $: if ($toolkitConfig.inputPath !== prevInputPath || (!$archiveMetadata && $toolkitConfig.inputPath)) {
+  $: if (!isDemoExplicitlyRequested() && ($toolkitConfig.inputPath !== prevInputPath || (!$archiveMetadata && $toolkitConfig.inputPath))) {
     prevInputPath = $toolkitConfig.inputPath;
     if (debounceTimer) clearTimeout(debounceTimer);
     if (!$toolkitConfig.inputPath || $toolkitConfig.inputPath.trim().length === 0) {

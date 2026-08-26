@@ -9,6 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import puppeteer from 'puppeteer-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,11 +42,44 @@ function findBrowserBinary() {
   return 'msedge';
 }
 
+async function isServerRunning(url) {
+  try {
+    const res = await fetch(url, { method: 'GET' });
+    return res.status === 200 || res.status === 304;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   console.log('\n📸 [BeReal Studio] Launching Automated Screenshot Capture Suite...\n');
 
   if (!fs.existsSync(SCREENSHOT_DIR)) {
     fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  }
+
+  let serverProcess = null;
+  const baseUrl = 'http://localhost:1420';
+
+  if (!(await isServerRunning(baseUrl))) {
+    console.log('⚡ Starting local Vite dev server on port 1420...');
+    const isWindows = process.platform === 'win32';
+    const bunCmd = isWindows ? 'bun.cmd' : 'bun';
+    serverProcess = spawn(bunCmd, ['run', 'dev'], {
+      cwd: ROOT_DIR,
+      stdio: 'pipe',
+      shell: isWindows,
+    });
+
+    let attempts = 0;
+    while (attempts < 30) {
+      await new Promise((r) => setTimeout(r, 1000));
+      attempts++;
+      if (await isServerRunning(baseUrl)) {
+        console.log('✅ Local dev server ready on http://localhost:1420\n');
+        break;
+      }
+    }
   }
 
   const executablePath = findBrowserBinary();
@@ -74,11 +108,11 @@ async function main() {
     console.log(`[${i + 1}/${VIEWS.length}] Capturing ${item.label} (${item.name})...`);
 
     try {
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 15000 });
+      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 20000 });
 
       // Wait for app header and view transition to complete
-      await page.waitForSelector('.app-header', { timeout: 5000 });
-      await new Promise((res) => setTimeout(res, 800));
+      await page.waitForSelector('.app-header', { timeout: 8000 });
+      await new Promise((res) => setTimeout(res, 1800));
 
       await page.screenshot({ path: outPath, type: 'png' });
 
@@ -90,6 +124,16 @@ async function main() {
   }
 
   await browser.close();
+
+  if (serverProcess) {
+    console.log('🛑 Shutting down spawned Vite dev server...');
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', serverProcess.pid.toString(), '/f', '/t']);
+    } else {
+      serverProcess.kill('SIGTERM');
+    }
+  }
+
   console.log(`\n🎉 All ${VIEWS.length} showcase screenshots successfully captured into docs/screenshots/!\n`);
 }
 

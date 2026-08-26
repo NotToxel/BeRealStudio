@@ -46,10 +46,18 @@ jobs:
             const tagName = '${{ steps.get-tag.outputs.tag }}';
             
             let releaseBody = '';
-            const notesFile = path.join(process.env.GITHUB_WORKSPACE, `docs/RELEASE_NOTES_${tagName}.md`);
-            if (fs.existsSync(notesFile)) {
-              releaseBody = fs.readFileSync(notesFile, 'utf8');
-            } else {
+            const candidates = [
+              path.join(process.env.GITHUB_WORKSPACE, `docs/releases/${tagName}.md`),
+              path.join(process.env.GITHUB_WORKSPACE, `docs/releases/RELEASE_NOTES_${tagName}.md`),
+              path.join(process.env.GITHUB_WORKSPACE, `docs/RELEASE_NOTES_${tagName}.md`),
+            ];
+            for (const candidate of candidates) {
+              if (fs.existsSync(candidate)) {
+                releaseBody = fs.readFileSync(candidate, 'utf8');
+                break;
+              }
+            }
+            if (!releaseBody) {
               releaseBody = `## 🚀 BeReal Studio ${tagName}\n\nOne-click desktop application to browse, composite, and recap BeReal GDPR archives.`;
             }
 

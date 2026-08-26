@@ -24,10 +24,14 @@
   import RefreshCw from 'lucide-svelte/icons/refresh-cw';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
+  import { isDemoExplicitlyRequested } from '$lib/devMode';
 
   let selectedPathInput = $lastScannedArchivePath || '';
 
   onMount(() => {
+    if (isDemoExplicitlyRequested()) {
+      return;
+    }
     // Auto-load if we have an archive path and haven't loaded yet
     if ($lastScannedArchivePath && !$explorerData && !$isLoadingMemories) {
       loadMemories($lastScannedArchivePath);

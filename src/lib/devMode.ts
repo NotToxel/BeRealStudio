@@ -10,7 +10,7 @@ import {
   defaultToolkitConfig,
   defaultRecapperConfig,
 } from './stores';
-import { explorerData, calendarCurrentMonth } from './memoriesStore';
+import { explorerData, calendarCurrentMonth, memoriesLoadError, isLoadingMemories } from './memoriesStore';
 import type { ArchiveInfo, MonthCount, ActiveJob, ActivityRecord, ExplorerMemory } from './types';
 
 export const isDev = import.meta.env.DEV;
@@ -354,6 +354,8 @@ export function loadDemoExplorer() {
     },
   ];
 
+  memoriesLoadError.set(null);
+  isLoadingMemories.set(false);
   explorerData.set({
     memories: demoMemories,
     totalCount: demoMemories.length,
