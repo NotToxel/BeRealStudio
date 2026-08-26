@@ -51,10 +51,12 @@
   import Clock from 'lucide-svelte/icons/clock';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Copy from 'lucide-svelte/icons/copy';
+  import Bug from 'lucide-svelte/icons/bug';
   import VolumeIcon from '$components/common/VolumeIcon.svelte';
   import {
     memoryHeaderSettings,
     globalAudioSettings,
+    showMemoryDebugBadges,
     replaceLocationPlaceholders,
     replaceTimeTagPlaceholders,
   } from '$lib/memoriesStore';
@@ -131,6 +133,13 @@
       hwInfoStore.set(info);
     } catch (e) {
       console.warn('Failed to detect hardware acceleration:', e);
+      hwInfoStore.set({
+        gpuName: 'Standard Multi-Core CPU',
+        encoderName: 'libx264 (Software CPU)',
+        isGpuAccelerated: false,
+        cpuCores: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 8) : 8,
+        parallelThreads: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 8) : 8,
+      });
     } finally {
       checkingHwInfo = false;
     }
@@ -1014,6 +1023,30 @@
           <RotateCcw size={13} />
           <span>Reset All Configurations to Defaults...</span>
         </button>
+      </div>
+    </div>
+
+    <!-- 6. Developer Tools & Diagnostics -->
+    <div class="card section-card">
+      <div class="head-title">
+        <Bug size={18} class="text-amber-400" />
+        <h2 class="title-sm">6. Developer Tools &amp; Metadata Inspector</h2>
+      </div>
+
+      <p class="text-secondary text-desc">
+        Feature flags and advanced metadata inspection tools for troubleshooting and dataset analysis.
+      </p>
+
+      <div class="settings-grid-2col">
+        <div class="setting-item-box">
+          <Toggle
+            label="Memory Timing &amp; Metadata Inspector"
+            description="Display interactive badges on memory cards with live BeReal moment alerts, timing offsets, and JSON inspector tooltips"
+            icon={Bug}
+            accentColor="cyan"
+            bind:checked={$showMemoryDebugBadges}
+          />
+        </div>
       </div>
     </div>
   </div>

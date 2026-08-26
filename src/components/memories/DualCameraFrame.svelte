@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getSafeImageSrc, getMediaDataUrl, globalPerspective, globalAudioSettings } from '$lib/memoriesStore';
+  import { getSafeImageSrc, getMediaDataUrl, globalPerspective, globalAudioSettings, showMemoryDebugBadges } from '$lib/memoriesStore';
   import Play from 'lucide-svelte/icons/play';
   import Pause from 'lucide-svelte/icons/pause';
   import Repeat from 'lucide-svelte/icons/repeat';
@@ -26,7 +26,7 @@
   export let takenAt: string = '';
   export let rawJson: string | undefined = undefined;
   export let debugInfo: string | undefined = undefined;
-  export let showDebugBadge: boolean = true;
+  export let showDebugBadge: boolean | undefined = undefined;
 
   // Local user toggle override; if null, defaults to $globalPerspective
   let localSwappedOverride: boolean | null = null;
@@ -388,14 +388,39 @@
       </div>
     {/if}
 
-    <!-- Dev Debug Extraction Overlay on Post -->
-    {#if showDebugBadge && (isLate !== undefined || debugInfo || rawJson)}
-      <div class="post-dev-debug-badge" title={lateExact ? `${lateExact} • ${rawJson || debugInfo}` : (rawJson || debugInfo)}>
+    <!-- Formal Memory Timing & Metadata Inspector Badge (Hidden behind $showMemoryDebugBadges flag) -->
+    {#if (showDebugBadge ?? $showMemoryDebugBadges) && (isLate !== undefined || debugInfo || rawJson)}
+      <div class="post-dev-debug-badge">
         <div class="debug-badge-inner {isLate ? 'is-late' : 'is-ontime'}">
-          <span class="debug-icon">{isLate ? '⚠️' : '✓'}</span>
-          <span class="debug-text">{isLate ? `LATE (${lateDuration || 'Late'})` : 'ON TIME'}</span>
+          <span class="status-dot"></span>
+          <span class="debug-text">{isLate ? `LATE ${lateDuration ? '• ' + lateDuration : ''}` : 'ON TIME'}</span>
           {#if takenAt}
             <span class="debug-time">{takenAt.slice(11, 16)}</span>
+          {/if}
+        </div>
+
+        <!-- Rich Diagnostics Tooltip Popover on Hover -->
+        <div class="debug-popover-card">
+          <div class="popover-header">
+            <span class="popover-badge {isLate ? 'badge-late' : 'badge-ontime'}">
+              {isLate ? '⚠️ Late Submission' : '✓ On-Time Delivery'}
+            </span>
+            {#if takenAt}
+              <span class="popover-time font-mono">{takenAt.slice(11, 19)} UTC</span>
+            {/if}
+          </div>
+
+          {#if debugInfo || lateExact}
+            <div class="popover-detail-row">
+              <span class="detail-label">Timing Offset:</span>
+              <span class="detail-value">{lateExact || debugInfo}</span>
+            </div>
+          {/if}
+
+          {#if rawJson}
+            <div class="popover-json-preview">
+              <pre class="raw-json-text">{rawJson.slice(0, 180)}{rawJson.length > 180 ? '...' : ''}</pre>
+            </div>
           {/if}
         </div>
       </div>
@@ -606,42 +631,159 @@
     position: absolute;
     top: 8px;
     left: 8px;
-    z-index: 25;
+    z-index: 35;
     pointer-events: auto;
-    cursor: help;
+    cursor: default;
   }
 
   .debug-badge-inner {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 7px;
+    gap: 5px;
+    padding: 3px 8px;
     border-radius: var(--radius-full);
-    font-size: 9.5px;
-    font-weight: 800;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
-    letter-spacing: 0.02em;
+    font-size: 9px;
+    font-weight: 700;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75);
+    letter-spacing: 0.03em;
     text-transform: uppercase;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .post-dev-debug-badge:hover .debug-badge-inner {
+    transform: scale(1.04);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.9);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
   }
 
   .debug-badge-inner.is-late {
-    background: rgba(220, 38, 38, 0.88);
-    border: 1px solid rgba(248, 113, 113, 0.8);
-    color: #ffffff;
+    background: rgba(20, 10, 10, 0.85);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+    color: #fca5a5;
+  }
+
+  .debug-badge-inner.is-late .status-dot {
+    background: #ef4444;
+    box-shadow: 0 0 6px #ef4444;
   }
 
   .debug-badge-inner.is-ontime {
-    background: rgba(5, 150, 105, 0.88);
-    border: 1px solid rgba(52, 211, 153, 0.8);
-    color: #ffffff;
+    background: rgba(6, 22, 16, 0.85);
+    border: 1px solid rgba(52, 211, 153, 0.5);
+    color: #6ee7b7;
+  }
+
+  .debug-badge-inner.is-ontime .status-dot {
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
   }
 
   .debug-time {
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 8.5px;
     opacity: 0.85;
     padding-left: 2px;
+  }
+
+  /* Popover Hover Card */
+  .debug-popover-card {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 240px;
+    background: rgba(15, 17, 23, 0.96);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .post-dev-debug-badge:hover .debug-popover-card {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .popover-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+  }
+
+  .badge-late {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .badge-ontime {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .popover-time {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .popover-detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+  }
+
+  .detail-label {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .detail-value {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .popover-json-preview {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: var(--radius-xs);
+    padding: 6px 8px;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .raw-json-text {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: #94a3b8;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 
   .size-sm .debug-badge-inner {

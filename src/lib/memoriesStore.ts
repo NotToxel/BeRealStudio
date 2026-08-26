@@ -60,6 +60,26 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Memory Inspector & Metadata Debug Badges Flag (Hidden behind feature flag, default: false)
+function loadDebugBadgesSetting(): boolean {
+  if (typeof window !== 'undefined') {
+    try {
+      return localStorage.getItem('bereal_show_debug_badges') === 'true';
+    } catch {}
+  }
+  return false;
+}
+
+export const showMemoryDebugBadges = writable<boolean>(loadDebugBadgesSetting());
+
+if (typeof window !== 'undefined') {
+  showMemoryDebugBadges.subscribe((val) => {
+    try {
+      localStorage.setItem('bereal_show_debug_badges', String(val));
+    } catch {}
+  });
+}
+
 // Global perspective toggle ('primary' = main camera large | 'secondary' = selfie camera large)
 export const globalPerspective = writable<'primary' | 'secondary'>('primary');
 
