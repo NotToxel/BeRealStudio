@@ -41,10 +41,10 @@
     openExportModal(memory);
   }
 
-  async function handleOpenExplorer() {
+  async function handleReveal(filePath?: string) {
     closeMenu();
-    if (memory.primaryPath) {
-      await revealInFolder(memory.primaryPath);
+    if (filePath) {
+      await revealInFolder(filePath);
     }
   }
 
@@ -200,11 +200,51 @@
           <span>Download</span>
         </button>
 
-        {#if memory.primaryPath}
-          <button type="button" class="menu-item" on:click={handleOpenExplorer}>
-            <FolderOpen size={16} class="text-amber-400" />
-            <span>Reveal in Folder</span>
-          </button>
+        <!-- Reveal in Folder (Inline Camera & Video File Selector) -->
+        {#if memory.primaryPath || memory.secondaryPath || memory.btsPath}
+          <div class="inline-reveal-row">
+            <span class="inline-reveal-label">
+              <FolderOpen size={13} class="text-amber-400" />
+              <span>Reveal in Folder:</span>
+            </span>
+            <div class="inline-reveal-buttons">
+              {#if memory.primaryPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.primaryPath)}
+                  title="Reveal Main Camera photo in file explorer"
+                >
+                  <Camera size={11} class="text-teal-400" />
+                  <span>Main</span>
+                </button>
+              {/if}
+
+              {#if memory.secondaryPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.secondaryPath)}
+                  title="Reveal Selfie Camera photo in file explorer"
+                >
+                  <User size={11} class="text-rose-400" />
+                  <span>Selfie</span>
+                </button>
+              {/if}
+
+              {#if memory.btsPath}
+                <button
+                  type="button"
+                  class="inline-pill-btn"
+                  on:click={() => handleReveal(memory.btsPath)}
+                  title="Reveal BTS Video in file explorer"
+                >
+                  <Film size={11} class="text-amber-400" />
+                  <span>BTS</span>
+                </button>
+              {/if}
+            </div>
+          </div>
         {/if}
       </div>
 
@@ -430,10 +470,52 @@
     color: #ffffff;
   }
 
-  .menu-divider {
-    height: 1px;
-    background: var(--border-subtle);
-    margin: 4px 0;
+  /* Inline Reveal Selection Row */
+  .inline-reveal-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius-sm);
+    margin: 2px 0;
+  }
+
+  .inline-reveal-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .inline-reveal-buttons {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .inline-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #1a1a26;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .inline-pill-btn:hover {
+    background: #28283a;
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
   }
 
   .toast-preview-card {
