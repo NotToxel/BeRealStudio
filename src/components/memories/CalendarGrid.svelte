@@ -57,6 +57,9 @@
   // Available months & years from dataset
   $: availableMonths = $explorerData?.uniqueMonths ?? [];
   $: uniqueYears = $explorerData?.uniqueYears ?? [currentYear];
+  $: availableYears = [...new Set(availableMonths.map((m) => parseInt(m.slice(0, 4), 10)))].sort((a, b) => a - b);
+  $: hasPrevYear = availableYears.some((y) => y < pickerYear);
+  $: hasNextYear = availableYears.some((y) => y > pickerYear);
   $: currentMonthIdx = availableMonths.indexOf(yearMonth);
   $: hasPrevMonth = currentMonthIdx > 0;
   $: hasNextMonth = currentMonthIdx < availableMonths.length - 1;
@@ -135,6 +138,7 @@
 
   function selectMonthFromPicker(mIdx: number) {
     const targetMonthKey = `${pickerYear}-${String(mIdx + 1).padStart(2, '0')}`;
+    if (!availableMonths.includes(targetMonthKey)) return;
     calendarCurrentMonth.set(targetMonthKey);
     isPickerOpen = false;
   }
@@ -240,8 +244,9 @@
               <button
                 type="button"
                 class="picker-nav-btn"
-                on:click={() => pickerYear--}
-                title="Previous Year"
+                disabled={!hasPrevYear}
+                on:click={() => hasPrevYear && pickerYear--}
+                title={hasPrevYear ? "Previous Year" : "No memories in earlier years"}
               >
                 <ChevronLeft size={14} />
               </button>
@@ -249,8 +254,9 @@
               <button
                 type="button"
                 class="picker-nav-btn"
-                on:click={() => pickerYear++}
-                title="Next Year"
+                disabled={!hasNextYear}
+                on:click={() => hasNextYear && pickerYear++}
+                title={hasNextYear ? "Next Year" : "No memories in later years"}
               >
                 <ChevronRight size={14} />
               </button>
@@ -268,8 +274,9 @@
                   class="picker-month-btn"
                   class:is-selected={isCurrent}
                   class:has-memories={hasData}
-                  on:click={() => selectMonthFromPicker(mIdx)}
-                  title="{mName} {pickerYear}: {cnt} BeReals"
+                  disabled={!hasData}
+                  on:click={() => hasData && selectMonthFromPicker(mIdx)}
+                  title={hasData ? `${mName} ${pickerYear}: ${cnt} BeReals` : `No memories in ${mName} ${pickerYear}`}
                 >
                   <span class="month-name-text">{mName}</span>
                   {#if cnt > 0}
@@ -603,9 +610,16 @@
     transition: all 0.15s ease;
   }
 
-  .picker-nav-btn:hover {
+  .picker-nav-btn:hover:not(:disabled) {
     background: #242436;
     border-color: var(--border-medium);
+  }
+
+  .picker-nav-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: transparent;
   }
 
   .picker-months-grid {
@@ -631,9 +645,17 @@
     gap: 4px;
   }
 
-  .picker-month-btn:hover {
+  .picker-month-btn:hover:not(:disabled) {
     background: #1f1f2e;
     color: #ffffff;
+  }
+
+  .picker-month-btn:disabled {
+    opacity: 0.22;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
   }
 
   .picker-month-btn.has-memories {
