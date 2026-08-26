@@ -1211,4 +1211,40 @@ mod tests {
         assert!(!bad_info.is_valid);
         assert_eq!(bad_info.validation_errors.len(), 1);
     }
+
+    #[test]
+    fn test_bereal_post_flexible_is_late_deserialization() {
+        // 1. camelCase with boolean true
+        let json1 = r#"{"takenAt": "2024-08-26T16:00:00Z", "isLate": true, "notificationAt": "2024-08-26T14:00:00Z"}"#;
+        let p1: BeRealPost = serde_json::from_str(json1).unwrap();
+        assert_eq!(p1.is_late, Some(true));
+        assert_eq!(p1.notification_at.as_deref(), Some("2024-08-26T14:00:00Z"));
+
+        // 2. snake_case with boolean true
+        let json2 = r#"{"taken_at": "2024-08-26T16:00:00Z", "is_late": true, "late_in_seconds": 7200}"#;
+        let p2: BeRealPost = serde_json::from_str(json2).unwrap();
+        assert_eq!(p2.is_late, Some(true));
+        assert_eq!(p2.late_in_seconds, Some(7200));
+
+        // 3. String boolean "true" and string seconds "3600"
+        let json3 = r#"{"takenAt": "2024-08-26T15:00:00Z", "isLate": "true", "lateInSeconds": "3600"}"#;
+        let p3: BeRealPost = serde_json::from_str(json3).unwrap();
+        assert_eq!(p3.is_late, Some(true));
+        assert_eq!(p3.late_in_seconds, Some(3600));
+
+        // 4. Integer 1 for true
+        let json4 = r#"{"takenAt": "2024-08-26T15:00:00Z", "isLate": 1}"#;
+        let p4: BeRealPost = serde_json::from_str(json4).unwrap();
+        assert_eq!(p4.is_late, Some(true));
+
+        // 5. On-time with boolean false
+        let json5 = r#"{"takenAt": "2024-08-26T14:02:00Z", "isLate": false}"#;
+        let p5: BeRealPost = serde_json::from_str(json5).unwrap();
+        assert_eq!(p5.is_late, Some(false));
+
+        // 6. On-time with snake_case "is_late": false
+        let json6 = r#"{"taken_at": "2024-08-26T14:02:00Z", "is_late": false}"#;
+        let p6: BeRealPost = serde_json::from_str(json6).unwrap();
+        assert_eq!(p6.is_late, Some(false));
+    }
 }

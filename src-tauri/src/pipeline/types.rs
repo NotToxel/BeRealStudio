@@ -1,6 +1,58 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ─── Flexible Serde Deserializers ──────────────────────────────────────────
+
+pub fn deserialize_flexible_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match val {
+        Some(serde_json::Value::Bool(b)) => Ok(Some(b)),
+        Some(serde_json::Value::String(s)) => {
+            let clean = s.trim().to_lowercase();
+            if clean == "true" || clean == "1" || clean == "yes" {
+                Ok(Some(true))
+            } else if clean == "false" || clean == "0" || clean == "no" {
+                Ok(Some(false))
+            } else {
+                Ok(None)
+            }
+        }
+        Some(serde_json::Value::Number(n)) => {
+            if let Some(i) = n.as_i64() {
+                Ok(Some(i != 0))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Some(f != 0.0))
+            } else {
+                Ok(None)
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+pub fn deserialize_flexible_i64<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match val {
+        Some(serde_json::Value::Number(n)) => {
+            if let Some(i) = n.as_i64() {
+                Ok(Some(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Some(f.round() as i64))
+            } else {
+                Ok(None)
+            }
+        }
+        Some(serde_json::Value::String(s)) => Ok(s.trim().parse::<i64>().ok()),
+        _ => Ok(None),
+    }
+}
+
 // ─── BeReal JSON Data Structures ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -11,13 +63,17 @@ pub struct BeRealPost {
     pub secondary: Option<MediaAsset>,
     pub secondary_placeholder: Option<MediaAsset>,
     pub bts_media: Option<MediaAsset>,
+    #[serde(alias = "taken_at", alias = "postedAt", alias = "posted_at", alias = "creationDate")]
     pub taken_at: String,
     pub location: Option<Location>,
     pub caption: Option<String>,
     pub retake_counter: Option<u32>,
     pub visibility: Option<Vec<String>>,
+    #[serde(default, alias = "late_in_seconds", alias = "lateSeconds", alias = "secondsLate", deserialize_with = "deserialize_flexible_i64")]
     pub late_in_seconds: Option<i64>,
+    #[serde(default, alias = "is_late", alias = "late", alias = "isLatePost", deserialize_with = "deserialize_flexible_bool")]
     pub is_late: Option<bool>,
+    #[serde(default, alias = "notification_at", alias = "momentAt", alias = "moment_at", alias = "berealMoment", alias = "bereal_moment", alias = "notificationDate", alias = "notification_date")]
     pub notification_at: Option<String>,
 }
 
