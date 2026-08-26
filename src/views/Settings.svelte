@@ -369,30 +369,6 @@
     </div>
   {/if}
 
-  <!-- Reset Confirmation Modal -->
-  {#if showResetModal}
-    <div class="modal-backdrop">
-      <div class="modal-card">
-        <div class="modal-head">
-          <AlertTriangle size={22} class="text-amber-400" />
-          <h3 class="title-sm font-bold text-white">Reset All Settings to Defaults?</h3>
-        </div>
-        <p class="modal-body text-secondary text-sm">
-          Are you sure you want to restore all photo processing and recap video options to factory defaults? Your processed photos on disk will not be affected.
-        </p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary btn-sm" on:click={() => (showResetModal = false)}>
-            Cancel
-          </button>
-          <button type="button" class="btn btn-danger btn-sm" on:click={handleConfirmReset}>
-            <RotateCcw size={13} />
-            <span>Yes, Reset to Defaults</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
   <div class="sections-list">
     <!-- 1. Configuration Management (Export / Import / Save) -->
     <div class="card section-card">
@@ -1668,44 +1644,5 @@
 
   .fader-level-btn.active .level-desc {
     color: #7dd3fc;
-  }
-
-  /* Modal Backdrop */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-    padding: 20px;
-  }
-
-  .modal-card {
-    background: #131318;
-    border: 1px solid var(--border-medium);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    max-width: 440px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-  }
-
-  .modal-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 6px;
   }
 </style>
