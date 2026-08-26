@@ -6,8 +6,9 @@
   <p>
     <a href="https://github.com/NotToxel/BeRealStudio/releases/latest"><img src="https://img.shields.io/github/v/release/NotToxel/BeRealStudio?label=Latest%20Release&logo=github&color=blue" alt="Latest Release" /></a>
     <a href="https://github.com/NotToxel/BeRealStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/NotToxel/BeRealStudio/release.yml?branch=master&label=Release%20Build&logo=github" alt="Release Build Status" /></a>
-    <a href="https://github.com/NotToxel/BeRealStudio/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" /></a>
+    <a href="https://github.com/NotToxel/BeRealStudio/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat&logo=gnu" alt="License" /></a>
     <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-purple?style=flat" alt="Cross Platform" />
+    <img src="https://img.shields.io/badge/Privacy-100%25%20Local-emerald?style=flat" alt="Privacy" />
   </p>
 </div>
 
@@ -19,12 +20,12 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format | Direct Download Link |
 | :--- | :--- | :--- |
-| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64-setup.exe) |
-| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64_en-US.msi) |
-| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_aarch64.dmg) |
-| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.2.1_x64.dmg) |
-| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.1_amd64.AppImage) |
-| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.2.1_amd64.deb) |
+| **Windows** (x64) | `.exe` (Installer) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64-setup.exe) |
+| **Windows** (x64) | `.msi` (Package) | [⬇️ **Download for Windows (.msi)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64_en-US.msi) |
+| **macOS** (Apple Silicon) | `.dmg` (M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_aarch64.dmg) |
+| **macOS** (Intel) | `.dmg` (x86_64) | [⬇️ **Download for macOS (Intel)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64.dmg) |
+| **Linux** (x64) | `.AppImage` (Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.3.0_amd64.AppImage) |
+| **Linux** (x64) | `.deb` (Debian / Ubuntu) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio_2.3.0_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
@@ -257,7 +258,7 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-├── package.json                            # App manifest & dependencies (v2.2.1)
+├── package.json                            # App manifest & dependencies (v2.3.0)
 └── README.md                               # User documentation & GDPR guide
 ```
 
@@ -265,10 +266,12 @@ BeRealStudio/
 
 ## 🗺️ Future Roadmap & Upcoming Features
 
-- [x] **📅 Native BeReal-Style Memories & Calendar Viewer** *(Completed in v2.0.0)*:
+- [x] **📅 Native BeReal-Style Memories & Calendar Viewer** *(Completed in v2.0.0 & v2.3.0)*:
   - Monthly Memories Calendar Matrix with day thumbnails, late badges, and retake counters.
   - Interactive Feed & Lightbox with front/back camera click-to-swap and movable PIP.
   - Multi-dimensional search, hierarchical location drawers, and single-memory exports.
+  - Smooth 1:1 pointer drag panning and zoom controls for high-res photo and video exploration.
+  - Full Video BeReal support with synchronized dual-video playback and Side-by-Side MP4 combining.
 - [x] **🍏 Apple Photos Live Photos Compatibility** *(Completed in v2.2.1)*:
   - Export paired still image (`.jpg`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier`) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
 - [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
@@ -286,10 +289,12 @@ It unifies, rewrites, and modernizes the core capabilities of three pioneer open
 
 - **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator and reverse-geocoding rules engine.
 - **[BeReal-GDPR-Photo-Toolkit](https://github.com/hatobi/bereal-gdpr-photo-toolkit)** *(by [@hatobi](https://github.com/hatobi))* — Pioneer of BeReal GDPR archive extraction, EXIF metadata restoration, and Picture-in-Picture photo compositing.
-- **[makelive](https://github.com/mifi/makelive)** *(by [@mifi](https://github.com/mifi))* — Pioneer of Apple Photos compatible Live Photo generation with matching Content Identifier metadata synchronization on paired image and video assets.
+- **[makelive (Make Live)](https://github.com/mifi/makelive)** *(by [@mifi](https://github.com/mifi))* — Pioneer of Apple Photos Live Photo generation, inspiring our native Rust binary muxing of paired still photos (`.jpg`) and Behind-the-Scenes micro-videos (`.mov`) with synchronized Apple Content Identifier UUIDs (`MakerApple:17` EXIF & `com.apple.quicktime.content.identifier` QuickTime metadata).
 
 ---
 
 ## 📜 License
 
-MIT License &copy; 2026 NotToxel and BeReal Studio Contributors. Free and open-source.
+GNU General Public License v3.0 or later (GPL-3.0-or-later) &copy; 2026 NotToxel and BeReal Studio Contributors.
+
+BeReal Studio is free and open-source software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
