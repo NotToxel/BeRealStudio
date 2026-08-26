@@ -107,9 +107,15 @@
     secondaryError = true;
   }
 
-  // Drag & Move PIP handler with 4-Corner Snap
+  // Drag & Move PIP handler with 4-Corner Snap & GPU-accelerated transforms
+  let cachedContainerW = 0;
+  let cachedContainerH = 0;
+  let cachedPipW = 0;
+  let cachedPipH = 0;
+  let rafId: number | null = null;
+
   function startPipDrag(e: MouseEvent | TouchEvent) {
-    if (!interactive) return;
+    if (!interactive || !containerEl) return;
     e.stopPropagation();
     isDragging = true;
     wasDragged = false;
@@ -119,69 +125,70 @@
     dragInitialClientX = clientX;
     dragInitialClientY = clientY;
 
-    // If currently anchored to a corner, initialize pipPosX/Y from element rect
-    if (!hasMovedCustom && containerEl) {
-      const pipEl = containerEl.querySelector('.pip-frame-wrapper') as HTMLElement;
-      if (pipEl) {
-        const cRect = containerEl.getBoundingClientRect();
-        const pRect = pipEl.getBoundingClientRect();
-        pipPosX = pRect.left - cRect.left;
-        pipPosY = pRect.top - cRect.top;
-      }
+    // Cache container and PIP element dimensions once at start of drag
+    const cRect = containerEl.getBoundingClientRect();
+    cachedContainerW = cRect.width;
+    cachedContainerH = cRect.height;
+    cachedPipW = cRect.width * 0.3047;
+    cachedPipH = cachedPipW * (4 / 3);
+
+    const pipEl = containerEl.querySelector('.pip-frame-wrapper') as HTMLElement;
+    if (pipEl) {
+      const pRect = pipEl.getBoundingClientRect();
+      pipPosX = pRect.left - cRect.left;
+      pipPosY = pRect.top - cRect.top;
+      hasMovedCustom = true;
     }
 
     dragStartX = clientX - pipPosX;
     dragStartY = clientY - pipPosY;
 
-    window.addEventListener('mousemove', onPipDragMove);
+    window.addEventListener('mousemove', onPipDragMove, { passive: true });
     window.addEventListener('mouseup', onPipDragEnd);
-    window.addEventListener('touchmove', onPipDragMove, { passive: false });
+    window.addEventListener('touchmove', onPipDragMove, { passive: true });
     window.addEventListener('touchend', onPipDragEnd);
   }
 
   function onPipDragMove(e: MouseEvent | TouchEvent) {
-    if (!isDragging || !containerEl) return;
+    if (!isDragging) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-    if (Math.hypot(clientX - dragInitialClientX, clientY - dragInitialClientY) > 5) {
+    if (Math.hypot(clientX - dragInitialClientX, clientY - dragInitialClientY) > 4) {
       wasDragged = true;
     }
-
-    const rect = containerEl.getBoundingClientRect();
-    const pipW = rect.width * 0.29;
-    const pipH = pipW * (4 / 3);
 
     let newX = clientX - dragStartX;
     let newY = clientY - dragStartY;
 
-    // Constrain inside container bounds with 8px margin
-    newX = Math.max(8, Math.min(newX, rect.width - pipW - 8));
-    newY = Math.max(8, Math.min(newY, rect.height - pipH - 8));
+    // Constrain inside container bounds with 6px margin using cached dimensions
+    newX = Math.max(6, Math.min(newX, cachedContainerW - cachedPipW - 6));
+    newY = Math.max(6, Math.min(newY, cachedContainerH - cachedPipH - 6));
 
-    pipPosX = newX;
-    pipPosY = newY;
-    hasMovedCustom = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      pipPosX = newX;
+      pipPosY = newY;
+    });
   }
 
   function onPipDragEnd() {
     if (!isDragging) return;
     isDragging = false;
+    if (rafId) cancelAnimationFrame(rafId);
+
     window.removeEventListener('mousemove', onPipDragMove);
     window.removeEventListener('mouseup', onPipDragEnd);
     window.removeEventListener('touchmove', onPipDragMove);
     window.removeEventListener('touchend', onPipDragEnd);
 
     // If dragged, calculate nearest of the 4 corners and snap to it
-    if (wasDragged && containerEl) {
-      const rect = containerEl.getBoundingClientRect();
-      const pipW = rect.width * 0.29;
-      const pipH = pipW * (4 / 3);
-      const centerX = pipPosX + pipW / 2;
-      const centerY = pipPosY + pipH / 2;
+    if (wasDragged && cachedContainerW > 0) {
+      const centerX = pipPosX + cachedPipW / 2;
+      const centerY = pipPosY + cachedPipH / 2;
 
-      const isLeft = centerX < rect.width / 2;
-      const isTop = centerY < rect.height / 2;
+      const isLeft = centerX < cachedContainerW / 2;
+      const isTop = centerY < cachedContainerH / 2;
 
       if (isTop && isLeft) {
         pipCorner = 'top-left';
@@ -340,7 +347,8 @@
       <div
         class="pip-frame-wrapper corner-{pipCorner}"
         class:is-custom-pos={hasMovedCustom}
-        style={hasMovedCustom ? `left: ${pipPosX}px; top: ${pipPosY}px;` : ''}
+        class:is-dragging={isDragging}
+        style={hasMovedCustom ? `transform: translate3d(${pipPosX}px, ${pipPosY}px, 0); top: 0; left: 0; right: auto; bottom: auto; will-change: transform;` : ''}
       >
         <div
           class="pip-frame"
@@ -561,11 +569,12 @@
     width: 30.47%;
     aspect-ratio: 3 / 4;
     z-index: 25;
-    transition: top 0.22s cubic-bezier(0.16, 1, 0.3, 1), left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: top 0.22s cubic-bezier(0.16, 1, 0.3, 1), left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  .pip-frame-wrapper.is-dragging,
   .pip-frame-wrapper.is-custom-pos {
-    transition: none;
+    transition: none !important;
   }
 
   .pip-frame-wrapper.corner-top-left {
