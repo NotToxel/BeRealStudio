@@ -1,12 +1,14 @@
 <script lang="ts">
   import { globalPerspective } from '$lib/memoriesStore';
 
+  export let variant: 'floating-modal' | 'floating-window' = 'floating-modal';
+
   function setPerspective(p: 'primary' | 'secondary') {
     globalPerspective.set(p);
   }
 </script>
 
-<div class="perspective-floating-pill" role="group" aria-label="Toggle camera perspective">
+<div class="perspective-floating-pill variant-{variant}" role="group" aria-label="Toggle camera perspective">
   <!-- Primary / Standard Mode Button -->
   <button
     type="button"
@@ -44,21 +46,31 @@
 
 <style>
   .perspective-floating-pill {
-    position: absolute;
-    bottom: 16px;
-    left: 16px;
     display: inline-flex;
     align-items: center;
-    background: rgba(14, 14, 22, 0.92);
-    backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(14, 14, 22, 0.94);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 14px;
     padding: 3px 4px;
     gap: 3px;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
     z-index: 100;
     user-select: none;
+    pointer-events: auto;
     transition: transform var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .perspective-floating-pill.variant-floating-modal {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+  }
+
+  .perspective-floating-pill.variant-floating-window {
+    position: fixed;
+    bottom: 24px;
+    left: 28px;
   }
 
   .perspective-floating-pill:hover {

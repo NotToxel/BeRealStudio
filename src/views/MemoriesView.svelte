@@ -173,7 +173,7 @@
       </div>
 
       <!-- Floating Bottom-Left Perspective Toggle Pill -->
-      <PerspectiveSwitcher />
+      <PerspectiveSwitcher variant="floating-window" />
     </div>
   {/if}
 

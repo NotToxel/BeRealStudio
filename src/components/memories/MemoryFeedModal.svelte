@@ -15,9 +15,9 @@
   } from '$lib/memoriesStore';
   import { exportSingleMemory } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
-  import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import MemoryActionMenu from './MemoryActionMenu.svelte';
+  import PerspectiveSwitcher from './PerspectiveSwitcher.svelte';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Download from 'lucide-svelte/icons/download';
 
@@ -307,6 +307,9 @@
           <div class="virtual-spacer" style="height: {bottomSpacerHeight}px;"></div>
         {/if}
       </div>
+
+      <!-- Always Visible Pinned Bottom-Left Perspective Toggle (Cannot be scrolled off) -->
+      <PerspectiveSwitcher variant="floating-modal" />
     </div>
   </div>
 {/if}
