@@ -98,22 +98,29 @@ jobs:
               releaseId = data.id;
             }
 
-            // Clean up any unwanted build script or junk assets if present
+            // Clean up any unwanted build script or junk assets across all repository releases (including v2.0.0)
             try {
-              const assets = await github.rest.repos.listReleaseAssets({
+              const releases = await github.rest.repos.listReleases({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release_id: releaseId,
-                per_page: 100
+                per_page: 50
               });
-              for (const asset of assets.data) {
-                if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
-                  console.log(`Deleting unwanted asset: ${asset.name} (${asset.id})`);
-                  await github.rest.repos.deleteReleaseAsset({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    asset_id: asset.id
-                  });
+              for (const rel of releases.data) {
+                const assets = await github.rest.repos.listReleaseAssets({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: rel.id,
+                  per_page: 100
+                });
+                for (const asset of assets.data) {
+                  if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
+                    console.log(`Deleting unwanted asset: ${asset.name} (${asset.id}) from release ${rel.tag_name}`);
+                    await github.rest.repos.deleteReleaseAsset({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      asset_id: asset.id
+                    });
+                  }
                 }
               }
             } catch (e) {
@@ -290,33 +297,36 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Purge Non-Release and Intermediate Build Binaries
+      - name: Purge Non-Release and Intermediate Build Binaries Across All Releases
         uses: actions/github-script@v7
         with:
           script: |
-            const releaseId = ${{ needs.create-release.outputs.release_id }};
-            if (!releaseId) {
-              console.log('No release_id provided, skipping asset cleanup.');
-              return;
-            }
             try {
-              const assets = await github.rest.repos.listReleaseAssets({
+              const releases = await github.rest.repos.listReleases({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release_id: releaseId,
-                per_page: 100
+                per_page: 50
               });
-              for (const asset of assets.data) {
-                if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
-                  console.log(`Purging unwanted asset: ${asset.name} (${asset.id})`);
-                  await github.rest.repos.deleteReleaseAsset({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    asset_id: asset.id
-                  });
+              for (const rel of releases.data) {
+                console.log(`Checking release assets for ${rel.tag_name} (${rel.id})...`);
+                const assets = await github.rest.repos.listReleaseAssets({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: rel.id,
+                  per_page: 100
+                });
+                for (const asset of assets.data) {
+                  if (/^build[-_]script/i.test(asset.name) || /^bereal_studio\.exe$/i.test(asset.name)) {
+                    console.log(`Purging unwanted asset: ${asset.name} (${asset.id}) from ${rel.tag_name}`);
+                    await github.rest.repos.deleteReleaseAsset({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      asset_id: asset.id
+                    });
+                  }
                 }
               }
-              console.log('Asset cleanup completed successfully.');
+              console.log('All repository release assets cleaned successfully.');
             } catch (e) {
               console.log('Error during asset cleanup:', e.message);
             }

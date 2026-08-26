@@ -101,6 +101,12 @@ BeRealStudio/
      ```
      *(Avoid verbose logs, raw command dumps, or test verification outputs).*
 
+3. **Release Branch & CI Verification Protocol:**
+   - **Branch Isolation:** Prepare releases on a dedicated release branch (e.g. `release/vX.X.X`) branched off `dev`.
+   - **Preflight Checks:** Always run and pass `node scripts/preflight.js` (manifest sync, `svelte-check`, production build, `cargo test`, `cargo check --release`).
+   - **Wait for Complete CI & Build Success:** **NEVER merge release branches to `master` until all CI build matrix jobs (Windows, macOS Universal, Linux) have completed and passed with 100% success.**
+   - **Merge & Tag:** Only once all release artifacts and checks are verified 100% green, merge into `master`, push tags, and publish.
+
 ---
 
 ## 🛠️ Development & Build Commands (Powered by Bun)
