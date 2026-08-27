@@ -176,9 +176,9 @@ npm run tauri build
 ```
 
 ### Build Artifact Locations:
-- **Windows:** `src-tauri/target/release/bundle/msi/BeReal Studio_2.2.1_x64_en-US.msi` or `.exe`
-- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.2.1_universal.dmg`
-- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.2.1_amd64.deb` or `appimage`
+- **Windows:** `src-tauri/target/release/bundle/nsis/BeReal Studio_2.3.2_x64-setup.exe` or `src-tauri/target/release/bereal-studio.exe`
+- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.3.2_aarch64.dmg` or `universal.dmg`
+- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.3.2_amd64.deb` or `appimage/BeReal Studio_2.3.2_amd64.AppImage`
 
 ---
 

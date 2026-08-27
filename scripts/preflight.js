@@ -99,6 +99,19 @@ async function main() {
     } else {
       errors += missingIcons;
     }
+
+    // README.md Version & Download links check
+    const readmePath = path.join(ROOT_DIR, 'README.md');
+    if (fs.existsSync(readmePath)) {
+      const readmeContent = fs.readFileSync(readmePath, 'utf8');
+      if (readmeContent.includes(`BeReal.Studio_${pkgVer}_x64-setup.exe`) &&
+          readmeContent.includes(`BeReal Studio_${pkgVer}_x64-setup.exe`)) {
+        success(`README.md download links and build artifact locations verified (v${pkgVer})`);
+      } else {
+        fail(`README.md contains outdated version references. Please update download links and build artifact paths to v${pkgVer}`);
+        errors++;
+      }
+    }
   } catch (err) {
     fail(`Failed manifest checks: ${err.message}`);
     errors++;
