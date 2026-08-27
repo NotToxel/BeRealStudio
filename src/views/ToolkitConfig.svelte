@@ -627,30 +627,34 @@
                   <ol class="gdpr-step-list">
                     <li>
                       <span class="step-badge font-mono">1</span>
-                      <span>Tap your <strong>Profile icon</strong> in the top-right corner.</span>
+                      <span>Tap your <strong>Profile icon</strong> in the bottom-right corner.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">2</span>
-                      <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
+                      <span>Tap the <strong>Settings icon</strong> in the top-right corner.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">3</span>
-                      <span>Select <strong>Ask a Question</strong> &rarr; <strong>Troubleshooting</strong> &rarr; <strong>Other</strong>.</span>
+                      <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">4</span>
-                      <span>Tap <strong>Contact Us</strong> at the bottom of the article.</span>
+                      <span>Select <strong>Ask a Question</strong> &rarr; <strong>Troubleshooting</strong> &rarr; <strong>Other</strong>.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">5</span>
-                      <span>Select Topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
+                      <span>Tap <strong>Contact Us</strong> at the bottom of the article.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">6</span>
-                      <span>Type a message with at least <strong>10 characters</strong> and submit your request.</span>
+                      <span>Select Topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
                     </li>
                     <li>
                       <span class="step-badge font-mono">7</span>
+                      <span>Type a message with at least <strong>10 characters</strong> and submit your request.</span>
+                    </li>
+                    <li>
+                      <span class="step-badge font-mono">8</span>
                       <span>BeReal will email you a secure download link containing your raw archive ZIP.</span>
                     </li>
                   </ol>

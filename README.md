@@ -113,13 +113,14 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 ## 📋 How to Download Your Archive from BeReal
  
 1. Open the **BeReal** mobile app and tap your **Profile icon** (bottom-right).
-2. Tap **Help** &rarr; Select **Contact Us**.
-3. Select **Ask a Question** &rarr; Tap **Troubleshooting** &rarr; Tap **Other**.
-4. Tap **Contact Us** at the bottom &rarr; Select the **Topic** dropdown.
-5. Select **"I'd like to request a copy of my data"**.
-6. Type a message with at least **10 characters** (e.g., *"Please provide a copy of my account data"*) and submit.
-7. BeReal will deliver a secure download link via email containing your official archive ZIP (including `posts.json` and all media).
-8. Once downloaded, select the ZIP or unzipped folder directly in **BeReal Studio**.
+2. Tap the **Settings icon** (top-right).
+3. Tap **Help** &rarr; Select **Contact Us**.
+4. Select **Ask a Question** &rarr; Tap **Troubleshooting** &rarr; Tap **Other**.
+5. Tap **Contact Us** at the bottom &rarr; Select the **Topic** dropdown.
+6. Select **"I'd like to request a copy of my data"**.
+7. Type a message with at least **10 characters** (e.g., *"Please provide a copy of my account data"*) and submit.
+8. BeReal will deliver a secure download link via email containing your official archive ZIP (including `posts.json` and all media).
+9. Once downloaded, select the ZIP or unzipped folder directly in **BeReal Studio**.
 
 ---
 

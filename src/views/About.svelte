@@ -138,30 +138,34 @@
       <ol class="gdpr-step-list text-secondary">
         <li>
           <span class="step-badge font-mono">1</span>
-          <span>Open the <strong>BeReal</strong> mobile app and tap your <strong>Profile icon</strong> in the top-right corner.</span>
+          <span>Open the <strong>BeReal</strong> mobile app and tap your <strong>Profile icon</strong> in the bottom-right corner.</span>
         </li>
         <li>
           <span class="step-badge font-mono">2</span>
-          <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
+          <span>Tap the <strong>Settings icon</strong> in the top-right corner.</span>
         </li>
         <li>
           <span class="step-badge font-mono">3</span>
-          <span>Select <strong>Ask a Question</strong> &rarr; Tap <strong>Troubleshooting</strong> &rarr; Select <strong>Other</strong>.</span>
+          <span>Tap <strong>Help</strong> &rarr; Select <strong>Contact Us</strong>.</span>
         </li>
         <li>
           <span class="step-badge font-mono">4</span>
-          <span>Tap <strong>Contact Us</strong> at the bottom of the article &rarr; Tap the <strong>Topic</strong> dropdown.</span>
+          <span>Select <strong>Ask a Question</strong> &rarr; Tap <strong>Troubleshooting</strong> &rarr; Select <strong>Other</strong>.</span>
         </li>
         <li>
           <span class="step-badge font-mono">5</span>
-          <span>Select the topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
+          <span>Tap <strong>Contact Us</strong> at the bottom of the article &rarr; Tap the <strong>Topic</strong> dropdown.</span>
         </li>
         <li>
           <span class="step-badge font-mono">6</span>
-          <span>Type a short message with at least <strong>10 characters</strong> (e.g., <em>"Please provide a full copy of my account data"</em>) and submit your request.</span>
+          <span>Select the topic: <strong>"I'd like to request a copy of my data"</strong>.</span>
         </li>
         <li>
           <span class="step-badge font-mono">7</span>
+          <span>Type a short message with at least <strong>10 characters</strong> (e.g., <em>"Please provide a full copy of my account data"</em>) and submit your request.</span>
+        </li>
+        <li>
+          <span class="step-badge font-mono">8</span>
           <span>BeReal support will email you a secure download link containing your raw archive ZIP with <code>posts.json</code> and all full-resolution memories.</span>
         </li>
       </ol>
