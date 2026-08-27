@@ -22,12 +22,12 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format / Architecture | Direct Download Link |
 | :--- | :--- | :--- |
-| <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_x64-setup.exe) |
+| <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_x64-setup.exe) |
 | <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit Standalone) | [⬇️ **Download for Windows (Portable)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio.exe) |
-| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_aarch64.dmg) |
+| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_aarch64.dmg) |
 | <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.app.tar.gz` (Universal .app Bundle) | [⬇️ **Download for macOS (.app Bundle)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal-Studio-macOS.app.tar.gz) |
-| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.AppImage) |
-| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.0_amd64.deb) |
+| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_amd64.AppImage) |
+| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
 
