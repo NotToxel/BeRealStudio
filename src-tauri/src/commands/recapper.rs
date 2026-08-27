@@ -96,27 +96,39 @@ fn run_recapper(
     });
     emitter.info("Analysing audio...");
     let raw_audio_duration = audio::get_audio_duration(Path::new(&config.music_path))?;
+    if !raw_audio_duration.is_finite() || raw_audio_duration <= 0.0 {
+        anyhow::bail!("Invalid or unreadable audio track duration ({:.2}s). Please verify the audio file is valid.", raw_audio_duration);
+    }
     let mut audio_duration = raw_audio_duration;
-    if let Some(min_d) = config.min_duration_secs {
-        if min_d > 0.0 && audio_duration < min_d {
-            audio_duration = min_d;
-        }
+    let min_d = config.min_duration_secs.unwrap_or(0.0).max(0.0);
+    let max_d = config.max_duration_secs.unwrap_or(0.0).max(0.0);
+
+    if min_d > 0.0 && max_d > 0.0 && max_d < min_d {
+        emitter.warn(format!("Max video length ({:.1}s) was less than min length ({:.1}s); aligning max to min.", max_d, min_d));
     }
-    if let Some(max_d) = config.max_duration_secs {
-        if max_d > 0.0 && audio_duration > max_d {
-            audio_duration = max_d;
-        }
+
+    if min_d > 0.0 && audio_duration < min_d {
+        audio_duration = min_d;
     }
+    if max_d > 0.0 && audio_duration > max_d {
+        audio_duration = max_d.max(min_d);
+    }
+    // Clamp target audio duration to sane limits [0.5s, 7200s]
+    audio_duration = audio_duration.clamp(0.5, 7200.0);
     emitter.info(format!("Slideshow target duration: {:.1}s (audio: {:.1}s)", audio_duration, raw_audio_duration));
 
     // ── Step 3: Calculate per-image durations ─────────────────────────────────
     let durations = timing::calculate_durations(
         audio_duration,
         image_paths.len(),
-        config.start_padding,
-        config.end_padding,
+        config.start_padding.max(0.0),
+        config.end_padding.max(0.0),
         &config.speed_mode,
     );
+
+    if durations.is_empty() {
+        anyhow::bail!("Failed to calculate slideshow frame durations for {} images over {:.1}s.", image_paths.len(), audio_duration);
+    }
 
     // ── Step 4: Geocode if needed (sequential due to rate limit) ─────────────
     let total = image_paths.len();

@@ -20,6 +20,15 @@
   function decrement() {
     value = Math.max(+(value - step).toFixed(2), min);
   }
+
+  function handleBlur() {
+    isFocused = false;
+    if (value === null || value === undefined || isNaN(value)) {
+      value = min;
+    } else {
+      value = Math.min(Math.max(+Number(value).toFixed(2), min), max);
+    }
+  }
 </script>
 
 <div class="stepper-component accent-{accentColor}">
@@ -61,7 +70,7 @@
           {max}
           {step}
           on:focus={() => (isFocused = true)}
-          on:blur={() => (isFocused = false)}
+          on:blur={handleBlur}
         />
         {#if unit}
           <span class="unit-badge font-mono">{unit}</span>

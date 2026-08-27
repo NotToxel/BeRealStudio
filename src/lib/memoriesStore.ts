@@ -738,11 +738,26 @@ export function replaceLocationPlaceholders(template: string, memory: ExplorerMe
     .trim();
 }
 
+/**
+ * Returns true if this memory is the first BeReal taken on that day / moment cycle.
+ * Subsequent posts on the same date are Bonus BeReals and do not highlight late status.
+ */
+export function isFirstBeRealOfDay(memory: ExplorerMemory): boolean {
+  if (!memory) return false;
+  const dateStr = `${memory.year}-${String(memory.month).padStart(2, '0')}-${String(memory.day).padStart(2, '0')}`;
+  const map = get(rawMemoriesByDate);
+  const posts = map.get(dateStr);
+  if (!posts || posts.length === 0) return true;
+  return posts[0].id === memory.id;
+}
+
 export function replaceTimeTagPlaceholders(template: string, memory: ExplorerMemory): string {
   if (!template) return '';
   const shortDate = formatShortDate(memory);
-  const lateStr = memory.isLate ? (memory.lateDuration || 'Late') : 'On time';
-  const lateExactStr = memory.isLate ? (memory.lateExact || memory.lateDuration || 'Late') : 'On time';
+  const isFirst = isFirstBeRealOfDay(memory);
+  const isLateHighlight = memory.isLate && isFirst;
+  const lateStr = isLateHighlight ? (memory.lateDuration || 'Late') : 'On time';
+  const lateExactStr = isLateHighlight ? (memory.lateExact || memory.lateDuration || 'Late') : 'On time';
 
   let result = template
     .replace(/\{time\}/gi, memory.timeFormatted || '')
@@ -796,9 +811,12 @@ export function formatMemoryLocation(memory: ExplorerMemory, settings: MemoryHea
 export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHeaderSettings): string {
   if (!settings.showTimeTag) return '';
 
+  const isFirst = isFirstBeRealOfDay(memory);
+  const isLateHighlight = memory.isLate && isFirst;
+
   if (settings.timeTagFormat === 'custom') {
     let customFormatted = replaceTimeTagPlaceholders(settings.customTimeTagText?.trim() || '', memory);
-    if (settings.showLateAddition && memory.isLate && !customFormatted.includes(memory.lateDuration || 'Late')) {
+    if (settings.showLateAddition && isLateHighlight && !customFormatted.includes(memory.lateDuration || 'Late')) {
       const lateStr = memory.lateDuration || 'Late';
       customFormatted = customFormatted ? `${customFormatted} • ${lateStr}` : lateStr;
     }
@@ -822,7 +840,8 @@ export function formatMemoryTimeTag(memory: ExplorerMemory, settings: MemoryHead
   }
 
   // Show how late you were as an addition separated by a dot if enabled, matching theme text
-  if (settings.showLateAddition && memory.isLate && (memory.lateDuration || memory.lateExact)) {
+  // Highlight late ONLY if it is the first BeReal of the day from the BeReal moment
+  if (settings.showLateAddition && isLateHighlight && (memory.lateDuration || memory.lateExact)) {
     const lateStr = memory.lateDuration || 'Late';
     return `${baseTime} • ${lateStr}`;
   }

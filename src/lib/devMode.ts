@@ -98,16 +98,16 @@ export function loadDemoArchive() {
     ],
     validationErrors: [],
     warnings: [],
-    postsJsonPath: 'C:\\Development\\BeRealStudio\\archive\\bereal-gdpr-photo-toolkit\\posts.json',
-    mediaBasePath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR\\Photos',
+    postsJsonPath: 'C:\\Users\\Developer\\Downloads\\BeReal_Archive_GDPR\\posts.json',
+    mediaBasePath: 'C:\\Users\\Developer\\Downloads\\BeReal_Archive_GDPR\\Photos',
   };
 
   currentArchive.set(mockMeta);
-  lastScannedArchivePath.set('C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR.zip');
+  lastScannedArchivePath.set('C:\\Users\\Developer\\Downloads\\BeReal_Archive_GDPR.zip');
   toolkitConfig.update((cfg) => ({
     ...cfg,
-    inputPath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR.zip',
-    outputPath: 'C:\\Users\\cl\\Pictures\\BeReal_Photos',
+    inputPath: 'C:\\Users\\Developer\\Downloads\\BeReal_Archive_GDPR.zip',
+    outputPath: 'C:\\Users\\Developer\\Pictures\\BeReal_Photos',
     dateRangeStart: '2024-01-01',
     dateRangeEnd: '2024-12-31',
     convertFormat: 'Jpeg',
@@ -367,7 +367,7 @@ export function loadDemoExplorer() {
     userName: 'toxel',
     userFullname: 'Caleb Lim',
     profilePictureDataUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%2338bdf8'/><stop offset='100%' stop-color='%23a855f7'/></linearGradient></defs><circle cx='50' cy='50' r='50' fill='url(%23g)'/><text x='50' y='62' font-family='sans-serif' font-size='42' font-weight='bold' fill='white' text-anchor='middle'>T</text></svg>",
-    mediaBasePath: 'C:\\Users\\cl\\Downloads\\BeReal_Archive_GDPR\\Photos',
+    mediaBasePath: 'C:\\Users\\Developer\\Downloads\\BeReal_Archive_GDPR\\Photos',
   });
   calendarCurrentMonth.set('2024-08');
 }

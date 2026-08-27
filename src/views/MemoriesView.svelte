@@ -12,7 +12,6 @@
   import { lastScannedArchivePath, currentArchive } from '$lib/stores';
   import MemoriesGrid from '$components/memories/MemoriesGrid.svelte';
   import CalendarGrid from '$components/memories/CalendarGrid.svelte';
-  import MemoryFeedModal from '$components/memories/MemoryFeedModal.svelte';
   import MemoryFilterBar from '$components/memories/MemoryFilterBar.svelte';
   import PerspectiveSwitcher from '$components/memories/PerspectiveSwitcher.svelte';
   import FilePicker from '$components/FilePicker.svelte';
@@ -184,9 +183,6 @@
       <PerspectiveSwitcher variant="floating-window" />
     </div>
   {/if}
-
-  <!-- Fullscreen / Modal Feed View (when memory clicked) -->
-  <MemoryFeedModal />
 </div>
 
 <style>

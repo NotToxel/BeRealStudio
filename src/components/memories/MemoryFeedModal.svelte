@@ -388,32 +388,42 @@
 <style>
   .feed-modal-backdrop {
     position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.92);
+    top: var(--titlebar-height, 38px);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.94);
     backdrop-filter: blur(24px);
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    z-index: 500;
+    padding: 0;
+    z-index: 1050;
+    box-sizing: border-box;
   }
 
   .feed-modal-shell {
     position: relative;
     width: 100%;
-    max-width: 530px;
-    height: 96vh;
+    max-width: 540px;
+    height: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     background: #000000;
-    border: 1px solid var(--border-medium);
-    border-radius: 28px;
+    border-left: 1px solid var(--border-medium);
+    border-right: 1px solid var(--border-medium);
+    border-top: none;
+    border-bottom: none;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95);
+    box-shadow: 0 0 64px rgba(0, 0, 0, 0.95);
+    box-sizing: border-box;
   }
 
   @media (min-width: 1200px) {
     .feed-modal-shell {
-      max-width: 550px;
+      max-width: 560px;
     }
   }
 
@@ -423,12 +433,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
-    background: rgba(0, 0, 0, 0.88);
-    backdrop-filter: blur(14px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    z-index: 40;
+    padding: 8px 16px;
+    min-height: 48px;
+    height: 48px;
+    background: #0a0a0f;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    z-index: 60;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
 
   .feed-scroll-viewport {
@@ -505,17 +517,24 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 2px;
+    line-height: 1.2;
   }
 
   .top-date-text {
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #ffffff;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
   }
 
   .top-index-text {
-    font-size: 10.5px;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--text-muted);
+    line-height: 1.2;
   }
 
   .top-actions {

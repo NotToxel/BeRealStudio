@@ -193,7 +193,7 @@ input, select, textarea, pre, code {
 
 .main-content.is-memories-view {
   max-width: 100%;
-  padding: 12px 32px 0 32px;
+  padding: 12px 32px 14px 32px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

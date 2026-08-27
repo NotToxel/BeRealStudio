@@ -133,4 +133,37 @@ mod tests {
         let sum: f64 = durations.iter().sum();
         assert!((sum - 60.0).abs() < 0.001, "sum={}", sum);
     }
+
+    #[test]
+    fn test_boundary_zero_and_negative_inputs() {
+        assert!(calculate_durations(0.0, 10, 1.0, 1.0, &SpeedMode::Even).is_empty());
+        assert!(calculate_durations(-50.0, 10, 1.0, 1.0, &SpeedMode::Even).is_empty());
+        assert!(calculate_durations(60.0, 0, 1.0, 1.0, &SpeedMode::Even).is_empty());
+        assert!(calculate_durations(f64::NAN, 10, 1.0, 1.0, &SpeedMode::Even).is_empty());
+        assert!(calculate_durations(f64::INFINITY, 10, 1.0, 1.0, &SpeedMode::Even).is_empty());
+    }
+
+    #[test]
+    fn test_boundary_single_image() {
+        let durations = calculate_durations(15.0, 1, 5.0, 5.0, &SpeedMode::Even);
+        assert_eq!(durations.len(), 1);
+        assert_eq!(durations[0], 15.0);
+    }
+
+    #[test]
+    fn test_boundary_excessive_padding_scales_down() {
+        // Requested padding 500s on a 10s video
+        let durations = calculate_durations(10.0, 5, 250.0, 250.0, &SpeedMode::Ramp);
+        let sum: f64 = durations.iter().sum();
+        assert!((sum - 10.0).abs() < 0.001, "sum={}", sum);
+        assert_eq!(durations.len(), 5);
+    }
+
+    #[test]
+    fn test_boundary_large_dataset() {
+        let durations = calculate_durations(3600.0, 10000, 2.0, 2.0, &SpeedMode::Ramp);
+        let sum: f64 = durations.iter().sum();
+        assert!((sum - 3600.0).abs() < 0.01, "sum={}", sum);
+        assert_eq!(durations.len(), 10000);
+    }
 }

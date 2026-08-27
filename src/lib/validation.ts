@@ -68,12 +68,32 @@ export function validateRecapperConfig(
     errors.push('Please specify an output video destination path.');
   }
 
-  if (config.startPadding < 0 || config.startPadding > 15) {
+  if (config.startPadding < 0 || config.startPadding > 30) {
     warnings.push('Start hold duration is typically between 0s and 10s.');
   }
 
-  if (config.endPadding < 0 || config.endPadding > 15) {
+  if (config.endPadding < 0 || config.endPadding > 30) {
     warnings.push('End hold duration is typically between 0s and 10s.');
+  }
+
+  if (config.minDurationSecs < 0 || config.minDurationSecs > 1800) {
+    errors.push('Minimum video length must be between 0s and 1800s (30 mins).');
+  }
+
+  if (config.maxDurationSecs < 0 || config.maxDurationSecs > 3600) {
+    errors.push('Maximum video length must be between 0s and 3600s (60 mins).');
+  }
+
+  if (
+    config.minDurationSecs > 0 &&
+    config.maxDurationSecs > 0 &&
+    config.maxDurationSecs < config.minDurationSecs
+  ) {
+    errors.push('Maximum video length cannot be less than Minimum video length.');
+  }
+
+  if (config.fps <= 0 || config.fps > 120) {
+    errors.push('Framerate must be between 1 and 120 FPS.');
   }
 
   if (archiveInfo && archiveInfo.validationErrors?.length) {

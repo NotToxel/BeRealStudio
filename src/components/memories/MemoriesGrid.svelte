@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { filteredMemories, openFeedAt, openContextMenu, memoryHeaderSettings } from '$lib/memoriesStore';
+  import { filteredMemories, openFeedAt, openContextMenu, memoryHeaderSettings, isFirstBeRealOfDay } from '$lib/memoriesStore';
   import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import Images from 'lucide-svelte/icons/images';
@@ -102,59 +102,66 @@
     updateActiveMonth();
   }
 
-  let isProgrammaticScroll = false;
-  let programmaticScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let scrollRafPending = false;
 
   function updateActiveMonth() {
-    if (!scrollContainer || monthPositions.length === 0) return;
+    if (!scrollContainer || monthGroups.length === 0) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
     const maxScroll = Math.max(1, scrollHeight - clientHeight);
 
-    // If at or near bottom (within 16px of maxScroll), lock to the last month
-    if (scrollTop >= maxScroll - 16) {
-      const last = monthPositions[monthPositions.length - 1];
+    // If at or near bottom (within 24px of maxScroll), lock to the last month
+    if (scrollTop >= maxScroll - 24) {
+      const last = monthGroups[monthGroups.length - 1];
       activeScrubMonth = last.title;
       activeScrubKey = last.key;
-      scrollThumbTopPercent = last.topPercent;
+      scrollThumbTopPercent = 96;
       return;
     }
 
-    // If at or near top (within 10px of top), lock to the first month
-    if (scrollTop <= 10) {
-      const first = monthPositions[0];
+    // If at or near top (within 24px of top), lock to the first month
+    if (scrollTop <= 24) {
+      const first = monthGroups[0];
       activeScrubMonth = first.title;
       activeScrubKey = first.key;
-      scrollThumbTopPercent = first.topPercent;
+      scrollThumbTopPercent = 4;
       return;
     }
 
     let activeIdx = 0;
     let nextFrac = 0;
+    const vRect = scrollContainer.getBoundingClientRect();
 
-    for (let i = 0; i < monthPositions.length; i++) {
-      if (scrollTop + 10 >= monthPositions[i].offsetTop) {
+    for (let i = 0; i < monthGroups.length; i++) {
+      const el = document.getElementById(`month-group-${monthGroups[i].key}`);
+      if (!el) continue;
+      const elRect = el.getBoundingClientRect();
+      const realTop = elRect.top - vRect.top;
+      if (realTop <= 50) {
         activeIdx = i;
       } else {
         break;
       }
     }
 
-    if (activeIdx < monthPositions.length - 1) {
-      const cur = monthPositions[activeIdx];
-      const next = monthPositions[activeIdx + 1];
-      const span = Math.max(1, next.offsetTop - cur.offsetTop);
-      nextFrac = Math.min(1, Math.max(0, (scrollTop - cur.offsetTop) / span));
+    if (activeIdx < monthGroups.length - 1) {
+      const curEl = document.getElementById(`month-group-${monthGroups[activeIdx].key}`);
+      const nextEl = document.getElementById(`month-group-${monthGroups[activeIdx + 1].key}`);
+      if (curEl && nextEl) {
+        const curTop = curEl.getBoundingClientRect().top - vRect.top;
+        const nextTop = nextEl.getBoundingClientRect().top - vRect.top;
+        const span = Math.max(1, nextTop - curTop);
+        nextFrac = Math.min(1, Math.max(0, -curTop / span));
+      }
     }
 
-    const currentPos = monthPositions[activeIdx];
-    if (currentPos) {
-      activeScrubMonth = currentPos.title;
-      activeScrubKey = currentPos.key;
+    const currentGroup = monthGroups[activeIdx];
+    if (currentGroup) {
+      activeScrubMonth = currentGroup.title;
+      activeScrubKey = currentGroup.key;
     }
 
-    if (monthPositions.length > 1) {
-      const stepPct = 92 / (monthPositions.length - 1);
+    if (monthGroups.length > 1) {
+      const stepPct = 92 / (monthGroups.length - 1);
       scrollThumbTopPercent = 4 + (activeIdx + nextFrac) * stepPct;
     } else {
       scrollThumbTopPercent = 50;
@@ -163,7 +170,7 @@
 
   function handleScroll() {
     if (isDraggingScrubber) return;
-    if (!isProgrammaticScroll && !scrollRafPending) {
+    if (!scrollRafPending) {
       scrollRafPending = true;
       requestAnimationFrame(() => {
         updateActiveMonth();
@@ -173,7 +180,7 @@
     isScrolling = true;
     clearTimeout(scrollHideTimer);
     scrollHideTimer = setTimeout(() => {
-      if (!isDraggingScrubber && !isProgrammaticScroll) {
+      if (!isDraggingScrubber) {
         isScrolling = false;
       }
     }, 800);
@@ -183,26 +190,21 @@
     activeScrubMonth = title;
     activeScrubKey = key;
     isScrolling = true;
-    isProgrammaticScroll = true;
 
-    const pos = monthPositions.find((p) => p.key === key);
-    if (pos) {
-      scrollThumbTopPercent = pos.topPercent;
-    }
-
-    if (programmaticScrollTimer) clearTimeout(programmaticScrollTimer);
-    programmaticScrollTimer = setTimeout(() => {
-      isProgrammaticScroll = false;
-      isScrolling = false;
-    }, 1000);
+    clearTimeout(scrollHideTimer);
+    scrollHideTimer = setTimeout(() => {
+      if (!isDraggingScrubber) {
+        isScrolling = false;
+      }
+    }, 1200);
 
     const el = document.getElementById(`month-group-${key}`);
-    if (el && scrollContainer) {
-      scrollContainer.scrollTo({ top: el.offsetTop, behavior: 'smooth' });
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  function jumpToNearestMonthFromPct(pct: number, smooth: boolean = true) {
+  function jumpToNearestMonthFromPct(pct: number, smooth: boolean = false) {
     if (monthGroups.length === 0 || !scrollContainer) return;
     if (monthGroups.length === 1) {
       scrollToMonth(monthGroups[0].key, monthGroups[0].title);
@@ -213,46 +215,82 @@
     const targetGroup = monthGroups[nearestIdx];
     if (!targetGroup) return;
 
-    if (smooth) {
-      scrollToMonth(targetGroup.key, targetGroup.title);
-    } else {
-      activeScrubMonth = targetGroup.title;
-      activeScrubKey = targetGroup.key;
-      scrollThumbTopPercent = monthPositions[nearestIdx]?.topPercent ?? pct;
-      const el = document.getElementById(`month-group-${targetGroup.key}`);
-      if (el && scrollContainer) {
-        scrollContainer.scrollTop = el.offsetTop;
+    activeScrubMonth = targetGroup.title;
+    activeScrubKey = targetGroup.key;
+    scrollThumbTopPercent = 4 + (nearestIdx / (monthGroups.length - 1)) * 92;
+
+    const el = document.getElementById(`month-group-${targetGroup.key}`);
+    if (el) {
+      if (smooth) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
       }
     }
   }
 
+  let dragStartY = 0;
+  let hasDragged = false;
+  let activeDotTarget: { key: string; title: string } | null = null;
+
   function handleTrackPointerDown(e: PointerEvent) {
-    if (e.button !== 0) return;
-    const target = e.currentTarget as HTMLElement;
-    try {
-      target.setPointerCapture(e.pointerId);
-    } catch {}
+    if (e.button !== 0 || !scrubberTrackEl) return;
+    dragStartY = e.clientY;
+    hasDragged = false;
+
+    const dotBtn = (e.target as HTMLElement)?.closest('.timeline-month-dot') as HTMLElement | null;
+    if (dotBtn && dotBtn.dataset.monthKey) {
+      activeDotTarget = {
+        key: dotBtn.dataset.monthKey,
+        title: dotBtn.dataset.monthTitle || '',
+      };
+    } else {
+      activeDotTarget = null;
+    }
+
     isDraggingScrubber = true;
     isScrolling = true;
-    handleScrubberMove(e);
+    try {
+      scrubberTrackEl.setPointerCapture(e.pointerId);
+    } catch {}
+
+    if (!activeDotTarget) {
+      handleScrubberMove(e);
+    }
   }
 
   function handleTrackPointerMove(e: PointerEvent) {
     if (!isDraggingScrubber) return;
-    handleScrubberMove(e);
+    if (Math.abs(e.clientY - dragStartY) > 3) {
+      hasDragged = true;
+      activeDotTarget = null;
+    }
+    if (hasDragged) {
+      handleScrubberMove(e);
+    }
   }
 
   function handleTrackPointerUp(e: PointerEvent) {
     if (!isDraggingScrubber) return;
-    const target = e.currentTarget as HTMLElement;
     try {
-      target.releasePointerCapture(e.pointerId);
+      scrubberTrackEl?.releasePointerCapture(e.pointerId);
     } catch {}
+
+    if (!hasDragged && activeDotTarget) {
+      scrollToMonth(activeDotTarget.key, activeDotTarget.title);
+    }
+
     isDraggingScrubber = false;
+    activeDotTarget = null;
     clearTimeout(scrollHideTimer);
     scrollHideTimer = setTimeout(() => {
       isScrolling = false;
-    }, 1200);
+    }, 1000);
+  }
+
+  function handleTrackWheel(e: WheelEvent) {
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop += e.deltaY;
   }
 
   function handleScrubberMove(e: PointerEvent | MouseEvent | TouchEvent) {
@@ -313,6 +351,8 @@
             <!-- Grid of BeReals for this month -->
             <div class="memories-grid">
               {#each group.memories as memory (memory.id)}
+                {@const isFirst = isFirstBeRealOfDay(memory)}
+                {@const isLateFirst = memory.isLate && isFirst}
                 <div
                   class="grid-card-wrap"
                   role="button"
@@ -362,15 +402,15 @@
                           <Clock size={11} class="text-sky-400" />
                           <span class="tooltip-time-val">{memory.timeFormatted || 'Unknown time'}</span>
                         </div>
-                        <div class="tooltip-subtag" class:is-late={memory.isLate} class:is-ontime={!memory.isLate}>
-                          {memory.isLate ? (memory.lateExact || memory.lateDuration || 'Late') : 'On Time'}
+                        <div class="tooltip-subtag" class:is-late={isLateFirst} class:is-ontime={!isLateFirst}>
+                          {isLateFirst ? (memory.lateExact || memory.lateDuration || 'Late') : (!isFirst ? 'Bonus BeReal' : 'On Time')}
                         </div>
                         <div class="tooltip-tip-arrow"></div>
                       </div>
                     </div>
 
                     <div class="card-meta-right">
-                      {#if memory.isLate && ($memoryHeaderSettings.showLatePillsInGrid ?? true)}
+                      {#if isLateFirst && ($memoryHeaderSettings.showLatePillsInGrid ?? true)}
                         <div class="card-late-wrap">
                           <span class="card-late-pill">
                             {memory.lateDuration || 'Late'}
@@ -428,6 +468,7 @@
         on:pointerup={handleTrackPointerUp}
         on:pointercancel={handleTrackPointerUp}
         on:lostpointercapture={handleTrackPointerUp}
+        on:wheel|passive={handleTrackWheel}
         title="Drag scrubber or click markers to jump through timeline"
       >
         <div class="timeline-line-rail"></div>
@@ -450,9 +491,8 @@
             class="timeline-month-dot"
             class:is-active={activeScrubKey === pos.key}
             style="top: {pos.topPercent}%;"
-            on:pointerdown|stopPropagation
-            on:mousedown|stopPropagation
-            on:click|stopPropagation={() => scrollToMonth(pos.key, pos.title)}
+            data-month-key={pos.key}
+            data-month-title={pos.title}
             aria-label="Jump to {pos.title}"
           >
             <span class="dot-inner-core"></span>
@@ -507,6 +547,9 @@
     position: relative;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    scroll-behavior: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .memories-scroll-viewport::-webkit-scrollbar {
@@ -574,6 +617,8 @@
     border-radius: 18px;
     transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
     outline: none;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
   }
 
   .grid-card-wrap:hover {
@@ -879,7 +924,11 @@
     opacity: 0 !important;
   }
 
-  /* Suppress individual dot tooltips while user is actively dragging, scrolling, or clicking */
+  /* Suppress individual dot tooltips and pointer events while user is actively dragging, scrolling, or clicking */
+  .timeline-scrubber-track.is-dragging .timeline-month-dot {
+    pointer-events: none !important;
+  }
+
   .timeline-scrubber-track.is-dragging .month-hover-tooltip,
   .timeline-scrubber-track.is-scrolling .month-hover-tooltip,
   .timeline-scrubber-track:active .month-hover-tooltip {

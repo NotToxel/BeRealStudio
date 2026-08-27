@@ -141,11 +141,21 @@
   .retained-view-stage {
     width: 100%;
     height: 100%;
-    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
   }
 
   .retained-view-stage.is-active {
-    display: block;
+    position: relative;
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 1;
+    opacity: 1;
   }
 
   .view-transition-stage {

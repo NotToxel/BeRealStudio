@@ -680,11 +680,45 @@
       </div>
     {/if}
 
-    <!-- Top-right badge (e.g. BTS indicator) -->
+    <!-- Top-right badge (e.g. BTS indicator / interactive play trigger) -->
     {#if badgeText}
-      <div class="corner-badge">
-        <span>{badgeText}</span>
-      </div>
+      {#if btsSrc}
+        <div class="corner-badge-wrap">
+          <button
+            type="button"
+            class="corner-badge bts-corner-btn"
+            class:active={isPlayingBts}
+            on:click|stopPropagation={toggleBts}
+            title={isPlayingBts ? 'Pause BTS micro-video' : 'Play BTS micro-video'}
+            aria-label="Play BTS micro-video"
+          >
+            {#if isPlayingBts}
+              <Pause size={size === 'lg' ? 12 : 11} class="bts-icon" />
+              <span>BTS Playing</span>
+            {:else}
+              <Film size={size === 'lg' ? 12 : 11} class="bts-icon" />
+              <span>{badgeText}</span>
+            {/if}
+          </button>
+
+          {#if isPlayingBts}
+            <button
+              type="button"
+              class="bts-corner-audio-btn"
+              class:is-muted={isBtsMuted}
+              on:click|stopPropagation={() => (isBtsMuted = !isBtsMuted)}
+              title={isBtsMuted ? 'Unmute BTS Audio' : 'Mute BTS Audio'}
+              aria-label="Toggle BTS audio"
+            >
+              <VolumeIcon muted={isBtsMuted} size={size === 'lg' ? 12 : 10} />
+            </button>
+          {/if}
+        </div>
+      {:else}
+        <div class="corner-badge">
+          <span>{badgeText}</span>
+        </div>
+      {/if}
     {/if}
 
     <!-- Formal Memory Timing & Metadata Inspector Badge (Hidden behind $showMemoryDebugBadges flag) -->
@@ -792,9 +826,12 @@
       </div>
     {/if}
 
-    <!-- BTS Micro-Video Play Trigger & Audio Toggle -->
-    {#if btsSrc}
-      <div class="bts-controls-cluster">
+    <!-- BTS Micro-Video Play Trigger & Audio Toggle (Only shown in interactive modes) -->
+    {#if btsSrc && interactive}
+      <div
+        class="bts-controls-cluster"
+        class:pos-left={pipCorner === 'bottom-right' && !hasMovedCustom}
+      >
         <button
           type="button"
           class="bts-trigger-pill"
@@ -1022,20 +1059,105 @@
     font-size: 38px;
   }
 
-  /* Corner badge (e.g. retakes count or post count) */
+  .corner-badge-wrap {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 25;
+  }
+
+  /* Corner badge (e.g. retakes count, post count, or clickable BTS button) */
   .corner-badge {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    padding: 2px 7px;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    font-size: 10.5px;
+    top: 9px;
+    right: 9px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+    font-size: 11px;
     font-weight: 700;
     color: #ffffff;
-    z-index: 15;
+    z-index: 25;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-sizing: border-box;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+
+  .corner-badge-wrap .corner-badge {
+    position: static;
+  }
+
+  .size-lg .corner-badge {
+    top: 12px;
+    right: 12px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    gap: 6px;
+  }
+
+  .bts-corner-btn {
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    outline: none;
+    user-select: none;
+  }
+
+  .bts-corner-btn:hover {
+    background: rgba(56, 189, 248, 0.9);
+    color: #000000;
+    border-color: #38bdf8;
+    transform: scale(1.05);
+    box-shadow: 0 2px 12px rgba(56, 189, 248, 0.45);
+  }
+
+  .bts-corner-btn.active {
+    background: #38bdf8;
+    color: #000000;
+    border-color: #38bdf8;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
+  }
+
+  .bts-corner-audio-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s ease;
+  }
+
+  .size-lg .bts-corner-audio-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .bts-corner-audio-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: scale(1.08);
+  }
+
+  .bts-corner-audio-btn.is-muted {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
+  }
+
+  :global(.bts-icon) {
+    flex-shrink: 0;
   }
 
   /* On-Post Dev Debug Extraction Badge */
@@ -1421,6 +1543,12 @@
     align-items: center;
     gap: 6px;
     z-index: 30;
+    transition: all 0.2s ease;
+  }
+
+  .bts-controls-cluster.pos-left {
+    right: auto;
+    left: 10px;
   }
 
   .bts-trigger-pill {
