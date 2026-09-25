@@ -27,6 +27,8 @@
   const KEY_STORAGE = 'bereal_maptiler_key';
   const DETAIL_STORAGE = 'bereal_map_detail_enabled';
   const MAX_PINS = 12;
+  const MEMORY_FOCUS_ZOOM = 15;
+  const MAP_MAX_ZOOM = 18;
 
   let container: HTMLDivElement;
   let map: maplibregl.Map | null = null;
@@ -233,6 +235,9 @@
     button.setAttribute('aria-label', group.items.length === 1
       ? `Memory from ${group.items[0].memory.dateFormatted}`
       : `${group.items.length} memories at this location`);
+    button.title = group.items.length === 1
+      ? `Memory from ${group.items[0].memory.dateFormatted}`
+      : `${group.items.length} memories at this location`;
     const photo = document.createElement('span');
     photo.className = 'memory-map-pin-photo';
     const first = group.items[0].memory;
@@ -265,8 +270,8 @@
     try {
       const zoom = await source.getClusterExpansionZoom(id);
       if (!map) return;
-      if (zoom <= (detailedMap ? 15 : 6) && map.getZoom() < (detailedMap ? 15 : 6)) {
-        map.easeTo({ center: coordinates, zoom: Math.min(zoom, detailedMap ? 16 : 6), offset: [mapPanelOffset(), 0], duration: 240 });
+      if (zoom <= 15 && map.getZoom() < 15) {
+        map.easeTo({ center: coordinates, zoom: Math.min(zoom, 16), offset: [mapPanelOffset(), 0], duration: 240 });
         return;
       }
       const leaves = await source.getClusterLeaves(id, 10000, 0);
@@ -307,7 +312,12 @@
       if (!clusterIds.has(id)) { marker.remove(); clusterMarkers.delete(id); }
     }
     const features = map.queryRenderedFeatures([[0, 0], [canvas.clientWidth, canvas.clientHeight]], { layers: ['memory-single-hit'] });
-    const keys = [...new Set(features.map((feature) => String(feature.properties?.key ?? '')))].filter(Boolean).slice(0, MAX_PINS);
+    const focusedCoordinates = focusedMarker?.getLngLat();
+    const focusedKey = focusedCoordinates
+      ? `${focusedCoordinates.lat.toFixed(5)},${focusedCoordinates.lng.toFixed(5)}`
+      : null;
+    const keys = [...new Set(features.map((feature) => String(feature.properties?.key ?? '')))]
+      .filter((key) => key && key !== focusedKey).slice(0, MAX_PINS);
     const next = new Set(keys);
     for (const [key, marker] of markers) {
       if (!next.has(key)) { marker.remove(); markers.delete(key); }
@@ -360,10 +370,10 @@
     focusedMarker?.remove();
     const pin = createPin(group ?? { key: item.memory.id, items: [item], latitude: item.latitude, longitude: item.longitude });
     pin.classList.add('is-focused');
-    pin.setAttribute('aria-label', `Selected memory from ${item.memory.dateFormatted}`);
+    pin.setAttribute('aria-label', `Selected memory from ${item.memory.dateFormatted}${group && group.items.length > 1 ? `; ${group.items.length} memories at this location` : ''}`);
     focusedMarker = new maplibregl.Marker({ element: pin, anchor: 'bottom', offset: [0, -13] })
       .setLngLat([item.longitude, item.latitude]).addTo(map);
-    map.easeTo({ center: [item.longitude, item.latitude], zoom: Math.max(map.getZoom(), detailedMap ? 14 : 5.5), offset: [mapPanelOffset(), 0], duration: 450 });
+    map.easeTo({ center: [item.longitude, item.latitude], zoom: Math.max(map.getZoom(), MEMORY_FOCUS_ZOOM), offset: [mapPanelOffset(), 0], duration: 700 });
   }
 
   function clearPlaceTo(level: 'country' | 'city' | 'suburb') {
@@ -400,7 +410,7 @@
       localStorage.setItem(KEY_STORAGE, key);
       localStorage.setItem(DETAIL_STORAGE, 'true');
       tileKey = key;
-      map.setMaxZoom(18);
+      map.setMaxZoom(MAP_MAX_ZOOM);
       map.setStyle(styleUrl);
       detailedMap = true;
       showTileSettings = false;
@@ -413,7 +423,7 @@
   function useOfflineMap() {
     if (!map) return;
     map.setStyle(OFFLINE_STYLE);
-    map.setMaxZoom(6);
+    map.setMaxZoom(MAP_MAX_ZOOM);
     localStorage.setItem(DETAIL_STORAGE, 'false');
     detailedMap = false;
     showTileSettings = false;
@@ -422,11 +432,11 @@
   onMount(() => {
     maplibregl.setWorkerUrl(mapWorkerUrl);
     try { keyInput = localStorage.getItem(KEY_STORAGE) || import.meta.env.VITE_MAPTILER_KEY || ''; } catch {}
-    map = new maplibregl.Map({ container, style: OFFLINE_STYLE, center: [0, 24], zoom: 1.7, minZoom: 1, maxZoom: 6, attributionControl: false });
+    map = new maplibregl.Map({ container, style: OFFLINE_STYLE, center: [0, 24], zoom: 1.7, minZoom: 1, maxZoom: MAP_MAX_ZOOM, attributionControl: false });
     map.scrollZoom.setZoomRate(1 / 80);
     map.scrollZoom.setWheelZoomRate(1 / 300);
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
     map.on('style.load', () => {
       for (const marker of markers.values()) marker.remove();
       markers.clear();
@@ -563,9 +573,9 @@
   .map-actions button, .settings-buttons button { border: 0; border-radius: 9px; background: #f7f9fc; color: #162537; padding: 8px 10px; display: inline-flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; cursor: pointer; }
   .map-actions button:disabled { opacity: .55; cursor: not-allowed; }
   .map-actions button:hover:not(:disabled), .settings-buttons button:hover { background: #d9efff; }
-  .offline-label { bottom: 10px; left: 16px; color: #c2d4df; font-size: 10px; background: #111923dc; border-radius: 6px; padding: 5px 7px; }
-  .density-legend { position: absolute; z-index: 3; left: 16px; bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 9px; align-items: center; width: 148px; padding: 8px 10px; border-radius: 8px; background: #111923e8; color: #cbdde8; font-size: 9px; }
-  .density-legend.with-offline-label { bottom: 42px; }
+  .offline-label { bottom: 42px; left: 16px; color: #c2d4df; font-size: 10px; background: #111923dc; border-radius: 6px; padding: 5px 7px; }
+  .density-legend { position: absolute; z-index: 3; left: 16px; bottom: 42px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 9px; align-items: center; width: 148px; padding: 8px 10px; border-radius: 8px; background: #111923e8; color: #cbdde8; font-size: 9px; }
+  .density-legend.with-offline-label { bottom: 72px; }
   .density-legend strong { grid-column: 1 / -1; color: #f2f8fc; font-size: 10px; margin-bottom: 6px; }
   .density-scale { grid-column: 1 / -1; height: 7px; border-radius: 99px; background: linear-gradient(90deg, #167db4, #20b5d4, #77d9df, #f4dd6d, #fff2b0); margin-bottom: 4px; }
   .density-legend span:last-child { text-align: right; }
@@ -625,16 +635,15 @@
   :global(.memory-map-pin-photo) { position: absolute; inset: 0; overflow: hidden; border-radius: 8px; }
   :global(.memory-map-pin-main) { display: block; width: 100%; height: 100%; object-fit: cover; }
   :global(.memory-map-pin-pip) { position: absolute; left: 4%; top: 4%; width: 40%; aspect-ratio: 3 / 4; border: 2px solid white; border-radius: 6px; object-fit: cover; box-shadow: 0 2px 7px #06111eb8; }
-  :global(.memory-map-pin-count) { position: absolute; z-index: 1; right: -11px; top: -12px; min-width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 99px; background: #ffe66b; color: #13293b; font-size: 11px; font-weight: 850; padding: 0 6px; box-shadow: 0 2px 8px #06111eb0; }
+  :global(.memory-map-pin-count) { position: absolute; z-index: 1; right: 8px; top: 8px; min-width: 24px; height: 24px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 99px; background: #ffe66b; color: #13293b; font-size: 11px; font-weight: 850; padding: 0 5px; box-shadow: 0 2px 8px #06111eb0; }
   :global(.memory-map-cluster) { width: var(--cluster-size, 42px); height: var(--cluster-size, 42px); display: grid; place-items: center; padding: 0; border: 3px solid #c2efff; border-radius: 50%; background: #f5f9ff; color: #112338; font-size: 13px; font-weight: 850; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: 0 4px 14px #06111ec9, 0 0 0 5px #d8f4ff45; }
   :global(.memory-map-pin:focus-visible), button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #87d7ff; outline-offset: 3px; }
   :global(.maplibregl-control-container) { color: #173247; }
-  .memories-map-shell :global(.maplibregl-ctrl-bottom-right) { right: 458px; bottom: 10px; }
-  .memories-map-shell.panel-collapsed :global(.maplibregl-ctrl-bottom-right) { right: 206px; }
+  .memories-map-shell :global(.maplibregl-ctrl-top-left) { left: 16px; top: 108px; z-index: 3; }
+  .memories-map-shell :global(.maplibregl-ctrl-top-left .maplibregl-ctrl) { margin: 0; }
   @media (max-width: 1100px) {
     .map-results { width: 360px; }
     .map-results.group-open { width: 380px; }
     .row-thumbnail { width: 92px; }
-    .memories-map-shell :global(.maplibregl-ctrl-bottom-right) { right: 398px; }
   }
 </style>

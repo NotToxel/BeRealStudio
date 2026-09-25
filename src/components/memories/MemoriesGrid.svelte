@@ -840,7 +840,7 @@
   }
 
   .loc-tooltip-action {
-    color: #7dd3fc;
+    color: var(--text-secondary);
     font-size: 10px;
     font-weight: 700;
   }
@@ -919,7 +919,7 @@
   }
 
   .card-loc-pill.is-link {
-    color: #7dd3fc;
+    color: var(--text-muted);
     cursor: pointer;
     text-decoration: underline;
     text-decoration-color: transparent;
@@ -929,8 +929,8 @@
 
   .card-loc-pill.is-link:hover,
   .card-loc-pill.is-link:focus-visible {
-    color: #e0f2fe;
-    text-decoration-color: currentColor;
+    color: var(--text-main);
+    text-decoration-color: var(--text-secondary);
   }
 
   .card-loc-pill.is-link:focus-visible {

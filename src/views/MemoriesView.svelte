@@ -276,7 +276,6 @@
     position: sticky;
     top: -18px;
     z-index: 60;
-    background: var(--bg-main);
     padding: 10px 0 12px 0;
     display: flex;
     flex-direction: column;

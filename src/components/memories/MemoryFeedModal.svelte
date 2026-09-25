@@ -644,7 +644,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: #7dd3fc;
+    color: var(--text-secondary);
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -657,8 +657,8 @@
 
   .location-link:hover,
   .location-link:focus-visible {
-    color: #e0f2fe;
-    text-decoration-color: currentColor;
+    color: var(--text-main);
+    text-decoration-color: var(--text-secondary);
   }
 
   .location-link:focus-visible {
