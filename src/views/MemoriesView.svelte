@@ -6,6 +6,7 @@
     memoriesLoadProgress,
     memoriesLoadError,
     activeExplorerView,
+    mapFocusMemory,
     activeFeedMemory,
     loadMemories,
   } from '$lib/memoriesStore';
@@ -29,12 +30,15 @@
   let selectedPathInput = $lastScannedArchivePath || '';
   let MemoriesMapComponent: typeof import('$components/memories/MemoriesMap.svelte').default | null = null;
 
-  async function showMap() {
+  function showMap() {
+    mapFocusMemory.set(null);
     activeExplorerView.set('map');
-    if (!MemoriesMapComponent) {
-      const module = await import('$components/memories/MemoriesMap.svelte');
+  }
+
+  $: if ($activeExplorerView === 'map' && !MemoriesMapComponent) {
+    import('$components/memories/MemoriesMap.svelte').then((module) => {
       MemoriesMapComponent = module.default;
-    }
+    });
   }
 
   onMount(() => {

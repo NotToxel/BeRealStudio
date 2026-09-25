@@ -1997,13 +1997,13 @@
   }
 
   .morph-stage.mode-pip .layer-secondary {
-    top: 14px;
-    left: 14px;
-    width: 30%;
-    aspect-ratio: 3 / 4;
-    border-radius: 12px;
-    border: 2.5px solid #000000;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+    top: 2.08333%;
+    left: 2.77778%;
+    width: 30.37037%;
+    aspect-ratio: 82 / 109;
+    border-radius: 10.06% / 7.57%;
+    border: 1px solid #000000;
+    box-shadow: none;
     z-index: 10;
     background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
   }

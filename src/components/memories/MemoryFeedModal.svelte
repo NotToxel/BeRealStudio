@@ -17,6 +17,7 @@
     showMemoryDebugBadges,
     formatMemoryLocation,
     formatMemoryTimeTag,
+    showMemoryOnMap,
   } from '$lib/memoriesStore';
   import { exportSingleMemory } from '$lib/tauri';
   import { save } from '@tauri-apps/plugin-dialog';
@@ -186,6 +187,11 @@
     closeFeed();
   }
 
+  function handleShowOnMap(memory: ExplorerMemory) {
+    handleClose();
+    showMemoryOnMap(memory);
+  }
+
   $: userName = $explorerData?.userName || 'toxel';
   $: profilePic = $explorerData?.profilePictureDataUrl || '';
 </script>
@@ -277,7 +283,11 @@
                   {#if locText || timeText}
                     <div class="user-subtitle-row">
                       {#if locText}
-                        <span class="location-text">{locText}</span>
+                        {#if memory.location}
+                          <button type="button" class="location-text location-link" title="Show on map" aria-label="Show {locText} on map" on:click={() => handleShowOnMap(memory)}>{locText}</button>
+                        {:else}
+                          <span class="location-text">{locText}</span>
+                        {/if}
                       {/if}
                       {#if locText && timeText}
                         <span class="subtitle-bullet">•</span>
@@ -627,6 +637,34 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .location-link {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #7dd3fc;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+  }
+
+  .location-link:hover,
+  .location-link:focus-visible {
+    color: #e0f2fe;
+    text-decoration-color: currentColor;
+  }
+
+  .location-link:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
 
   .subtitle-bullet {

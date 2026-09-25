@@ -222,7 +222,7 @@ export function loadDemoActiveJobs() {
         { level: 'Info', message: 'Scanning archive ZIP with streaming JSON reader...', timestamp: new Date().toISOString() },
         { level: 'Info', message: 'Found 190 valid post memory pairs across 12 months.', timestamp: new Date().toISOString() },
         { level: 'Info', message: 'Spawning Rayon threadpool with 8 CPU worker cores.', timestamp: new Date().toISOString() },
-        { level: 'Info', message: 'Compositing Picture-in-Picture lenses (60px radius, 7px border)...', timestamp: new Date().toISOString() },
+        { level: 'Info', message: 'Compositing Picture-in-Picture lenses (33px radius, 4px border at 1080px width)...', timestamp: new Date().toISOString() },
       ],
     },
   ];

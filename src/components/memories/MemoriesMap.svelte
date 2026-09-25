@@ -4,7 +4,7 @@
   import type { GeoJSONSource, Marker } from 'maplibre-gl';
   import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { explorerFilter, filteredMemories, getMediaDataUrl, getSafeImageSrc, openFeedAt } from '$lib/memoriesStore';
+  import { explorerFilter, filteredMemories, mapFocusMemory, getMediaDataUrl, getSafeImageSrc, openFeedAt } from '$lib/memoriesStore';
   import { getLocatedMemories, getMemoryCover, getMemoryPlaces, isInsideMapBounds, type LocatedMemory, type PlaceLevel } from '$lib/memoriesMap';
   import MapPin from 'lucide-svelte/icons/map-pin';
   import Layers from 'lucide-svelte/icons/layers';
@@ -32,6 +32,7 @@
   let map: maplibregl.Map | null = null;
   let markers = new Map<string, Marker>();
   let clusterMarkers = new Map<number, Marker>();
+  let focusedMarker: Marker | null = null;
   let groupedPoints = new Map<string, PointGroup>();
   let visibleItems: LocatedMemory[] = [];
   let selectedGroup: PointGroup | null = null;
@@ -50,12 +51,20 @@
   let markerFrame = 0;
   let lastMarkerUpdate = 0;
   let resizeObserver: ResizeObserver | undefined;
+  let lastFocusedMemoryId: string | null = null;
 
   $: located = getLocatedMemories($filteredMemories);
   $: placeLevel = ($explorerFilter.selectedCountry === 'all' ? 'country' : $explorerFilter.selectedCity === 'all' ? 'city' : 'suburb') as PlaceLevel;
   $: places = getMemoryPlaces(located, placeLevel);
   $: unmappedCount = $filteredMemories.length - located.length;
   $: if (map && mapReady && located) updateSource();
+  $: if (map && mapReady && $mapFocusMemory && $mapFocusMemory.id !== lastFocusedMemoryId) {
+    const target = located.find((item) => item.memory.id === $mapFocusMemory?.id);
+    if (target) {
+      lastFocusedMemoryId = target.memory.id;
+      focusMemory(target);
+    }
+  }
 
   function makeGroups(items: LocatedMemory[]): Map<string, PointGroup> {
     const groups = new Map<string, PointGroup>();
@@ -147,6 +156,12 @@
   function updateSource() {
     if (!map) return;
     groupedPoints = makeGroups(located);
+    if (lastFocusedMemoryId && !located.some((item) => item.memory.id === lastFocusedMemoryId)) {
+      focusedMarker?.remove();
+      focusedMarker = null;
+      lastFocusedMemoryId = null;
+      mapFocusMemory.set(null);
+    }
     const source = map.getSource('memories') as GeoJSONSource | undefined;
     if (source) source.setData(toFeatureCollection());
     const heatSource = map.getSource('memory-heat-data') as GeoJSONSource | undefined;
@@ -342,7 +357,13 @@
     if (!map) return;
     const group = groupedPoints.get(`${item.latitude.toFixed(5)},${item.longitude.toFixed(5)}`);
     if (group) selectGroup(group);
-    map.easeTo({ center: [item.longitude, item.latitude], zoom: Math.max(map.getZoom(), detailedMap ? 9 : 4.5), offset: [mapPanelOffset(), 0], duration: 300 });
+    focusedMarker?.remove();
+    const pin = createPin(group ?? { key: item.memory.id, items: [item], latitude: item.latitude, longitude: item.longitude });
+    pin.classList.add('is-focused');
+    pin.setAttribute('aria-label', `Selected memory from ${item.memory.dateFormatted}`);
+    focusedMarker = new maplibregl.Marker({ element: pin, anchor: 'bottom', offset: [0, -13] })
+      .setLngLat([item.longitude, item.latitude]).addTo(map);
+    map.easeTo({ center: [item.longitude, item.latitude], zoom: Math.max(map.getZoom(), detailedMap ? 14 : 5.5), offset: [mapPanelOffset(), 0], duration: 450 });
   }
 
   function clearPlaceTo(level: 'country' | 'city' | 'suburb') {
@@ -413,7 +434,10 @@
       clusterMarkers.clear();
       groupedPoints = makeGroups(located);
       installLayers();
-      if (!mapReady) { mapReady = true; setTimeout(() => fitItems(located), 50); }
+      if (!mapReady) {
+        mapReady = true;
+        if (!$mapFocusMemory) setTimeout(() => fitItems(located), 50);
+      }
     });
     map.on('move', queueViewportUpdate);
     map.on('moveend', updateViewport);
@@ -432,6 +456,8 @@
     markers.clear();
     for (const marker of clusterMarkers.values()) marker.remove();
     clusterMarkers.clear();
+    focusedMarker?.remove();
+    focusedMarker = null;
     map?.remove();
     map = null;
   });
@@ -593,6 +619,8 @@
   .map-empty h3 { margin: 8px 0; font-size: 16px; }
   .map-empty p { margin: 0; color: #bed1dd; font-size: 12px; line-height: 1.5; }
   :global(.memory-map-pin) { display: block; position: absolute; box-sizing: border-box; width: 96px; height: 128px; padding: 0; border: 3px solid white; border-radius: 12px; background: #22435b; box-shadow: 0 4px 14px #06111ec0; cursor: pointer; }
+  :global(.memory-map-pin.is-focused) { z-index: 2; border-color: #7dd3fc; box-shadow: 0 8px 22px #06111ed9, 0 0 0 4px #7dd3fc66; }
+  :global(.memory-map-pin.is-focused::after) { background: #7dd3fc; }
   :global(.memory-map-pin::after) { content: ''; position: absolute; left: calc(50% - 10px); bottom: -13px; width: 20px; height: 13px; background: white; clip-path: polygon(0 0, 100% 0, 50% 100%); }
   :global(.memory-map-pin-photo) { position: absolute; inset: 0; overflow: hidden; border-radius: 8px; }
   :global(.memory-map-pin-main) { display: block; width: 100%; height: 100%; object-fit: cover; }
