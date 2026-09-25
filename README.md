@@ -68,9 +68,10 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 
 ## ✨ Key Features
 
-### 📱 1. Native Memories & Calendar Explorer
+### 📱 1. Native Memories, Calendar & Map Explorer
 - **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
-- **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** (with viewport-filling timeline scrubber) and an interactive **Monthly Calendar Matrix** (with pinned sticky navigation).
+- **Three View Modes**: Switch between a responsive **Memories Card Grid**, an interactive **Monthly Calendar Matrix**, and a location **Map**.
+- **Memories Map**: Explore geotagged posts on a dark map with dual-camera photo pins, proximity clusters, broad-area density, and a results panel that follows the visible area. Places drills from country to city to suburb using the explorer filters. Select a crowded location to browse all its photos in a gallery and open any memory in the feed. The included Natural Earth world overview works offline.
 - **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
 - **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
 - **Interactive Dual-Camera Frame**:
@@ -86,6 +87,10 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
   - **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos directly into JPEG headers via Samsung SEFH binary trailers and Google MicroVideo XMP.
   - **Raw Media Clips & Camera Isolations**: Export primary camera, selfie camera, or raw MP4 video clips independently.
 - **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
+
+#### Detailed map tiles
+
+Open **Memories → Map → Offline map**, paste your MapTiler API key, and choose **Use detailed map**. The key is saved only in this app's local storage. Street detail and place labels need an internet connection; the world outline, pins, clustering, filters, and place list work without one. MapTiler receives tile requests for the area you view and your IP address, while BeReal photos and pin coordinates remain on your device. You can switch back to the offline map from the same control.
 
 ---
 

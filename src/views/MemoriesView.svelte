@@ -18,6 +18,7 @@
 
   import Images from 'lucide-svelte/icons/images';
   import Calendar from 'lucide-svelte/icons/calendar';
+  import Map from 'lucide-svelte/icons/map';
   import FolderOpen from 'lucide-svelte/icons/folder-open';
   import AlertTriangle from 'lucide-svelte/icons/triangle-alert';
   import RefreshCw from 'lucide-svelte/icons/refresh-cw';
@@ -26,6 +27,15 @@
   import { isDemoExplicitlyRequested } from '$lib/devMode';
 
   let selectedPathInput = $lastScannedArchivePath || '';
+  let MemoriesMapComponent: typeof import('$components/memories/MemoriesMap.svelte').default | null = null;
+
+  async function showMap() {
+    activeExplorerView.set('map');
+    if (!MemoriesMapComponent) {
+      const module = await import('$components/memories/MemoriesMap.svelte');
+      MemoriesMapComponent = module.default;
+    }
+  }
 
   onMount(() => {
     if (isDemoExplicitlyRequested()) {
@@ -55,7 +65,7 @@
           <span class="title-text">Memories Explorer</span>
         </div>
 
-        <!-- Segmented View Tabs (Memories | Calendar) -->
+        <!-- Segmented View Tabs -->
         <div class="segmented-view-picker">
           <button
             type="button"
@@ -75,6 +85,15 @@
           >
             <Calendar size={14} />
             <span>Calendar</span>
+          </button>
+          <button
+            type="button"
+            class="segment-btn"
+            class:active={$activeExplorerView === 'map'}
+            on:click={showMap}
+          >
+            <Map size={14} />
+            <span>Map</span>
           </button>
         </div>
       </div>
@@ -133,7 +152,7 @@
         <div class="connect-text">
           <h2 class="title-md">Connect Your BeReal Archive</h2>
           <p class="text-secondary text-sm">
-            Select your unextracted BeReal export <code>.zip</code> or photos folder to explore your memories grid and calendar.
+            Select your unextracted BeReal export <code>.zip</code> or photos folder to explore your memories grid, calendar, and map.
           </p>
         </div>
       </div>
@@ -177,10 +196,19 @@
         <div class="explorer-view-stage" class:is-active={$activeExplorerView === 'calendar'} aria-hidden={$activeExplorerView !== 'calendar'}>
           <CalendarGrid />
         </div>
+        {#if $activeExplorerView === 'map'}
+          <div class="explorer-view-stage is-active map-stage">
+            {#if MemoriesMapComponent}
+              <svelte:component this={MemoriesMapComponent} />
+            {:else}
+              <div class="map-loading">Preparing map…</div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <!-- Floating Bottom-Left Perspective Toggle Pill -->
-      <PerspectiveSwitcher variant="floating-window" />
+      {#if $activeExplorerView !== 'map'}<PerspectiveSwitcher variant="floating-window" />{/if}
     </div>
   {/if}
 </div>
@@ -244,11 +272,8 @@
     position: sticky;
     top: -18px;
     z-index: 60;
-    background: rgba(9, 9, 12, 0.94);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: var(--bg-main);
     padding: 10px 0 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -370,6 +395,18 @@
 
   .explorer-view-stage.is-active {
     display: block;
+  }
+
+  .explorer-view-stage.is-active.map-stage {
+    display: flex;
+  }
+
+  .map-loading {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    color: var(--text-secondary);
+    font-size: 13px;
   }
 
   /* Connect Archive Card */

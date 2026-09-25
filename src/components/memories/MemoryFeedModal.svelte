@@ -214,7 +214,7 @@
           type="button"
           class="back-nav-btn"
           on:click={handleClose}
-          title="Back to Grid / Calendar (Esc)"
+          title="Back to Memories Explorer (Esc)"
           aria-label="Close feed"
         >
           <ArrowLeft size={16} />

@@ -1,6 +1,6 @@
 [package]
 name = "bereal-studio"
-version = "2.3.2"
+version = "2.4.0"
 description = "High-performance native backend for BeReal Studio — process and recap your BeReal GDPR data exports"
 authors = ["BeReal Studio"]
 edition = "2021"

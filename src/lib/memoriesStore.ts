@@ -23,7 +23,7 @@ export const isLoadingMemories = writable<boolean>(false);
 export const memoriesLoadProgress = writable<{ percentage: number; stage: string }>({ percentage: 0, stage: 'Preparing archive...' });
 export const memoriesLoadError = writable<string | null>(null);
 
-export const activeExplorerView = writable<'grid' | 'calendar'>('grid');
+export const activeExplorerView = writable<'grid' | 'calendar' | 'map'>('grid');
 export const activeFeedMemory = writable<ExplorerMemory | null>(null);
 export const activeFeedIndex = writable<number | null>(null);
 
