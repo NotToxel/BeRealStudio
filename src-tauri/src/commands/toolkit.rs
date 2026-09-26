@@ -238,7 +238,9 @@ pub async fn check_toolkit_conflicts(config: ToolkitConfig) -> Result<Destinatio
 
         // 4. Live Photos
         if config.create_live_photos {
-            if dir_live_photos.join(format!("{}_combined.jpg", time_str)).exists()
+            if dir_live_photos.join(format!("{}_combined.pvt", time_str)).exists()
+                || dir_live_photos.join(format!("{}_combined_reversed.pvt", time_str)).exists()
+                || dir_live_photos.join(format!("{}_combined.jpg", time_str)).exists()
                 || dir_live_photos.join(format!("{}_combined.mov", time_str)).exists()
             {
                 conflicting_files_count += 1;
@@ -633,15 +635,19 @@ fn run_toolkit(
                         if config.create_live_photos {
                             if let Some(bts) = bts_path {
                                 if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) && actual_dest.extension().map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg")).unwrap_or(false) {
-                                    match live_photo::create_apple_live_photo_pair(
-                                        &actual_dest,
-                                        bts,
-                                        &dir_live_photos,
-                                        &format!("{}_combined", timestamp),
-                                        dt,
-                                        location.as_ref(),
-                                        caption.as_deref(),
-                                    ) {
+                                    let base_name = format!("{}_combined", timestamp);
+                                    let result = if config.package_live_photos {
+                                        live_photo::create_apple_live_photo_package(
+                                            &actual_dest, bts, &dir_live_photos.join(format!("{}.pvt", base_name)),
+                                            dt, location.as_ref(), caption.as_deref(),
+                                        ).map(|_| ())
+                                    } else {
+                                        live_photo::create_apple_live_photo_pair(
+                                            &actual_dest, bts, &dir_live_photos, &base_name,
+                                            dt, location.as_ref(), caption.as_deref(),
+                                        ).map(|_| ())
+                                    };
+                                    match result {
                                         Ok(_) => { live_photos_created.fetch_add(1, Ordering::Relaxed); }
                                         Err(e) => emitter.warn(format!("Apple Live Photo pair failed for {}: {}", actual_dest.display(), e)),
                                     }
@@ -667,15 +673,22 @@ fn run_toolkit(
                         if config.create_live_photos {
                             if let Some(bts) = bts_path {
                                 if bts.exists() && matches!(config.convert_format, OutputFormat::Jpeg) && actual_dest.extension().map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg")).unwrap_or(false) {
-                                    let _ = live_photo::create_apple_live_photo_pair(
-                                        &actual_dest,
-                                        bts,
-                                        &dir_live_photos,
-                                        &format!("{}_combined_reversed", timestamp),
-                                        dt,
-                                        location.as_ref(),
-                                        caption.as_deref(),
-                                    );
+                                    let base_name = format!("{}_combined_reversed", timestamp);
+                                    let result = if config.package_live_photos {
+                                        live_photo::create_apple_live_photo_package(
+                                            &actual_dest, bts, &dir_live_photos.join(format!("{}.pvt", base_name)),
+                                            dt, location.as_ref(), caption.as_deref(),
+                                        ).map(|_| ())
+                                    } else {
+                                        live_photo::create_apple_live_photo_pair(
+                                            &actual_dest, bts, &dir_live_photos, &base_name,
+                                            dt, location.as_ref(), caption.as_deref(),
+                                        ).map(|_| ())
+                                    };
+                                    match result {
+                                        Ok(_) => { live_photos_created.fetch_add(1, Ordering::Relaxed); }
+                                        Err(e) => emitter.warn(format!("Apple Live Photo pair failed for reversed composite {}: {}", actual_dest.display(), e)),
+                                    }
                                 }
                             }
                         }

@@ -158,8 +158,8 @@
     const cRect = containerEl.getBoundingClientRect();
     cachedContainerW = cRect.width;
     cachedContainerH = cRect.height;
-    cachedPipW = cRect.width * 0.3047;
-    cachedPipH = cachedPipW * (4 / 3);
+    cachedPipW = cRect.width * (328 / 1080);
+    cachedPipH = cachedPipW * (436 / 328);
 
     const pipEl = containerEl.querySelector('.pip-frame-wrapper') as HTMLElement;
     if (pipEl) {
@@ -982,6 +982,7 @@
 <style>
   .bereal-frame-container {
     position: relative;
+    container-type: inline-size;
     width: 100%;
     aspect-ratio: 3 / 4;
     border-radius: 16px;
@@ -1362,11 +1363,11 @@
     right: 14px;
   }
 
-  /* Movable Inset PIP Positioning matching 100% exact BeReal measurements */
+  /* Native 1080x1440 export: inset (30, 30), 328x436. */
   .pip-frame-wrapper {
     position: absolute;
-    width: 30.47%;
-    aspect-ratio: 3 / 4;
+    width: 30.37037%;
+    aspect-ratio: 82 / 109;
     z-index: 25;
     transition: top 0.22s cubic-bezier(0.16, 1, 0.3, 1), left 0.22s cubic-bezier(0.16, 1, 0.3, 1), right 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -1377,25 +1378,25 @@
   }
 
   .pip-frame-wrapper.corner-top-left {
-    top: 3.78%;
-    left: 3.78%;
+    top: 2.08333%;
+    left: 2.77778%;
   }
 
   .pip-frame-wrapper.corner-top-right {
-    top: 3.78%;
-    right: 3.78%;
+    top: 2.08333%;
+    right: 2.77778%;
     left: auto;
   }
 
   .pip-frame-wrapper.corner-bottom-left {
-    bottom: 3.78%;
-    left: 3.78%;
+    bottom: 2.08333%;
+    left: 2.77778%;
     top: auto;
   }
 
   .pip-frame-wrapper.corner-bottom-right {
-    bottom: 3.78%;
-    right: 3.78%;
+    bottom: 2.08333%;
+    right: 2.77778%;
     top: auto;
     left: auto;
   }
@@ -1408,26 +1409,10 @@
     background: #000000;
     padding: 0;
     box-sizing: border-box;
+    border: max(0.5px, 0.37037cqw) solid #000000;
+    border-radius: 10.06% / 7.57%;
+    box-shadow: none;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
-  }
-
-  /* Size-scaled borders and circular corner radii matching 16.24% continuous curvature */
-  .size-sm .pip-frame {
-    border-radius: 5px;
-    border: 1.5px solid #000000;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
-  }
-
-  .size-md .pip-frame {
-    border-radius: 9px;
-    border: 2.5px solid #000000;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.85);
-  }
-
-  .size-lg .pip-frame {
-    border-radius: 18px;
-    border: 4px solid #000000;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.9);
   }
 
   .pip-glass-placeholder {

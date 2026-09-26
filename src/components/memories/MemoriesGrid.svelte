@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { filteredMemories, openFeedAt, openContextMenu, memoryHeaderSettings, isFirstBeRealOfDay } from '$lib/memoriesStore';
+  import { filteredMemories, openFeedAt, openContextMenu, memoryHeaderSettings, isFirstBeRealOfDay, showMemoryOnMap } from '$lib/memoriesStore';
   import type { ExplorerMemory } from '$lib/types';
   import DualCameraFrame from './DualCameraFrame.svelte';
   import Images from 'lucide-svelte/icons/images';
@@ -359,7 +359,7 @@
                   tabindex="0"
                   on:click={() => handleMemoryClick(memory)}
                   on:contextmenu={(e) => openContextMenu(e, memory)}
-                  on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleMemoryClick(memory)}
+                  on:keydown={(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && handleMemoryClick(memory)}
                   aria-label="BeReal from {memory.dateFormatted} at {memory.timeFormatted || 'unknown time'}"
                 >
                   <DualCameraFrame
@@ -426,10 +426,17 @@
 
                       {#if memory.locationName || memory.location}
                         <div class="card-loc-wrap">
-                          <div class="card-loc-pill" aria-label={memory.locationName || 'Location'}>
-                            <MapPin size={10} class="flex-shrink-0" />
-                            <span class="card-loc-text">{memory.city || memory.locationName}</span>
-                          </div>
+                          {#if memory.location}
+                            <button type="button" class="card-loc-pill is-link" aria-label="Show {memory.locationName || memory.city || 'this memory'} on map" on:click|stopPropagation={() => showMemoryOnMap(memory)}>
+                              <MapPin size={10} class="flex-shrink-0" />
+                              <span class="card-loc-text">{memory.city || memory.locationName || 'Location'}</span>
+                            </button>
+                          {:else}
+                            <span class="card-loc-pill">
+                              <MapPin size={10} class="flex-shrink-0" />
+                              <span class="card-loc-text">{memory.city || memory.locationName}</span>
+                            </span>
+                          {/if}
                           <!-- Rich Location Tooltip Popover -->
                           <div class="loc-rich-tooltip" role="tooltip">
                             <div class="loc-tooltip-title">{memory.locationName || 'Location'}</div>
@@ -437,6 +444,7 @@
                               <div class="loc-tooltip-coords font-mono">
                                 {memory.location.latitude.toFixed(4)}°, {memory.location.longitude.toFixed(4)}°
                               </div>
+                              <div class="loc-tooltip-action">Click to view on map</div>
                             {/if}
                             <div class="tooltip-tip-arrow"></div>
                           </div>
@@ -740,6 +748,11 @@
     transform: translateX(-50%) translateY(0);
   }
 
+  .card-loc-wrap:focus-within .loc-rich-tooltip {
+    opacity: 1;
+    visibility: visible;
+  }
+
   /* Align right-hand meta tooltips to the right edge to avoid screen overflow */
   .card-meta-right .loc-rich-tooltip,
   .card-meta-right .late-rich-tooltip {
@@ -826,6 +839,12 @@
     color: #38bdf8;
   }
 
+  .loc-tooltip-action {
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
   .card-late-wrap {
     position: relative;
     display: inline-flex;
@@ -893,7 +912,31 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 72px;
-    cursor: help;
+    border: 0;
+    padding: 0;
+    background: none;
+    font-family: inherit;
+  }
+
+  .card-loc-pill.is-link {
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+    transition: color 0.16s ease, text-decoration-color 0.16s ease;
+  }
+
+  .card-loc-pill.is-link:hover,
+  .card-loc-pill.is-link:focus-visible {
+    color: var(--text-main);
+    text-decoration-color: var(--text-secondary);
+  }
+
+  .card-loc-pill.is-link:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 3px;
+    border-radius: 2px;
   }
 
   .card-loc-text {

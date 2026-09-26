@@ -23,11 +23,39 @@ export const isLoadingMemories = writable<boolean>(false);
 export const memoriesLoadProgress = writable<{ percentage: number; stage: string }>({ percentage: 0, stage: 'Preparing archive...' });
 export const memoriesLoadError = writable<string | null>(null);
 
-export const activeExplorerView = writable<'grid' | 'calendar'>('grid');
+export const activeExplorerView = writable<'grid' | 'calendar' | 'map'>('grid');
+export const mapFocusMemory = writable<ExplorerMemory | null>(null);
 export const activeFeedMemory = writable<ExplorerMemory | null>(null);
 export const activeFeedIndex = writable<number | null>(null);
 
+export function showMemoryOnMap(memory: ExplorerMemory) {
+  if (!memory.location) return;
+  mapFocusMemory.set(memory);
+  activeExplorerView.set('map');
+}
+
 export const explorerFilter = writable<ExplorerFilterState>({ ...initialFilterState });
+
+function matchesMemorySearch(m: ExplorerMemory, query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+
+  const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
+  const locationMatch =
+    (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
+    (m.city ? m.city.toLowerCase().includes(q) : false) ||
+    (m.country ? m.country.toLowerCase().includes(q) : false) ||
+    (m.locationName && !m.locationName.includes('°') && !/^-?\d+(\.\d+)?,\s*-?\d+/.test(m.locationName)
+      ? m.locationName.toLowerCase().includes(q)
+      : false);
+
+  const isoDate = `${m.year}-${String(m.month).padStart(2, '0')}-${String(m.day).padStart(2, '0')}`;
+  const isoDateTime = m.takenAt.replace(/(\.\d{3})?Z$/, '').replace(/([+-]\d{2}:?\d{2})$/, '');
+  const dateMatch = [m.dateFormatted, m.monthKey, isoDate, isoDateTime, m.takenAt, m.timeFormatted]
+    .some((value) => value.toLowerCase().includes(q));
+
+  return captionMatch || locationMatch || dateMatch;
+}
 
 // Global Audio settings (default muted state and volume level)
 export interface GlobalAudioSettings {
@@ -116,21 +144,7 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
 
     return $data.memories.filter((m: ExplorerMemory) => {
       // 1. Text search (caption, suburb, city, country, human-readable date)
-      if ($filter.searchQuery.trim()) {
-        const q = $filter.searchQuery.toLowerCase().trim();
-        const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
-        const locationMatch =
-          (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
-          (m.city ? m.city.toLowerCase().includes(q) : false) ||
-          (m.country ? m.country.toLowerCase().includes(q) : false) ||
-          (m.locationName && !m.locationName.includes('°') && !/^-?\d+(\.\d+)?,\s*-?\d+/.test(m.locationName)
-            ? m.locationName.toLowerCase().includes(q)
-            : false);
-        const dateMatch =
-          m.dateFormatted.toLowerCase().includes(q) ||
-          m.monthKey.includes(q);
-        if (!captionMatch && !locationMatch && !dateMatch) return false;
-      }
+      if (!matchesMemorySearch(m, $filter.searchQuery)) return false;
 
       // 2. Year filter
       if ($filter.selectedYear !== 'all' && m.year !== $filter.selectedYear) {
@@ -173,21 +187,7 @@ export const filteredMemories = derived<[typeof explorerData, typeof explorerFil
 
 // Helper for cross-dimension facet count calculation
 function matchesFacet(m: ExplorerMemory, filter: ExplorerFilterState, ignoreDim?: 'year' | 'month' | 'country' | 'city' | 'suburb'): boolean {
-  if (filter.searchQuery.trim()) {
-    const q = filter.searchQuery.toLowerCase().trim();
-    const captionMatch = m.caption ? m.caption.toLowerCase().includes(q) : false;
-    const locationMatch =
-      (m.suburb ? m.suburb.toLowerCase().includes(q) : false) ||
-      (m.city ? m.city.toLowerCase().includes(q) : false) ||
-      (m.country ? m.country.toLowerCase().includes(q) : false) ||
-      (m.locationName && !m.locationName.includes('°') && !/^-?\d+(\.\d+)?,\s*-?\d+/.test(m.locationName)
-        ? m.locationName.toLowerCase().includes(q)
-        : false);
-    const dateMatch =
-      m.dateFormatted.toLowerCase().includes(q) ||
-      m.monthKey.includes(q);
-    if (!captionMatch && !locationMatch && !dateMatch) return false;
-  }
+  if (!matchesMemorySearch(m, filter.searchQuery)) return false;
   if (ignoreDim !== 'year' && filter.selectedYear !== 'all' && m.year !== filter.selectedYear) return false;
   if (ignoreDim !== 'month' && filter.selectedMonth !== 'all' && m.monthKey !== filter.selectedMonth) return false;
   if (ignoreDim !== 'country' && filter.selectedCountry !== 'all' && m.country !== filter.selectedCountry) return false;
@@ -544,7 +544,7 @@ export function closeContextMenu() {
 
 // ─── Partitioned Export Preferences (Photos, Videos, BTS) ─────────────────────
 export interface PhotoExportPreferences {
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'motion_photo' | 'apple_live_photo';
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'motion_photo' | 'apple_live_photo' | 'apple_live_photo_pvt';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;

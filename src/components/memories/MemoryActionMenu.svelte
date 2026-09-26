@@ -85,18 +85,20 @@
     await handleExport('combined_pip');
   }
 
-  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo') {
+  async function handleExport(exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo' | 'apple_live_photo_pvt') {
     closeMenu();
     if (!memory.primaryPath) return;
 
     try {
       isExporting = true;
       const isVideo = exportType === 'bts_only';
-      const ext = isVideo ? 'mp4' : 'jpg';
+      const ext = isVideo ? 'mp4' : exportType === 'apple_live_photo_pvt' ? 'pvt' : 'jpg';
       const defaultFilename = `${memory.takenAt.slice(0, 10)}_${exportType}.${ext}`;
       const filters = isVideo
         ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
-        : [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }];
+        : exportType === 'apple_live_photo_pvt'
+          ? [{ name: 'Apple Live Photo package', extensions: ['pvt'] }]
+          : [{ name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }];
 
       const savePath = await save({
         defaultPath: defaultFilename,
@@ -290,6 +292,10 @@
           <button type="button" class="menu-item" on:click={() => handleExport('apple_live_photo')}>
             <Sparkles size={14} class="text-sky-400" />
             <span>Save Apple Live Photo (iOS)</span>
+          </button>
+          <button type="button" class="menu-item" on:click={() => handleExport('apple_live_photo_pvt')}>
+            <Sparkles size={14} class="text-sky-400" />
+            <span>Save Apple Live Photo package (.pvt)</span>
           </button>
         {/if}
       </div>

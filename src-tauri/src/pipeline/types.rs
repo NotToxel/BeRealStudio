@@ -133,6 +133,8 @@ pub struct ToolkitConfig {
     pub create_motion_photos: bool,
     #[serde(default)]
     pub create_live_photos: bool,
+    #[serde(default)]
+    pub package_live_photos: bool,
     pub embed_exif: bool,
     pub keep_original_filename: bool,
     pub cleanup_intermediates: bool,
@@ -153,6 +155,7 @@ impl Default for ToolkitConfig {
             create_reversed: false,
             create_motion_photos: false,
             create_live_photos: false,
+            package_live_photos: false,
             embed_exif: true,
             keep_original_filename: false,
             cleanup_intermediates: true,

@@ -22,14 +22,16 @@ Download the official standalone release for your platform from the [Latest Rele
 
 | Platform | Format / Architecture | Direct Download Link |
 | :--- | :--- | :--- |
-| <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_x64-setup.exe) |
+| <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit NSIS Setup) | [⬇️ **Download for Windows (Installer)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.6.0_x64-setup.exe) |
 | <img src="docs/icons/windows.svg" height="15" width="15" alt="Windows" style="vertical-align: middle;" /> **Windows** | `.exe` (64-bit Standalone) | [⬇️ **Download for Windows (Portable)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/bereal-studio.exe) |
-| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_aarch64.dmg) |
-| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.app.tar.gz` (Universal .app Bundle) | [⬇️ **Download for macOS (.app Bundle)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal-Studio-macOS.app.tar.gz) |
-| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_amd64.AppImage) |
-| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.3.2_amd64.deb) |
+| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.dmg` (Apple Silicon M1/M2/M3/M4) | [⬇️ **Download for macOS (Apple Silicon .dmg)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.6.0_aarch64.dmg) |
+| <img src="docs/icons/apple.svg" height="15" width="15" alt="macOS" style="vertical-align: middle;" /> **macOS** | `.app.tar.gz` (Apple Silicon .app Bundle) | [⬇️ **Download for macOS (.app Bundle)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal-Studio-macOS.app.tar.gz) |
+| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.AppImage` (x86_64 Universal) | [⬇️ **Download for Linux (.AppImage)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.6.0_amd64.AppImage) |
+| <img src="docs/icons/linux.svg" height="15" width="15" alt="Linux" style="vertical-align: middle;" /> **Linux** | `.deb` (Debian / Ubuntu x86_64) | [⬇️ **Download for Linux (.deb)**](https://github.com/NotToxel/BeRealStudio/releases/latest/download/BeReal.Studio_2.6.0_amd64.deb) |
 
 > 💡 *Looking for earlier releases, source archives, or release notes? Explore all [GitHub Releases](https://github.com/NotToxel/BeRealStudio/releases).*
+
+Read the [plain-language changelog](CHANGELOG.md) or the [full v2.6.0 release notes](docs/releases/v2.6.0.md).
 
 ---
 
@@ -40,7 +42,7 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 | Tool | Status | Purpose | Installation |
 | :--- | :--- | :--- | :--- |
 | **FFmpeg** | **Required for Videos** | Rendering recap videos (`.mp4`), audio sync, and video PIP compositing. | • <img src="docs/icons/windows.svg" height="13" width="13" alt="Windows" style="vertical-align: middle;" /> **Windows**: `winget install Gyan.FFmpeg`<br>• <img src="docs/icons/apple.svg" height="13" width="13" alt="macOS" style="vertical-align: middle;" /> **macOS**: `brew install ffmpeg`<br>• <img src="docs/icons/linux.svg" height="13" width="13" alt="Linux" style="vertical-align: middle;" /> **Linux**: `sudo apt install ffmpeg` |
-| **ExifTool** | **Optional / Recommended** | Extended video metadata & QuickTime `.mov` ContentIdentifier tagging.<br>*(**Note**: Photos, EXIF/IPTC restoration, Samsung motion photos, and Apple Live Photos use our built-in 100% pure Rust engine and do not require ExifTool).* | • <img src="docs/icons/windows.svg" height="13" width="13" alt="Windows" style="vertical-align: middle;" /> **Windows**: `winget install OliverBetz.ExifTool`<br>• <img src="docs/icons/apple.svg" height="13" width="13" alt="macOS" style="vertical-align: middle;" /> **macOS**: `brew install exiftool`<br>• <img src="docs/icons/linux.svg" height="13" width="13" alt="Linux" style="vertical-align: middle;" /> **Linux**: `sudo apt install libimage-exiftool-perl` |
+| **ExifTool** | **Optional / Recommended** | Extended photo and video metadata. Apple Live Photo pairing metadata does not require ExifTool; FFmpeg is required to create its paired `.mov`. | • <img src="docs/icons/windows.svg" height="13" width="13" alt="Windows" style="vertical-align: middle;" /> **Windows**: `winget install OliverBetz.ExifTool`<br>• <img src="docs/icons/apple.svg" height="13" width="13" alt="macOS" style="vertical-align: middle;" /> **macOS**: `brew install exiftool`<br>• <img src="docs/icons/linux.svg" height="13" width="13" alt="Linux" style="vertical-align: middle;" /> **Linux**: `sudo apt install libimage-exiftool-perl` |
 
 > 🔍 *You can check and verify your system's FFmpeg and ExifTool status anytime inside BeReal Studio under **Settings ⚙️ &rarr; System & Dependencies**.*
 
@@ -68,9 +70,10 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 
 ## ✨ Key Features
 
-### 📱 1. Native Memories & Calendar Explorer
+### 📱 1. Native Memories, Calendar & Map Explorer
 - **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
-- **Dual View Modes**: Switch effortlessly between a responsive **Memories Card Grid** (with viewport-filling timeline scrubber) and an interactive **Monthly Calendar Matrix** (with pinned sticky navigation).
+- **Three View Modes**: Switch between a responsive **Memories Card Grid**, an interactive **Monthly Calendar Matrix**, and a location **Map**.
+- **Memories Map**: Explore geotagged posts on a dark map with dual-camera photo pins, proximity clusters, broad-area density, and a results panel that follows the visible area. Places drills from country to city to suburb using the explorer filters. Select a crowded location to browse all its photos in a gallery and open any memory in the feed. The included Natural Earth world overview works offline.
 - **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
 - **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
 - **Interactive Dual-Camera Frame**:
@@ -82,10 +85,26 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
   - Live dynamic count tags on all filter chips and dimension selectors update continuously as multi-level filters are applied.
 - **Single-Memory Instant Export Dialog**:
   - **Picture-in-Picture & Side-by-Side**: High-resolution dual-camera composites with lossless EXIF restoration.
-  - **Apple Live Photo (.jpg + .mov pair)**: Generates matching Apple Content Identifier UUID metadata (`MakerApple:17` and `com.apple.quicktime.content.identifier`) recognized natively by macOS/iOS Apple Photos and iCloud.
+  - **Apple Live Photo (.jpg + .mov pair)**: Generates matching identifiers in the JPEG MakerNote and QuickTime MOV. A Windows-generated `.pvt` package was verified to import as one Live Photo on macOS 26.
   - **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos directly into JPEG headers via Samsung SEFH binary trailers and Google MicroVideo XMP.
   - **Raw Media Clips & Camera Isolations**: Export primary camera, selfie camera, or raw MP4 video clips independently.
 - **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
+
+#### Importing an Apple Live Photo
+
+The exporter writes a shared asset identifier to the JPEG MakerNote and movie-level QuickTime metadata. A Windows-generated `.pvt` package passed [makelive](https://github.com/RhetTbull/makelive)'s native check and imported into macOS 26 Photos as one Live Photo.
+
+1. Export **Apple Live Photo package (.pvt)**. It is an uncompressed directory containing a same-named `.jpg` and `.mov` plus `metadata.plist`. ZIP the directory for transfer, then extract it on the Mac. A ZIP renamed to `.pvt` is not a package.
+2. Double-click the extracted `.pvt` in Finder. Photos should import one asset with the **Live** badge; confirm the motion plays. For a diagnostic check, run `makelive --check memory.jpg memory.mov` against the files inside the package. It should report the shared asset ID.
+3. To get the Live Photo on iPhone, enable iCloud Photos on the Mac and iPhone with the same Apple Account, or AirDrop the imported Live Photo from **Mac Photos** to the iPhone. Transfer the Photos asset rather than its raw JPG/MOV files or ZIP.
+
+Batch exports are in `live_photos/`. Let iCloud Photos sync the imported asset to the iPhone, or share the asset from Photos using AirDrop. Sending raw files separately to an iPhone does not import them as one Live Photo. Export requires FFmpeg and a source BTS clip. This exporter does not yet write a QuickTime `still-image-time` timed metadata track, so key-frame behavior may differ from an iPhone capture. Live wallpaper eligibility is separate from Live Photo pairing.
+
+An `.xmp` sidecar is for IPTC details such as captions and keywords when Photos exports an unmodified original. It is not the Live Photo pairing identifier. The Google/Samsung Motion Photo XMP embedded in a JPEG is a different format and does not make an Apple Live Photo.
+
+#### Detailed map tiles
+
+Open **Memories → Map → Offline map**, paste your MapTiler API key, and choose **Use detailed map**. The key is saved only in this app's local storage. Street detail and place labels need an internet connection; the world outline, pins, clustering, filters, and place list work without one. MapTiler receives tile requests for the area you view and your IP address, while BeReal photos and pin coordinates remain on your device. You can switch back to the offline map from the same control.
 
 ---
 
@@ -131,8 +150,8 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 2. **Package Manager & JavaScript Runtime:**
    - **Bun (Recommended for ultra-fast startup):** Install via [bun.sh](https://bun.sh) (`powershell -c "irm bun.sh/install.ps1 | iex"`).
    - **NPM / PNPM / Yarn (Fully Supported):** Standard Node.js v18+ environment works out-of-the-box.
-3. **FFmpeg (For Recap Video & Motion Photos):**
-   - Required for video slideshow encoding and dual-video PIP overlays.
+3. **FFmpeg (For Recap Video & Apple Live Photos):**
+   - Required for video slideshow encoding, dual-video PIP overlays, and Apple Live Photo MOV creation.
    - **Windows:** `winget install Gyan.FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org/download.html).
    - **macOS:** `brew install ffmpeg`
    - **Linux:** `sudo apt install ffmpeg`
@@ -176,9 +195,9 @@ npm run tauri build
 ```
 
 ### Build Artifact Locations:
-- **Windows:** `src-tauri/target/release/bundle/nsis/BeReal Studio_2.3.2_x64-setup.exe` or `src-tauri/target/release/bereal-studio.exe`
-- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.3.2_aarch64.dmg` or `universal.dmg`
-- **Linux:** `src-tauri/target/release/bundle/deb/bereal-studio_2.3.2_amd64.deb` or `appimage/BeReal Studio_2.3.2_amd64.AppImage`
+- **Windows:** `src-tauri/target/release/bundle/nsis/BeReal Studio_2.6.0_x64-setup.exe` or `src-tauri/target/release/bereal-studio.exe`
+- **macOS:** `src-tauri/target/release/bundle/dmg/BeReal Studio_2.6.0_aarch64.dmg` or `src-tauri/target/release/bundle/macos/BeReal Studio.app`
+- **Linux:** `src-tauri/target/release/bundle/deb/BeReal Studio_2.6.0_amd64.deb` or `appimage/BeReal Studio_2.6.0_amd64.AppImage`
 
 ---
 
@@ -288,8 +307,8 @@ BeRealStudio/
   - Multi-dimensional search, hierarchical location drawers, and single-memory exports.
   - Smooth 1:1 pointer drag panning and zoom controls for high-res photo and video exploration.
   - Full Video BeReal support with synchronized dual-video playback and Side-by-Side MP4 combining.
-- [x] **🍏 Apple Photos Live Photos Compatibility** *(Completed in v2.2.1)*:
-  - Export paired still image (`.jpg`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier`) for native drag-and-drop Live Photo recognition in Apple Photos and iCloud.
+- [x] **🍏 Apple Photos Live Photos Compatibility**:
+  - Export paired still image (`.jpg`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier`). A packaged export imported as one Live Photo on macOS 26.
 - [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
   - Optional setting to burn original BeReal captions in authentic semi-transparent rounded pill styling directly onto composited images or recap slides.
 - [ ] **🎬 Recap Video Library & Gallery Viewer**:
@@ -305,7 +324,7 @@ It unifies, rewrites, and modernizes the core capabilities of three pioneer open
 
 - **[BeReel](https://github.com/theOneAndOnlyOne/BeReel)** *(by [@theOneAndOnlyOne](https://github.com/theOneAndOnlyOne))* — Creator of the music-synchronized BeReal recap video generator.
 - **[BeReal-GDPR-Photo-Toolkit](https://github.com/hatobi/bereal-gdpr-photo-toolkit)** *(by [@hatobi](https://github.com/hatobi))* — Pioneer of BeReal GDPR archive extraction, EXIF metadata restoration, and Picture-in-Picture photo compositing.
-- **[makelive (Make Live)](https://github.com/mifi/makelive)** *(by [@mifi](https://github.com/mifi))* — Pioneer of Apple Photos Live Photo generation, inspiring our native Rust binary muxing of paired still photos (`.jpg`) and Behind-the-Scenes micro-videos (`.mov`) with synchronized Apple Content Identifier UUIDs (`MakerApple:17` EXIF & `com.apple.quicktime.content.identifier` QuickTime metadata).
+- **[makelive (Make Live)](https://github.com/RhetTbull/makelive)** *(by [@RhetTbull](https://github.com/RhetTbull))* — Reference implementation for pairing still photos and videos using matching Apple content identifiers.
 
 ---
 

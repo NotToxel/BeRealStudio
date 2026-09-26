@@ -1,6 +1,6 @@
 {
   "name": "bereal-studio",
-  "version": "2.3.2",
+  "version": "2.6.0",
   "description": "Unified, local-first desktop application to restore, process, composite, and recap BeReal GDPR archives",
   "author": "NotToxel",
   "homepage": "https://github.com/NotToxel/BeRealStudio",
@@ -29,7 +29,8 @@
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-shell": "^2.3.5",
-    "@tauri-apps/plugin-store": "^2.4.4"
+    "@tauri-apps/plugin-store": "^2.4.4",
+    "maplibre-gl": "^6.11.2"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",

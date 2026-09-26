@@ -67,10 +67,10 @@
           class="core-nav-btn photos-btn"
           class:active={$currentView === 'toolkit-config'}
           on:click={() => navigate('toolkit-config')}
-          title="Photos Processing Suite"
+          title="Photos"
         >
           <Images size={15} />
-          <span class="core-btn-label">Photos<span class="core-btn-sub"> Suite</span></span>
+          <span class="core-btn-label">Photos</span>
         </button>
 
         <button
@@ -89,10 +89,10 @@
           class="core-nav-btn recap-btn"
           class:active={$currentView === 'recapper-config'}
           on:click={() => navigate('recapper-config')}
-          title="Recap Video Generator"
+          title="Recap"
         >
           <Film size={15} />
-          <span class="core-btn-label">Recap<span class="core-btn-sub"> Video</span></span>
+          <span class="core-btn-label">Recap</span>
         </button>
       </div>
     </div>
@@ -509,9 +509,6 @@
   }
 
   @media (max-width: 950px) {
-    .core-btn-sub {
-      display: none;
-    }
     .header-inner {
       padding: 6px 10px;
     }

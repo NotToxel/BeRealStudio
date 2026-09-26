@@ -765,11 +765,13 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
                 }
             }
         }
-        "apple_live_photo" | "live_photo" => {
+        "apple_live_photo" | "live_photo" | "apple_live_photo_pvt" => {
             let parent_dir = out_dest.parent().unwrap_or(Path::new("."));
             let file_stem = out_dest.file_stem().and_then(|s| s.to_str()).unwrap_or("bereal_live_photo");
-
-            let temp_composite = parent_dir.join(format!("{}_temp_export.jpg", file_stem));
+            let bts_path = opts.bts_path.as_deref().map(Path::new)
+                .filter(|path| path.is_file())
+                .ok_or_else(|| anyhow::anyhow!("Apple Live Photo export requires a BTS video clip."))?;
+            let temp_composite = parent_dir.join(format!(".{}_{}.jpg", file_stem, uuid::Uuid::new_v4()));
             if let Some(sec_str) = &opts.secondary_path {
                 let sec_path = Path::new(sec_str);
                 if sec_path.exists() {
@@ -783,10 +785,17 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
                 image_ops::convert_image(prim_path, &temp_composite, &OutputFormat::Jpeg, opts.quality)?;
             }
 
-            if let Some(bts_str) = &opts.bts_path {
-                let bts_path = Path::new(bts_str);
-                if bts_path.exists() {
-                    let (dest_jpg, dest_mov) = crate::pipeline::live_photo::create_apple_live_photo_pair(
+            let result = if opts.export_type == "apple_live_photo_pvt" {
+                crate::pipeline::live_photo::create_apple_live_photo_package(
+                    &temp_composite,
+                    bts_path,
+                    out_dest,
+                    &dt,
+                    location.as_ref(),
+                    opts.caption.as_deref(),
+                ).map(|package| package.display().to_string())
+            } else {
+                crate::pipeline::live_photo::create_apple_live_photo_pair(
                         &temp_composite,
                         bts_path,
                         parent_dir,
@@ -794,16 +803,10 @@ fn export_single_memory_inner(opts: ExportSinglePostOptions) -> Result<String> {
                         &dt,
                         location.as_ref(),
                         opts.caption.as_deref(),
-                    )?;
-                    let _ = std::fs::remove_file(&temp_composite);
-                    return Ok(format!("{} + {}", dest_jpg.display(), dest_mov.display()));
-                }
-            }
-
-            let _ = std::fs::rename(&temp_composite, out_dest);
-            if opts.embed_exif {
-                let _ = exif_writer::write_metadata(out_dest, &dt, location.as_ref(), opts.caption.as_deref());
-            }
+                ).map(|(jpg, mov)| format!("{} + {}", jpg.display(), mov.display()))
+            };
+            let _ = std::fs::remove_file(&temp_composite);
+            return result;
         }
         _ => {
             if let Some(sec_str) = &opts.secondary_path {

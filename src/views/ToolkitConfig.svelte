@@ -797,12 +797,20 @@
 
         <Toggle
           label="Apple Live Photos"
-          badge="BETA"
-          description="Exports paired .jpg + .mov files for native Apple Photos &amp; iCloud recognition"
-          tooltip="Embeds matching Apple Content Identifier UUIDs into the composite JPEG (MakerNote tag 17) and BTS MOV (QuickTime metadata) in the live_photos/ subfolder. Requires JPEG format."
+          description="Exports .jpg + .mov files with matching Apple metadata"
+          tooltip="Creates a JPEG and BTS MOV in live_photos/. For the tested Photos import path, also enable the .pvt package option. Requires JPEG output, a BTS clip, and FFmpeg."
           icon={Smartphone}
           disabled={$toolkitConfig.convertFormat !== 'Jpeg'}
           bind:checked={$toolkitConfig.createLivePhotos}
+          accentColor="rose"
+        />
+        <Toggle
+          label="Package Apple Live Photos (.pvt)"
+          description="Save each pair as a package for macOS Photos"
+          tooltip="Creates an uncompressed .pvt folder containing JPEG, MOV, and metadata.plist. ZIP it for transfer, extract it on Mac, then open the .pvt in Finder. To use it on iPhone, sync from Mac Photos with iCloud Photos or AirDrop the Live Photo from Mac Photos."
+          icon={Smartphone}
+          disabled={$toolkitConfig.convertFormat !== 'Jpeg' || !$toolkitConfig.createLivePhotos}
+          bind:checked={$toolkitConfig.packageLivePhotos}
           accentColor="rose"
         />
       </div>
@@ -1997,13 +2005,13 @@
   }
 
   .morph-stage.mode-pip .layer-secondary {
-    top: 14px;
-    left: 14px;
-    width: 30%;
-    aspect-ratio: 3 / 4;
-    border-radius: 12px;
-    border: 2.5px solid #000000;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+    top: 2.08333%;
+    left: 2.77778%;
+    width: 30.37037%;
+    aspect-ratio: 82 / 109;
+    border-radius: 10.06% / 7.57%;
+    border: 1px solid #000000;
+    box-shadow: none;
     z-index: 10;
     background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
   }

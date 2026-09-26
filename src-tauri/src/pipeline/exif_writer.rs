@@ -262,8 +262,11 @@ pub fn write_metadata_with_apple_id(
         .map(|e| e.eq_ignore_ascii_case("mp4") || e.eq_ignore_ascii_case("mov"))
         .unwrap_or(false);
 
-    if let Some(exiftool) = detect_exiftool() {
-        return write_metadata_exiftool(&exiftool, path, datetime, location, caption, is_video, apple_asset_id);
+    // ExifTool cannot create an Apple MakerNote in a normal JPEG.
+    if apple_asset_id.is_none() {
+        if let Some(exiftool) = detect_exiftool() {
+            return write_metadata_exiftool(&exiftool, path, datetime, location, caption, is_video, None);
+        }
     }
 
     if is_video {
@@ -278,7 +281,8 @@ pub fn write_metadata_with_apple_id(
         .with_context(|| "Not a valid JPEG file")?;
 
     // 1. Build and set EXIF APP1 (with Apple MakerNote if asset ID provided)
-    let exif_bytes = build_exif_bytes_with_apple_id(datetime, location, caption, apple_asset_id);
+    let dimensions = image::image_dimensions(path).ok();
+    let exif_bytes = build_exif_bytes_with_dimensions(datetime, location, caption, apple_asset_id, dimensions);
     jpeg.set_exif(Some(exif_bytes.into()));
 
     // 2. Build and inject IPTC APP13
@@ -444,6 +448,30 @@ impl ExifWriter {
         self.exif_entries.push(TiffEntry { tag, typ: 2, data });
     }
 
+    fn add_short_ifd0(&mut self, tag: u16, value: u16) {
+        self.ifd0_entries.push(TiffEntry { tag, typ: 3, data: value.to_le_bytes().to_vec() });
+    }
+
+    fn add_short_exif(&mut self, tag: u16, value: u16) {
+        self.exif_entries.push(TiffEntry { tag, typ: 3, data: value.to_le_bytes().to_vec() });
+    }
+
+    fn add_long_exif(&mut self, tag: u16, value: u32) {
+        self.exif_entries.push(TiffEntry { tag, typ: 4, data: value.to_le_bytes().to_vec() });
+    }
+
+    fn add_undefined_exif(&mut self, tag: u16, data: &[u8]) {
+        self.exif_entries.push(TiffEntry { tag, typ: 7, data: data.to_vec() });
+    }
+
+    fn add_resolution(&mut self) {
+        let dpi = [72u32.to_le_bytes(), 1u32.to_le_bytes()].concat();
+        self.ifd0_entries.push(TiffEntry { tag: 0x011A, typ: 5, data: dpi.clone() });
+        self.ifd0_entries.push(TiffEntry { tag: 0x011B, typ: 5, data: dpi });
+        self.add_short_ifd0(0x0128, 2);
+        self.add_short_ifd0(0x0213, 1);
+    }
+
     fn add_user_comment(&mut self, text: &str) {
         let mut data = Vec::with_capacity(8 + text.len());
         data.extend_from_slice(b"ASCII\0\0\0");
@@ -452,20 +480,21 @@ impl ExifWriter {
     }
 
     fn add_apple_maker_note(&mut self, asset_id: &str) {
-        // Apple MakerNote IFD embedding AssetIdentifier Tag 17 (0x0011)
-        let mut maker_note = Vec::new();
+        // Apple MakerNotes have a 14-byte header and a big-endian IFD.
+        // The IFD value offsets start at the beginning of this blob.
+        let mut maker_note = b"Apple iOS\0\0\x01MM".to_vec();
         let num_entries = 1u16;
-        maker_note.extend_from_slice(&num_entries.to_le_bytes());
+        maker_note.extend_from_slice(&num_entries.to_be_bytes());
 
         let tag = 0x0011u16; // 17: ContentIdentifier
         let typ = 2u16;      // ASCII
         let count = (asset_id.len() + 1) as u32;
-        let val_or_offset = 18u32; // 2 (count) + 12 (entry) + 4 (next IFD) = 18
-        maker_note.extend_from_slice(&tag.to_le_bytes());
-        maker_note.extend_from_slice(&typ.to_le_bytes());
-        maker_note.extend_from_slice(&count.to_le_bytes());
-        maker_note.extend_from_slice(&val_or_offset.to_le_bytes());
-        maker_note.extend_from_slice(&0u32.to_le_bytes()); // Next IFD = 0
+        let val_or_offset = 32u32; // 14-byte header + 2-byte count + 12-byte entry + 4-byte next IFD
+        maker_note.extend_from_slice(&tag.to_be_bytes());
+        maker_note.extend_from_slice(&typ.to_be_bytes());
+        maker_note.extend_from_slice(&count.to_be_bytes());
+        maker_note.extend_from_slice(&val_or_offset.to_be_bytes());
+        maker_note.extend_from_slice(&0u32.to_be_bytes()); // Next IFD = 0
         maker_note.extend_from_slice(asset_id.as_bytes());
         maker_note.push(0); // null-terminated
 
@@ -523,7 +552,7 @@ impl ExifWriter {
         let exif_sub_ifd_count = self.exif_entries.len() as u16;
         let exif_sub_ifd_size = 2 + (exif_sub_ifd_count as u32 * 12) + 4;
         let gps_ifd_offset = exif_sub_ifd_offset + exif_sub_ifd_size;
-        let gps_ifd_count = if has_gps { 4u16 } else { 0u16 };
+        let gps_ifd_count = if has_gps { 5u16 } else { 0u16 };
         let gps_ifd_size = if has_gps { 2 + (gps_ifd_count as u32 * 12) + 4 } else { 0u32 };
 
         let mut data_offset = if has_gps {
@@ -542,6 +571,7 @@ impl ExifWriter {
 
             let count = match typ {
                 2 | 7 => data.len() as u32,
+                3 => (data.len() / 2) as u32,
                 4 => (data.len() / 4) as u32,
                 5 => (data.len() / 8) as u32,
                 _ => data.len() as u32,
@@ -551,6 +581,11 @@ impl ExifWriter {
             if data.len() <= 4 {
                 entry[8..8 + data.len()].copy_from_slice(data);
             } else {
+                // TIFF values longer than four bytes must start at an even offset.
+                if data_offset % 2 != 0 {
+                    data_pool.push(0);
+                    data_offset += 1;
+                }
                 let offset = data_offset;
                 entry[8..12].copy_from_slice(&offset.to_le_bytes());
                 data_offset += data.len() as u32;
@@ -584,6 +619,7 @@ impl ExifWriter {
             (self.gps_lat, self.gps_lon)
         {
             buf.extend_from_slice(&gps_ifd_count.to_le_bytes());
+            buf.extend_from_slice(&encode_entry(0x0000, 1, &[2, 3, 0, 0])); // GPSVersionID
             // GPSLatitudeRef (0x0001)
             let lat_ref_bytes = [lat_ref as u8, 0];
             buf.extend_from_slice(&encode_entry(0x0001, 2, &lat_ref_bytes));
@@ -635,6 +671,16 @@ fn build_exif_bytes_with_apple_id(
     description: Option<&str>,
     apple_asset_id: Option<&str>,
 ) -> Vec<u8> {
+    build_exif_bytes_with_dimensions(datetime, location, description, apple_asset_id, None)
+}
+
+fn build_exif_bytes_with_dimensions(
+    datetime: &DateTime<Utc>,
+    location: Option<&Location>,
+    description: Option<&str>,
+    apple_asset_id: Option<&str>,
+    dimensions: Option<(u32, u32)>,
+) -> Vec<u8> {
     let mut writer = ExifWriter::new();
     let date_str = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
 
@@ -642,6 +688,15 @@ fn build_exif_bytes_with_apple_id(
     writer.add_ascii_ifd0(0x0132, &date_str); // DateTime
     writer.add_ascii_exif(0x9003, &date_str); // DateTimeOriginal
     writer.add_ascii_exif(0x9004, &date_str); // CreateDate
+    writer.add_resolution();
+    writer.add_undefined_exif(0x9000, b"0232"); // ExifVersion
+    writer.add_undefined_exif(0x9101, &[1, 2, 3, 0]); // ComponentsConfiguration
+    writer.add_undefined_exif(0xA000, b"0100"); // FlashpixVersion
+    writer.add_short_exif(0xA001, 1); // sRGB
+    if let Some((width, height)) = dimensions {
+        writer.add_long_exif(0xA002, width);
+        writer.add_long_exif(0xA003, height);
+    }
 
     // Captions & Descriptions
     if let Some(desc) = description {
@@ -665,9 +720,8 @@ fn build_exif_bytes_with_apple_id(
         }
     }
 
-    let mut payload = b"Exif\0\0".to_vec();
-    payload.extend(writer.build());
-    payload
+    // img-parts adds the APP1 "Exif\0\0" identifier in Jpeg::set_exif.
+    writer.build()
 }
 
 #[cfg(test)]
@@ -686,7 +740,7 @@ mod tests {
         let dt = Utc.with_ymd_and_hms(2024, 3, 15, 12, 0, 0).unwrap();
         let loc = Location { latitude: 48.8566, longitude: 2.3522 };
         let bytes = build_exif_bytes(&dt, Some(&loc), Some("Sunset in Paris"));
-        assert!(bytes.starts_with(b"Exif\0\0"));
+        assert!(bytes.starts_with(b"II*\0"));
         assert!(bytes.len() > 100);
     }
 
@@ -695,9 +749,34 @@ mod tests {
         let dt = Utc.with_ymd_and_hms(2024, 3, 15, 12, 0, 0).unwrap();
         let uuid_str = "C09DCB26-D321-4254-9F68-2E2E7FA16155";
         let bytes = build_exif_bytes_with_apple_id(&dt, None, None, Some(uuid_str));
-        assert!(bytes.starts_with(b"Exif\0\0"));
-        // Check that the UUID bytes exist inside the generated EXIF payload
-        let found = bytes.windows(uuid_str.len()).any(|w| w == uuid_str.as_bytes());
-        assert!(found, "UUID should be embedded in Apple MakerNote IFD");
+        assert!(bytes.starts_with(b"II*\0"));
+        let start = bytes.windows(10).position(|w| w == b"Apple iOS\0").unwrap();
+        let note = &bytes[start..];
+        assert_eq!(&note[10..14], b"\0\x01MM");
+        assert_eq!(&note[14..16], &1u16.to_be_bytes());
+        assert_eq!(&note[16..18], &0x0011u16.to_be_bytes());
+        assert_eq!(&note[18..20], &2u16.to_be_bytes());
+        let offset = u32::from_be_bytes(note[24..28].try_into().unwrap()) as usize;
+        assert_eq!(offset, 32);
+        assert_eq!(&note[offset..offset + uuid_str.len()], uuid_str.as_bytes());
+    }
+
+    #[test]
+    fn test_live_photo_jpeg_identifier_is_readable_by_exiftool() {
+        let Some(exiftool) = detect_exiftool() else { return };
+        let path = std::env::temp_dir().join(format!("bereal-live-{}.jpg", uuid::Uuid::new_v4()));
+        let image = image::RgbImage::new(2, 2);
+        image.save(&path).unwrap();
+        let dt = Utc.with_ymd_and_hms(2024, 3, 15, 12, 0, 0).unwrap();
+        let id = "C09DCB26-D321-4254-9F68-2E2E7FA16155";
+        write_metadata_with_apple_id(&path, &dt, None, None, Some(id)).unwrap();
+        let output = std::process::Command::new(exiftool)
+            .args(["-s3", "-MediaGroupUUID"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), id, "{}", path.display());
+        let _ = std::fs::remove_file(&path);
     }
 }
