@@ -151,12 +151,12 @@
     }
 
     try {
-      const ext = isVideo ? 'mp4' : (prefs as any).format?.toLowerCase() === 'png' ? 'png' : (prefs as any).format?.toLowerCase() === 'webp' ? 'webp' : 'jpg';
+      const ext = prefs.exportType === 'apple_live_photo_pvt' ? 'pvt' : isVideo ? 'mp4' : (prefs as any).format?.toLowerCase() === 'png' ? 'png' : (prefs as any).format?.toLowerCase() === 'webp' ? 'webp' : 'jpg';
       const defaultFilename = `${mem.takenAt.slice(0, 10)}_${prefs.exportType}.${ext}`;
 
       const savePath = await save({
         defaultPath: defaultFilename,
-        filters: isVideo ? [{ name: 'MP4 Video', extensions: ['mp4'] }] : [{ name: 'Image', extensions: [ext] }],
+        filters: isVideo ? [{ name: 'MP4 Video', extensions: ['mp4'] }] : [{ name: ext === 'pvt' ? 'Apple Live Photo package' : 'Image', extensions: [ext] }],
       });
 
       if (!savePath) return;

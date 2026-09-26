@@ -797,12 +797,20 @@
 
         <Toggle
           label="Apple Live Photos"
-          badge="BETA"
-          description="Exports paired .jpg + .mov files for native Apple Photos &amp; iCloud recognition"
-          tooltip="Embeds matching Apple Content Identifier UUIDs into the composite JPEG (MakerNote tag 17) and BTS MOV (QuickTime metadata) in the live_photos/ subfolder. Requires JPEG format."
+          description="Exports .jpg + .mov files with matching Apple metadata"
+          tooltip="Creates a JPEG and BTS MOV in live_photos/. For the tested Photos import path, also enable the .pvt package option. Requires JPEG output, a BTS clip, and FFmpeg."
           icon={Smartphone}
           disabled={$toolkitConfig.convertFormat !== 'Jpeg'}
           bind:checked={$toolkitConfig.createLivePhotos}
+          accentColor="rose"
+        />
+        <Toggle
+          label="Package Apple Live Photos (.pvt)"
+          description="Save each pair as a package for macOS Photos"
+          tooltip="Creates an uncompressed .pvt folder containing JPEG, MOV, and metadata.plist. ZIP it for transfer, extract it on Mac, then open the .pvt in Finder. To use it on iPhone, sync from Mac Photos with iCloud Photos or AirDrop the Live Photo from Mac Photos."
+          icon={Smartphone}
+          disabled={$toolkitConfig.convertFormat !== 'Jpeg' || !$toolkitConfig.createLivePhotos}
+          bind:checked={$toolkitConfig.packageLivePhotos}
           accentColor="rose"
         />
       </div>

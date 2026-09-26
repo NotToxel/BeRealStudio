@@ -29,6 +29,7 @@ export const defaultToolkitConfig: ToolkitConfig = {
   createReversed: false,
   createMotionPhotos: false,
   createLivePhotos: false,
+  packageLivePhotos: false,
   embedExif: true,
   keepOriginalFilename: false,
   cleanupIntermediates: true,

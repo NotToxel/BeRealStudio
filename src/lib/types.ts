@@ -61,6 +61,7 @@ export interface ToolkitConfig {
   createReversed: boolean;
   createMotionPhotos: boolean;
   createLivePhotos?: boolean;
+  packageLivePhotos?: boolean;
   embedExif: boolean;
   keepOriginalFilename: boolean;
   cleanupIntermediates: boolean;
@@ -336,7 +337,7 @@ export interface ExportSinglePostOptions {
   secondaryPath?: string;
   btsPath?: string;
   outputPath: string;
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo';
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo' | 'apple_live_photo_pvt';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;

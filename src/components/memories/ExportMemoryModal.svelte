@@ -23,15 +23,17 @@
   import Check from 'lucide-svelte/icons/check';
   import Loader2 from 'lucide-svelte/icons/loader-circle';
   import Lock from 'lucide-svelte/icons/lock';
+  import CircleHelp from 'lucide-svelte/icons/circle-help';
 
   let isExporting = false;
   let exportSuccess = false;
+  let exportError = '';
 
   $: state = $exportModalState;
   $: memory = state?.memory;
   $: isVideo = isMemoryVideo(memory);
 
-  type AnyExportType = 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo';
+  type AnyExportType = 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'bts_only' | 'motion_photo' | 'apple_live_photo' | 'apple_live_photo_pvt';
 
   let selectedType: AnyExportType = 'combined_pip';
   let selectedFormat: 'Jpeg' | 'Png' | 'WebP' = 'Jpeg';
@@ -60,16 +62,16 @@
     selectedType = 'primary_only';
   }
 
-  $: if (memory && isVideo && (selectedType === 'motion_photo' || selectedType === 'apple_live_photo')) {
+  $: if (memory && isVideo && (selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt')) {
     selectedType = 'combined_pip';
   }
 
-  $: if (memory && !memory.btsPath && (selectedType === 'bts_only' || selectedType === 'motion_photo' || selectedType === 'apple_live_photo')) {
+  $: if (memory && !memory.btsPath && (selectedType === 'bts_only' || selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt')) {
     selectedType = 'combined_pip';
   }
 
   // Force JPEG for motion photos and Apple Live Photos
-  $: if (selectedType === 'motion_photo' || selectedType === 'apple_live_photo') {
+  $: if (selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt') {
     if (selectedFormat !== 'Jpeg') {
       selectedFormat = 'Jpeg';
     }
@@ -81,6 +83,7 @@
     try {
       isExporting = true;
       exportSuccess = false;
+      exportError = '';
 
       // Save preference partitioned specifically by media kind
       if (selectedType === 'bts_only') {
@@ -107,11 +110,13 @@
 
       const datePrefix = memory.takenAt ? memory.takenAt.slice(0, 10) : 'bereal';
       const isVideoExport = isVideo || selectedType === 'bts_only';
-      const ext = isVideoExport ? 'mp4' : selectedFormat.toLowerCase() === 'png' ? 'png' : selectedFormat.toLowerCase() === 'webp' ? 'webp' : 'jpg';
+      const ext = selectedType === 'apple_live_photo_pvt' ? 'pvt' : isVideoExport ? 'mp4' : selectedFormat.toLowerCase() === 'png' ? 'png' : selectedFormat.toLowerCase() === 'webp' ? 'webp' : 'jpg';
       const defaultFilename = `${datePrefix}_${selectedType}.${ext}`;
 
       const filters = isVideoExport
         ? [{ name: 'MP4 Video', extensions: ['mp4'] }]
+        : selectedType === 'apple_live_photo_pvt'
+          ? [{ name: 'Apple Live Photo package (.pvt)', extensions: ['pvt'] }]
         : selectedType === 'apple_live_photo'
           ? [{ name: 'Apple Live Photo (.jpg + .mov)', extensions: ['jpg'] }]
           : [{ name: `${selectedFormat} Image`, extensions: [ext] }];
@@ -149,6 +154,7 @@
       }, 600);
     } catch (err) {
       console.error('Failed to export memory:', err);
+      exportError = `Export failed: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       isExporting = false;
     }
@@ -335,12 +341,45 @@
                 </div>
                 <div class="option-text">
                   <span class="option-name">Apple Live Photo (iOS)</span>
-                  <span class="option-desc">Paired .jpg + .mov Live Photo</span>
+                  <span class="option-desc">JPG + MOV with matching Apple metadata</span>
+                </div>
+              </label>
+
+              <label
+                class="format-option-card"
+                class:selected={selectedType === 'apple_live_photo_pvt'}
+              >
+                <input
+                  type="radio"
+                  name="exportType"
+                  value="apple_live_photo_pvt"
+                  bind:group={selectedType}
+                />
+                <div class="option-icon-box text-sky-400">
+                  <Sparkles size={18} />
+                </div>
+                <div class="option-text">
+                  <span class="option-name">Apple Live Photo package</span>
+                  <span class="option-desc">Transfer .pvt folder, then open on Mac</span>
                 </div>
               </label>
             {/if}
           {/if}
         </div>
+
+        {#if selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
+          <details class="apple-import-help">
+            <summary><CircleHelp size={14} /> How to import on Mac or iPhone</summary>
+            <div class="apple-import-steps">
+              {#if selectedType === 'apple_live_photo_pvt'}
+                <p><strong>Mac:</strong> If you transferred a ZIP, extract it. Double-click the .pvt folder in Finder, then check for one Live Photo in Photos.</p>
+              {:else}
+                <p><strong>Mac:</strong> Import the JPG and MOV together in Photos. For the tested transfer route, choose the .pvt package above.</p>
+              {/if}
+              <p><strong>iPhone:</strong> Sync the imported Live Photo from Mac Photos with iCloud Photos, or AirDrop it from Mac Photos.</p>
+            </div>
+          </details>
+        {/if}
 
         <!-- Format & Quality Section -->
         {#if isVideo || selectedType === 'bts_only'}
@@ -364,7 +403,7 @@
           <div class="format-quality-section">
             <div class="section-label-row">
               <span class="section-label">OUTPUT FORMAT &amp; QUALITY</span>
-              {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+              {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
                 <span class="format-req-badge">JPEG Required for Live Media</span>
               {/if}
             </div>
@@ -382,12 +421,12 @@
                 type="button"
                 class="format-pill-btn"
                 class:active={selectedFormat === 'WebP'}
-                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
-                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' ? 'WebP format is not supported for Live & Motion Photos (JPEG required)' : 'WebP image'}
+                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
+                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt' ? 'WebP format is not supported for Live & Motion Photos (JPEG required)' : 'WebP image'}
                 on:click={() => (selectedFormat = 'WebP')}
               >
                 <span>WEBP</span>
-                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
                   <Lock size={11} class="lock-icon" />
                 {/if}
               </button>
@@ -395,12 +434,12 @@
                 type="button"
                 class="format-pill-btn"
                 class:active={selectedFormat === 'Png'}
-                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
-                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' ? 'PNG format is not supported for Live & Motion Photos (JPEG required)' : 'Lossless PNG'}
+                disabled={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
+                title={selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt' ? 'PNG format is not supported for Live & Motion Photos (JPEG required)' : 'Lossless PNG'}
                 on:click={() => (selectedFormat = 'Png')}
               >
                 <span>PNG</span>
-                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo'}
+                {#if selectedType === 'motion_photo' || selectedType === 'apple_live_photo' || selectedType === 'apple_live_photo_pvt'}
                   <Lock size={11} class="lock-icon" />
                 {/if}
               </button>
@@ -464,6 +503,10 @@
           </label>
         </div>
       </div>
+
+      {#if exportError}
+        <div class="export-error" role="alert">{exportError}</div>
+      {/if}
 
       <!-- Footer Buttons -->
       <div class="modal-footer">
@@ -921,6 +964,56 @@
     padding: 14px 20px;
     background: #0d0d14;
     border-top: 1px solid var(--border-subtle);
+  }
+
+  .apple-import-help {
+    margin-top: -6px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .apple-import-help summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    color: #7dd3fc;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .apple-import-help summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .apple-import-help summary:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  .apple-import-steps {
+    display: grid;
+    gap: 5px;
+    margin-top: 8px;
+    max-width: 65ch;
+  }
+
+  .apple-import-steps strong {
+    color: var(--text-primary);
+  }
+
+  .export-error {
+    margin: 0 20px 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(244, 63, 94, 0.12);
+    color: #fecdd3;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .btn-cancel {

@@ -100,16 +100,24 @@ async function main() {
       errors += missingIcons;
     }
 
-    // README.md Version & Download links check
+    // Build paths describe this checkout; download links describe the latest published release.
     const readmePath = path.join(ROOT_DIR, 'README.md');
     if (fs.existsSync(readmePath)) {
       const readmeContent = fs.readFileSync(readmePath, 'utf8');
-      if (readmeContent.includes(`BeReal.Studio_${pkgVer}_x64-setup.exe`) &&
-          readmeContent.includes(`BeReal Studio_${pkgVer}_x64-setup.exe`)) {
-        success(`README.md download links and build artifact locations verified (v${pkgVer})`);
-      } else {
-        fail(`README.md contains outdated version references. Please update download links and build artifact paths to v${pkgVer}`);
-        errors++;
+      const buildPaths = [
+        `src-tauri/target/release/bundle/nsis/BeReal Studio_${pkgVer}_x64-setup.exe`,
+        `src-tauri/target/release/bundle/dmg/BeReal Studio_${pkgVer}_aarch64.dmg`,
+        `src-tauri/target/release/bundle/deb/BeReal Studio_${pkgVer}_amd64.deb`,
+        `appimage/BeReal Studio_${pkgVer}_amd64.AppImage`
+      ];
+      for (const buildPath of buildPaths) {
+        if (!readmeContent.includes(buildPath)) {
+          fail(`README.md is missing the current build artifact path: ${buildPath}`);
+          errors++;
+        }
+      }
+      if (buildPaths.every((buildPath) => readmeContent.includes(buildPath))) {
+        success(`README.md build artifact locations verified (v${pkgVer})`);
       }
     }
   } catch (err) {

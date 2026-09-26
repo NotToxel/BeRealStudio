@@ -544,7 +544,7 @@ export function closeContextMenu() {
 
 // ─── Partitioned Export Preferences (Photos, Videos, BTS) ─────────────────────
 export interface PhotoExportPreferences {
-  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'motion_photo' | 'apple_live_photo';
+  exportType: 'combined_pip' | 'combined_sidebyside' | 'primary_only' | 'secondary_only' | 'motion_photo' | 'apple_live_photo' | 'apple_live_photo_pvt';
   format: 'Jpeg' | 'WebP' | 'Png';
   quality: number;
   embedExif: boolean;
