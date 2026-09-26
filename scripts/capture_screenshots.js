@@ -19,6 +19,7 @@ const SCREENSHOT_DIR = path.resolve(ROOT_DIR, 'docs', 'screenshots');
 const VIEWS = [
   { name: '01_home_dashboard.png', view: 'home', label: 'Home Dashboard' },
   { name: '02_memories_explorer.png', view: 'memories', label: 'Native Memories Explorer' },
+  { name: '10_memories_calendar.png', view: 'memories', label: 'Memories Calendar', tab: 'Calendar' },
   { name: '03_photo_toolkit_config.png', view: 'toolkit-config', label: 'Photo Processing Suite' },
   { name: '04_recap_video_config.png', view: 'recapper-config', label: 'Recap Video Generator' },
   { name: '05_activity_history.png', view: 'activity', label: 'Active Tasks & Generation History' },
@@ -59,10 +60,10 @@ async function main() {
   }
 
   let serverProcess = null;
-  const baseUrl = 'http://localhost:1420';
+  const baseUrl = process.env.SCREENSHOT_BASE_URL || 'http://localhost:1420';
 
   if (!(await isServerRunning(baseUrl))) {
-    console.log('⚡ Starting local Vite dev server on port 1420...');
+    console.log(`⚡ Starting local Vite dev server for ${baseUrl}...`);
     const isWindows = process.platform === 'win32';
     const bunCmd = isWindows ? 'bun.cmd' : 'bun';
     serverProcess = spawn(bunCmd, ['run', 'dev'], {
@@ -76,7 +77,7 @@ async function main() {
       await new Promise((r) => setTimeout(r, 1000));
       attempts++;
       if (await isServerRunning(baseUrl)) {
-        console.log('✅ Local dev server ready on http://localhost:1420\n');
+        console.log(`✅ Local dev server ready on ${baseUrl}\n`);
         break;
       }
     }
@@ -99,24 +100,47 @@ async function main() {
   const page = await browser.newPage();
   page.on('console', (msg) => console.log('   [PAGE LOG]:', msg.text()));
   page.on('pageerror', (err) => console.log('   [PAGE ERROR]:', err.message));
+  let captured = 0;
 
   for (let i = 0; i < VIEWS.length; i++) {
     const item = VIEWS[i];
     const outPath = path.resolve(SCREENSHOT_DIR, item.name);
-    const targetUrl = `http://localhost:1420?demo=1&view=${item.view}`;
+    const targetUrl = `${baseUrl}?demo=1&view=${item.view}`;
 
     console.log(`[${i + 1}/${VIEWS.length}] Capturing ${item.label} (${item.name})...`);
 
     try {
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 20000 });
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // Wait for app header and view transition to complete
-      await page.waitForSelector('.app-header', { timeout: 8000 });
-      await new Promise((res) => setTimeout(res, 1800));
+      try {
+        await page.waitForSelector('.app-header', { timeout: 15000 });
+      } catch {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForSelector('.app-header', { timeout: 15000 });
+      }
+      if (item.tab) {
+        await page.waitForSelector('.segment-btn', { timeout: 8000 });
+        const clicked = await page.evaluate((tab) => {
+          const button = [...document.querySelectorAll('button.segment-btn')].find((element) => element.textContent?.trim() === tab);
+          button?.click();
+          return Boolean(button);
+        }, item.tab);
+        if (!clicked) throw new Error(`Could not find ${item.tab} tab`);
+        await page.waitForSelector('.explorer-view-stage.is-active .day-cell.has-memory', { timeout: 8000 });
+      }
+      await page.waitForFunction(() => [...document.images]
+        .filter((img) => img.getBoundingClientRect().width > 0)
+        .every((img) => img.complete && img.naturalWidth > 0), { timeout: 15000 }).catch(() => {});
+      if (item.tab === 'Calendar') {
+        await page.evaluate(() => document.getElementById('calendar-day-2024-08-22')?.scrollIntoView({ block: 'center' }));
+      }
+      await new Promise((res) => setTimeout(res, 1200));
 
       await page.screenshot({ path: outPath, type: 'png' });
 
       const stats = fs.statSync(outPath);
+      captured++;
       console.log(`   ✅ Successfully saved: ${item.name} (${(stats.size / 1024).toFixed(1)} KB)`);
     } catch (e) {
       console.warn(`   ⚠️ Warning: Could not capture ${item.name}:`, e.message);
@@ -134,7 +158,8 @@ async function main() {
     }
   }
 
+  if (captured !== VIEWS.length) throw new Error(`Captured ${captured} of ${VIEWS.length} showcase screenshots.`);
   console.log(`\n🎉 All ${VIEWS.length} showcase screenshots successfully captured into docs/screenshots/!\n`);
 }
 
-main().catch(console.error);
+main().catch((error) => { console.error(error); process.exitCode = 1; });

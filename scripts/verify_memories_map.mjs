@@ -14,7 +14,7 @@ const browser = await puppeteer.launch({ executablePath: browserPath, headless: 
 try {
   const baseUrl = process.env.MAP_VERIFY_BASE_URL || 'http://127.0.0.1:1420';
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 850, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 1280, height: 840, deviceScaleFactor: 2 });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -27,7 +27,12 @@ try {
     return Boolean(button);
   });
   if (!clickedMap) throw new Error('Map tab was not found.');
-  await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+  try {
+    await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+  } catch (error) {
+    const pageText = await page.evaluate(() => document.body.innerText.slice(0, 1500));
+    throw new Error(`Map canvas did not appear: ${JSON.stringify({ errors, pageText })}`, { cause: error });
+  }
   await new Promise((resolve) => setTimeout(resolve, 1800));
   const result = await page.evaluate(() => ({
     mapped: document.querySelector('.map-topline')?.textContent?.trim(),
@@ -121,7 +126,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 130));
     wheelSamples.push(await page.evaluate(() => ({ pins: document.querySelectorAll('.memory-map-pin').length, clusters: document.querySelectorAll('.memory-map-cluster').length })));
   }
-  if (!wheelSamples.some((sample) => sample.pins === 0)) throw new Error(`Photo pins did not combine while scrolling: ${JSON.stringify(wheelSamples)}`);
+  if (!wheelSamples.every((sample) => sample.clusters >= 1)) throw new Error(`Photo cluster disappeared while scrolling: ${JSON.stringify(wheelSamples)}`);
   await page.goto(`${baseUrl}/?demo=1&view=memories`, { waitUntil: 'networkidle2' });
   await page.evaluate(() => [...document.querySelectorAll('button.segment-btn')].find((element) => element.textContent?.trim() === 'Map')?.click());
   await page.waitForSelector('.maplibregl-canvas');
@@ -131,10 +136,12 @@ try {
       if (!data) return data;
       const london = data.memories.find((memory) => memory.city === 'London');
       const dense = Array.from({ length: 120 }, (_, index) => ({
-        ...london, id: `dense-${index}`, suburb: 'Shoreditch',
+        ...data.memories[index % data.memories.length], id: `dense-${index}`,
+        city: 'London', country: 'United Kingdom', suburb: 'Shoreditch',
+        locationName: 'Shoreditch, London, United Kingdom',
         location: { ...london.location },
         takenAt: new Date(Date.UTC(2024, 0, 1 + index)).toISOString(),
-        dateFormatted: `Dense ${index + 1}`,
+        dateFormatted: new Date(Date.UTC(2024, 0, 1 + index)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       }));
       return { ...data, memories: [...data.memories, ...dense], totalCount: data.memories.length + dense.length };
     });

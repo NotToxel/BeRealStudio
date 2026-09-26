@@ -2,7 +2,7 @@
 
 <div align="center">
   <h3>Unified, Local-First Desktop Suite for BeReal GDPR Data Exports</h3>
-  <p>Explore your memories in an authentic mobile feed & calendar, restore metadata, composite dual-camera memories, mux motion photos, and generate music-synchronized recap videos — 100% locally and privately.</p>
+  <p>Explore your memories in a feed, calendar, and map; restore and export photos; and create music-synchronized recap videos on your own computer.</p>
   <p>
     <a href="https://github.com/NotToxel/BeRealStudio/releases/latest"><img src="https://img.shields.io/github/v/release/NotToxel/BeRealStudio?label=Latest%20Release&logo=github&color=blue" alt="Latest Release" /></a>
     <a href="https://github.com/NotToxel/BeRealStudio/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/NotToxel/BeRealStudio/release.yml?label=Release%20Build&logo=github" alt="Release Build Status" /></a>
@@ -50,82 +50,61 @@ BeReal Studio is engineered with native Rust algorithms to minimize dependencies
 
 ## 🖼️ Application Showcase
 
-<div align="center">
-
-| 🏠 Home Dashboard & Archive Scanner | 📱 Native Memories & Calendar Explorer |
+| 🏠 Home | 📱 Memories |
 |:---:|:---:|
 | ![Home Dashboard](docs/screenshots/01_home_dashboard.png) | ![Memories Explorer](docs/screenshots/02_memories_explorer.png) |
 
-| 📸 Photo Processing Suite & Dual Perspectives | 🎬 Recap Video Generator & Audio Waveforms |
+| 📅 Memories calendar | 🗺️ Map overview |
+|:---:|:---:|
+| ![Memories Calendar](docs/screenshots/10_memories_calendar.png) | ![Offline Memories map](docs/screenshots/06_memories_map.png) |
+
+| 📍 Photo pins on the map | 🖼️ Gallery for a busy place |
+|:---:|:---:|
+| ![Memories map with photo pins](docs/screenshots/07_memories_map_detail.png) | ![Map gallery for a busy location](docs/screenshots/08_memories_map_dense_gallery.png) |
+
+![Memories map density](docs/screenshots/09_memories_map_density.png)
+
+| 📸 Photo processing | 🎬 Recap videos |
 |:---:|:---:|
 | ![Photo Processing](docs/screenshots/03_photo_toolkit_config.png) | ![Recap Video Generator](docs/screenshots/04_recap_video_config.png) |
 
-| ⚡ Active Operations & Generation History Queue |
-|:---:|
-| ![Activity History](docs/screenshots/05_activity_history.png) |
-
-</div>
+![Activity history and active jobs](docs/screenshots/05_activity_history.png)
 
 ---
 
 ## ✨ Key Features
 
-### 📱 1. Native Memories, Calendar & Map Explorer
-- **Authentic BeReal Experience**: Mobile-identical dark aesthetic designed to browse your entire GDPR archive seamlessly.
-- **Three View Modes**: Switch between a responsive **Memories Card Grid**, an interactive **Monthly Calendar Matrix**, and a location **Map**.
-- **Memories Map**: Explore geotagged posts on a dark map with dual-camera photo pins, proximity clusters, broad-area density, and a results panel that follows the visible area. Places drills from country to city to suburb using the explorer filters. Select a crowded location to browse all its photos in a gallery and open any memory in the feed. The included Natural Earth world overview works offline.
-- **Continuous Vertical Infinite Feed**: Tap any post to open a smooth, continuous vertical feed with instant auto-scroll to the selected memory.
-- **Dynamic Sticky Header**: Tracks active post date and position (e.g. `18 August 2024 • 14 of 420`) as you scroll.
-- **Interactive Dual-Camera Frame**:
-  - **Click-to-Swap**: Flip front and back cameras instantly.
-  - **Movable PIP**: Drag and reposition the selfie PIP anywhere or snap to the 4 corners.
-  - **Inline BTS Player**: Stream Behind-the-Scenes live video micro-clips with a single click.
-- **Smart Search & Live Compound Filtering**:
-  - Filter posts by text query, GPS location, BTS clips, captions, retakes, year, month, city, and country.
-  - Live dynamic count tags on all filter chips and dimension selectors update continuously as multi-level filters are applied.
-- **Single-Memory Instant Export Dialog**:
-  - **Picture-in-Picture & Side-by-Side**: High-resolution dual-camera composites with lossless EXIF restoration.
-  - **Apple Live Photo (.jpg + .mov pair)**: Generates matching identifiers in the JPEG MakerNote and QuickTime MOV. A Windows-generated `.pvt` package was verified to import as one Live Photo on macOS 26.
-  - **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos directly into JPEG headers via Samsung SEFH binary trailers and Google MicroVideo XMP.
-  - **Raw Media Clips & Camera Isolations**: Export primary camera, selfie camera, or raw MP4 video clips independently.
-- **Configurable Header Display**: Customize location formatting (City/Country, Suburb, Full) and timestamp/late tag display in Settings.
+### 📱 Memories Explorer
 
-#### Importing an Apple Live Photo
-
-The exporter writes a shared asset identifier to the JPEG MakerNote and movie-level QuickTime metadata. A Windows-generated `.pvt` package passed [makelive](https://github.com/RhetTbull/makelive)'s native check and imported into macOS 26 Photos as one Live Photo.
-
-1. Export **Apple Live Photo package (.pvt)**. It is an uncompressed directory containing a same-named `.jpg` and `.mov` plus `metadata.plist`. ZIP the directory for transfer, then extract it on the Mac. A ZIP renamed to `.pvt` is not a package.
-2. Double-click the extracted `.pvt` in Finder. Photos should import one asset with the **Live** badge; confirm the motion plays. For a diagnostic check, run `makelive --check memory.jpg memory.mov` against the files inside the package. It should report the shared asset ID.
-3. To get the Live Photo on iPhone, enable iCloud Photos on the Mac and iPhone with the same Apple Account, or AirDrop the imported Live Photo from **Mac Photos** to the iPhone. Transfer the Photos asset rather than its raw JPG/MOV files or ZIP.
-
-Batch exports are in `live_photos/`. Let iCloud Photos sync the imported asset to the iPhone, or share the asset from Photos using AirDrop. Sending raw files separately to an iPhone does not import them as one Live Photo. Export requires FFmpeg and a source BTS clip. This exporter does not yet write a QuickTime `still-image-time` timed metadata track, so key-frame behavior may differ from an iPhone capture. Live wallpaper eligibility is separate from Live Photo pairing.
-
-An `.xmp` sidecar is for IPTC details such as captions and keywords when Photos exports an unmodified original. It is not the Live Photo pairing identifier. The Google/Samsung Motion Photo XMP embedded in a JPEG is a different format and does not make an Apple Live Photo.
-
-#### Detailed map tiles
-
-Open **Memories → Map → Offline map**, paste your MapTiler API key, and choose **Use detailed map**. The key is saved only in this app's local storage. Street detail and place labels need an internet connection; the world outline, pins, clustering, filters, and place list work without one. MapTiler receives tile requests for the area you view and your IP address, while BeReal photos and pin coordinates remain on your device. You can switch back to the offline map from the same control.
+- Browse your archive as photo cards, a monthly calendar, or a continuous feed.
+- Swap the two cameras, move the selfie inset, and play behind-the-scenes clips.
+- Search by caption, date, or place; filter by media type and location.
+- Save one memory as a combined photo or video, an individual camera view, or a motion photo.
 
 ---
 
-### 📸 2. Photo Processing Suite
-- **Metadata Restoration & EXIF Synchronization**: Losslessly embeds original capture dates, times, GPS coordinates, and caption descriptions into EXIF/IPTC photo headers.
-- **BeReal Moment Registry & True Cycle Date Anchoring**: Accurately anchors posts taken late or past midnight to their true BeReal notification cycle dates.
-- **Dual-Camera Compositing**: Recreates BeReal's signature aesthetic with rounded corners and clean borders in Picture-in-Picture and Side-by-Side layouts.
-- **Dual-Angle Perspective Export**: Choose between **Standard** (primary background), **Reversed** (selfie background), or export **Both Angles** concurrently.
-- **Samsung & Google Motion Photos**: Muxes Behind-the-Scenes (BTS) videos into motion photos compatible with Samsung Gallery and Google Photos *(requires JPEG format)*.
-- **Visual Timeline & Date Range Filter**: Interactive monthly activity density curve and calendar picker to easily filter memories by year, month, or custom dates.
-- **Fast Batch Processing**: Multi-threaded Rayon pipeline processes hundreds of archive photos in seconds.
+### 🗺️ Map Viewer
+
+- See memories with saved locations as photo pins, nearby groups, and a density view. Open a place to browse its photos.
+- Start from a location label on a memory to jump to its spot on the map.
+- The world map works offline. Detailed street tiles are optional with your own MapTiler key; MapTiler receives the viewed area and your IP address, while your photos stay on your device.
 
 ---
 
-### 🎬 3. Recap Video Generator
-- **Music-Synchronized Recap Slideshows**: Automatically paces memories to your chosen soundtrack (MP3, WAV, M4A, AAC, FLAC) with real-time waveform visualization.
-- **Dynamic Timing Curves**: Customize video pacing with quadratic ramp, even timing, accelerate, decelerate, or wave timing curves.
-- **Smart Location & Date Stamps**: Formats reverse-geocoded location stamps and custom date typography on each memory slide.
-- **Offline Spatial Reverse Geocoder**: Built-in in-memory GeoNames spatial index for instant, offline city/country resolution with zero network pauses.
-- **Live Video Preview**: Interactive player to preview your recap sequence before rendering.
-- **Background Multi-Job Queue**: Render videos and process photo batches simultaneously in the background without UI interruption.
+### 📸 Photo Processing Suite
+
+- Restore capture dates, locations, and captions; keep late posts with their correct BeReal day.
+- Export both cameras in picture-in-picture or side-by-side layouts, with the main or selfie camera as the background.
+- Make Samsung or Google motion photos, or Apple Live Photo packages for Mac Photos. Live Photo export needs a behind-the-scenes clip and FFmpeg; see the [Mac import guide](docs/releases/v2.6.0.md#apple-live-photos-for-mac-photos).
+- Choose a date range and process a batch of photos together.
+
+---
+
+### 🎬 Recap Video Generator
+
+- Turn selected memories into a video paced to your music, with adjustable timing and a waveform preview.
+- Add dates and locations to slides and preview the sequence before rendering.
+- Keep photo batches and video renders running in the background.
 
 ---
 
@@ -293,7 +272,7 @@ BeRealStudio/
 │           ├── font_resolver.rs            # Built-in font resolver & disk loader
 │           ├── frame_renderer.rs           # Image resize & text overlay with shadows
 │           └── video_encoder.rs            # Zero-copy raw RGB frame piping to FFmpeg stdin
-├── package.json                            # App manifest & dependencies (v2.3.0)
+├── package.json                            # App manifest & dependencies (v2.6.0)
 └── README.md                               # User documentation & GDPR guide
 ```
 
@@ -309,8 +288,6 @@ BeRealStudio/
   - Full Video BeReal support with synchronized dual-video playback and Side-by-Side MP4 combining.
 - [x] **🍏 Apple Photos Live Photos Compatibility**:
   - Export paired still image (`.jpg`) and video (`.mov`) files with matching Apple Content Identifier UUID (`MakerApple:17` and `com.apple.quicktime.content.identifier`). A packaged export imported as one Live Photo on macOS 26.
-- [ ] **🏷️ Direct Caption Burn-In on Exported Photos**:
-  - Optional setting to burn original BeReal captions in authentic semi-transparent rounded pill styling directly onto composited images or recap slides.
 - [ ] **🎬 Recap Video Library & Gallery Viewer**:
   - In-app gallery indexing all rendered recap MP4s with playback preview, waveform scrubber, and quick actions ("Open in Player", "Show in Explorer").
 
@@ -330,6 +307,8 @@ It unifies, rewrites, and modernizes the core capabilities of three pioneer open
 
 ## 📜 License
 
-GNU General Public License v3.0 or later (GPL-3.0-or-later) &copy; 2026 NotToxel and BeReal Studio Contributors.
+Copyright &copy; 2026 **NotToxel**.
 
-BeReal Studio is free and open-source software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+BeReal Studio is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later). See the [full license](LICENSE).
+
+You can use, share, and modify the app under that license.
